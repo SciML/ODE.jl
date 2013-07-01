@@ -1,9 +1,5 @@
-require("../src/ODE.jl")
-require("DETEST.jl")
-#require("src/nearequal.jl")
-
 using ODE
-using DETEST
+using TestProblems
 using FactCheck
 
 abstol = 1e-6
@@ -13,13 +9,16 @@ reltol = 1e-6
 
 #println("Running tests for package ODE")
 
-solvers = [ode4]
-problem = single_equations[1]
+problem_set = [
+    TestProblems.ODETest(TestProblems.A1, ode45, 1e-6, 1e-6)
+]
 
-@facts "ode45" begin
+@facts begin
 
-    tout,yout = ode45(problem.f, problem.tspan, problem.y0)
-    soly = reshape(map(problem.sol,tout),size(yout))
+    for problem in problem_set
+        tout, yout = problem.solver(problem.ivp.f, problem.ivp.tspan, problem.ivp.y0)
+        soly = reshape(map(problem.ivp.sol,tout),size(yout))
 
-    @fact yout => roughly(soly, reltol)
+        @fact yout => roughly(soly, reltol)
+    end
 end
