@@ -491,4 +491,6 @@ function ode4ms{T<:Number}(F::Function, tspan::AbstractVector, x0::AbstractVecto
     return ode_ms(F, tspan, x0, 4)
 end
 
+include("ODEObj.jl")
+
 end # module ODE
