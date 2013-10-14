@@ -183,7 +183,7 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
     tol = 1.0e-5
     
     # see p.91 in the Ascher & Petzold reference for more infomation.
-    pow = 1/6; 
+    pow = 1/5
 
     c = sum(a, 2)
 
