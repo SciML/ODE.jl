@@ -44,12 +44,7 @@ export ode23, ode4, ode45, ode4s, ode4ms
 # Adapted from Cleve Moler's textbook
 # http://www.mathworks.com/moler/ncm/ode23tx.m
 
-function ode23(F::Function, tspan::AbstractVector, y_0::Number; rtol=1e-5, atol=1e-8, vecnorm=norm)
-    tout, yout = ode23(F, tspan, [y_0]; rtol=rtol, atol=atol, vecnorm=vecnorm)
-    return tout, yout[:,1]
-end # ode23
-
-function ode23{T<:Number}(F::Function, tspan::AbstractVector, y_0::AbstractVector{T}; rtol=1e-5, atol=1e-8, vecnorm=norm)
+function ode23(F, tspan, y_0; rtol=1e-5, atol=1e-8, vecnorm=norm)
     t0 = tspan[1]
     tfinal = tspan[end]
     tdir = sign(tfinal - t0)
@@ -181,13 +176,8 @@ end # ode23
 # created : 06 October 1999
 # modified: 17 January 2001
 
-function oderkf(F::Function, tspan::AbstractVector, x0::Number; tol=1e-5, vecnorm=norm)
-    tout, yout = oderkf(F, tspan, [x0]; tol=tol, vecnorm=vecnorm)
-    return tout, yout[1,:]
-end
 
-
-function oderkf{T<:Number}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a, b4, b5; tol=1.0e-5, vecnorm=norm)
+function oderkf(F, tspan, x0, a, b4, b5; tol=1.0e-5, norm=Base.norm)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/6; 
 
@@ -237,7 +227,7 @@ function oderkf{T<:Number}(F::Function, tspan::AbstractVector, x0::AbstractVecto
         gamma1 = x5 - x4
                 
         # Estimate the error and the acceptable error
-        delta = vecnorm(gamma1, Inf)       # actual error
+        delta = norm(gamma1, Inf)       # actual error
         tau = tol*max(norm(x,Inf), 1.0) # allowable error
         
         # Update the solution only if the error is acceptable
@@ -280,7 +270,7 @@ const dp_coefficients = ([    0           0          0         0         0      
                          # 5th order b-coefficients
                          [35/384 0 500/1113 125/192 -2187/6784 11/84 0],
                          )
-ode45_dp(F, tspan, x0; tol=1.0e-5, vecnorm=norm) = oderkf(F, tspan, x0, dp_coefficients...; tol=1.0e-5, vecnorm=norm)
+ode45_dp(F, tspan, x0; tol=1.0e-5, norm=Base.norm) = oderkf(F, tspan, x0, dp_coefficients...; tol=1.0e-5, norm=norm)
 
 # Fehlberg coefficients
 const fb_coefficients = ([    0         0          0         0        0
@@ -294,7 +284,7 @@ const fb_coefficients = ([    0         0          0         0        0
                          # 5th order b-coefficients
                          [16/135 0 6656/12825 28561/56430 -9/50 2/55],
                          )
-ode45_fb(F, tspan, x0; tol=1.0e-5, vecnorm=norm) = oderkf(F, tspan, x0, fb_coefficients...; tol=1.0e-5, vecnorm=norm)
+ode45_fb(F, tspan, x0; tol=1.0e-5, norm=Base.norm) = oderkf(F, tspan, x0, fb_coefficients...; tol=1.0e-5, norm=norm)
 
 # Cash-Karp coefficients
 # Numerical Recipes in Fortran 77
@@ -309,15 +299,11 @@ const ck_coefficients = ([   0         0       0           0          0
                          # 5th order b-coefficients
                          [2825/27648 0 18575/48384 13525/55296 277/14336 1/4],
                          )
-ode45_ck(F, tspan, x0; tol=1.0e-5, vecnorm=norm) = oderkf(F, tspan, x0, ck_coefficients...; tol=1.0e-5, vecnorm=norm)
+ode45_ck(F, tspan, x0; tol=1.0e-5, norm=Base.norm) = oderkf(F, tspan, x0, ck_coefficients...; tol=1.0e-5, norm=norm)
 
 # Use Dormand Prince version of ode45 by default
-function ode45(F::Function, tspan::AbstractVector, x0::Number; tol=1e-5, vecnorm=norm)
-    return ode45_dp(F, tspan, x0; tol=tol, vecnorm=vecnorm)
-end
-
-function ode45{T<:Number}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}; tol=1e-5, vecnorm=norm)
-    return ode45_dp(F, tspan, x0; tol=tol, vecnorm=vecnorm)
+function ode45(F, tspan, x0; tol=1e-5, norm=Base.norm)
+    return ode45_dp(F, tspan, x0; tol=tol, norm=norm)
 end
 
 #ODE4    Solve non-stiff differential equations, fourth order
@@ -366,7 +352,7 @@ function oderosenbrock{T<:Number}(F::Function, G::Function, tspan::AbstractVecto
     x[1,:] = x0'
 
     solstep = 1
-    while tspan[solstep] < max(tspan)
+    while tspan[solstep] < maximum(tspan)
         ts = tspan[solstep]
         hs = h[solstep]
         xs = reshape(x[solstep,:], size(x0))
