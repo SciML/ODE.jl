@@ -33,8 +33,14 @@ for solver in solvers
     # dt
     t,y=solver((t,y)->y, [0:.001:1], [1.])
     @test maximum(abs(y-e.^t)) < tol
+
+    # dv       dw
+    # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
+    # dt       dt
+    #
+    # y = [v, w]
+    t,y=solver((t,y)->[-y[2], y[1]], [0:.001:2*pi], [1., 2.])
+    @test maximum(abs(y-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
 end
-
-
 
 println("All looks OK")
