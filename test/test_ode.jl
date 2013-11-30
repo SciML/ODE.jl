@@ -1,5 +1,5 @@
 using ODE
-using Test
+using Base.Test
 
 tol = 1e-2
 
@@ -20,19 +20,19 @@ for solver in solvers
     # -- = 6 ==> y = 6t
     # dt
     t,y=solver((t,y)->6, [0:.1:1], [0.])
-    @test max(abs(y-6t)) < tol
+    @test maximum(abs(y-6t)) < tol
 
     # dy
     # -- = 2t ==> y = t.^2
     # dt
     t,y=solver((t,y)->2t, [0:.001:1], [0.])
-    @test max(abs(y-t.^2)) < tol
+    @test maximum(abs(y-t.^2)) < tol
     
     # dy
     # -- = y ==> y = y0*e.^t
     # dt
     t,y=solver((t,y)->y, [0:.001:1], [1.])
-    @test max(abs(y-e.^t)) < tol
+    @test maximum(abs(y-e.^t)) < tol
 end
 
 
