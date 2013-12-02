@@ -34,5 +34,4 @@ The code carries the following notice:
 ode4, ode4s, ode4ms
 ===================
 
-These are implemented by Jameson Nash, and available under the MIT License.
-
+These are implemented by Patrick O'Leary, and available under the MIT License.
