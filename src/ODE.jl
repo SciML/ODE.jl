@@ -5,13 +5,15 @@ module ODE
 using Polynomial
 
 ## minimal function export list
-export ode23, ode4, ode45, ode4s, ode4ms
+export ode23, ode4, ode45, ode4s, ode4ms, verlet
 
 ## complete function export list
 #export ode23, ode4,
 #    oderkf, ode45, ode45_dp, ode45_fb, ode45_ck,
 #    oderosenbrock, ode4s, ode4s_kr, ode4s_s,
 #    ode4ms, ode_ms
+
+include("symplectic.jl")
 
 
 #ODE23  Solve non-stiff differential equations.
