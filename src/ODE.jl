@@ -43,11 +43,9 @@ export ode23, ode4, ode45, ode4s, ode4ms
 # Initialize variables.
 # Adapted from Cleve Moler's textbook
 # http://www.mathworks.com/moler/ncm/ode23tx.m
-function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T})
+function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T}; reltol = 1.e-5, abstol = 1.e-8)
 
-    rtol = 1.e-5
-    atol = 1.e-8
-    threshold = atol / rtol
+    threshold = abstol / reltol
 
     t = tspan[1]
     tfinal = tspan[end]
@@ -64,7 +62,7 @@ function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T})
 
     s1 = F(t, y)
     r = norm(s1./max(abs(y), threshold), Inf) + realmin() # TODO: fix type bug in max()
-    h = tdir*0.8*rtol^(1/3)/r
+    h = tdir*0.8*reltol^(1/3)/r
 
     # The main loop.
 
@@ -95,7 +93,7 @@ function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T})
 
         # Accept the solution if the estimated error is less than the tolerance.
 
-        if err <= rtol
+        if err <= reltol
             t = tnew
             y = ynew
             tout = [tout; t]
@@ -105,7 +103,7 @@ function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T})
 
         # Compute a new step size.
 
-        h = h*min(5, 0.8*(rtol/err)^(1/3))
+        h = h*min(5, 0.8*(reltol/err)^(1/3))
 
         # Exit early if step size is too small.
 
@@ -178,8 +176,8 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a, b4, b5)
-    tol = 1.0e-5
+
+function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
 
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/5
@@ -218,8 +216,8 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
         gamma1 = x5 - x4
 
         # Estimate the error and the acceptable error
-        delta = norm(gamma1, Inf)       # actual error
-        tau = tol*max(norm(x,Inf), 1.0) # allowable error
+        delta = norm(gamma1, Inf)              # actual error
+        tau   = max(reltol*norm(x,Inf),abstol) # allowable error
 
         # Update the solution only if the error is acceptable
         if delta <= tau
@@ -271,7 +269,7 @@ const dp_coefficients = ([    0           0          0         0         0      
                          # 5th order b-coefficients
                          [35/384 0 500/1113 125/192 -2187/6784 11/84 0],
                          )
-ode45_dp(F, tspan, x0) = oderkf(F, tspan, x0, dp_coefficients...)
+ode45_dp(F, tspan, x0; kwargs...) = oderkf(F, tspan, x0, dp_coefficients...; kwargs...)
 
 # Fehlberg coefficients
 const fb_coefficients = ([    0         0          0         0        0
@@ -285,7 +283,7 @@ const fb_coefficients = ([    0         0          0         0        0
                          # 5th order b-coefficients
                          [16/135 0 6656/12825 28561/56430 -9/50 2/55],
                          )
-ode45_fb(F, tspan, x0) = oderkf(F, tspan, x0, fb_coefficients...)
+ode45_fb(F, tspan, x0; kwargs...) = oderkf(F, tspan, x0, fb_coefficients...; kwargs...)
 
 # Cash-Karp coefficients
 # Numerical Recipes in Fortran 77
@@ -300,7 +298,7 @@ const ck_coefficients = ([   0         0       0           0          0
                          # 5th order b-coefficients
                          [2825/27648 0 18575/48384 13525/55296 277/14336 1/4],
                          )
-ode45_ck(F, tspan, x0) = oderkf(F, tspan, x0, ck_coefficients...)
+ode45_ck(F, tspan, x0; kwargs...) = oderkf(F, tspan, x0, ck_coefficients...; kwargs...)
 
 # Use Dormand Prince version of ode45 by default
 const ode45 = ode45_dp
