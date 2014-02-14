@@ -53,10 +53,14 @@ end
 ## specifies a list of times for which a solution is requested. The last
 ## two arguments are the initial conditions x_0 and v_0.
 ##
-## The output, (t,x,v), consists of the solutions x(t), v(t) at the 
-## intermediate integration times t including tspan[1] and tspan[end].
+## Optional keywords are atol (error tolerance), norm (function to calculate the error)
+## and points=:all|:specified (flag to indicate type of output).
 ##
-function verlet_hh2(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm)
+## The output, (t,x,v), consists of the solutions x(t), v(t) at the 
+## intermediate integration times t including tspan[1] and tspan[end] for points==:all
+## or at tspan[1] and tspan[end] for points==:specified
+##
+function verlet_hh2(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm, points::Symbol=:all)
     if length(x_0) != length(v_0)
         error("Initial data x_0 and v_0 must have equal length.")
     end
@@ -107,13 +111,21 @@ function verlet_hh2(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm)
             tc = tc + 2*h
             h = 2*h
             
-            tout = [tout; tc]
-            xout = [xout; x.']
-            vout = [vout; v.']
+            if points == :all
+                tout = [tout; tc]
+                xout = [xout; x.']
+                vout = [vout; v.']
+            end
         end     
+    end
+
+    if points == :specified
+        tout = [tout; tc]
+        xout = [xout; x.']
+        vout = [vout; v.']
     end
     return tout, xout, vout
 end
 
 # use adaptive method by default
-verlet(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm)= verlet_hh2(a, tspan, x_0, v_0; atol=atol, norm=norm)
+verlet(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm, points::Symbol=:all)= verlet_hh2(a, tspan, x_0, v_0; atol=atol, norm=norm, points=points)
