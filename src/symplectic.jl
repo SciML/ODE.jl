@@ -50,23 +50,22 @@ end
 ##
 ## The function takes as a first argument a function, a(t,x),
 ## of time and position (the acceleration). The second argument
-## specifies a list of times for which a solution is requested. The last
+## specifies an intial time t_0 and a final time tf for which a solution is requested. The last
 ## two arguments are the initial conditions x_0 and v_0.
 ##
 ## Optional keywords are atol (error tolerance), norm (function to calculate the error)
 ## and points=:all|:specified (flag to indicate type of output).
 ##
 ## The output, (t,x,v), consists of the solutions x(t), v(t) at the 
-## intermediate integration times t including tspan[1] and tspan[end] for points==:all
-## or at tspan[1] and tspan[end] for points==:specified
+## intermediate integration times t including ti and tf for points==:all
+## or at ti and tf only for points==:specified
 ##
-function verlet_hh2(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm, points::Symbol=:all)
+function verlet_hh2(a, t_0, tf, x_0, v_0; atol = 1e-5, norm=Base.norm, points::Symbol=:all)
     if length(x_0) != length(v_0)
         error("Initial data x_0 and v_0 must have equal length.")
     end
 
-    tc = tspan[1]
-    tf = tspan[end]
+    tc = t_0
     h = tf - tc
     v = v_0
     x = x_0
@@ -128,4 +127,25 @@ function verlet_hh2(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm, points::Sym
 end
 
 # use adaptive method by default
-verlet(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm, points::Symbol=:all)= verlet_hh2(a, tspan, x_0, v_0; atol=atol, norm=norm, points=points)
+function verlet(a, tspan, x_0, v_0; atol = 1e-5, norm=Base.norm, points::Symbol=:all)
+    if length(tspan) < 2
+        error("Argument tspan must have at least two elements.")
+    end
+    
+    tout, xout, vout = verlet_hh2(a, tspan[1], tspan[2], x_0, v_0, atol=atol, norm=norm, points=points)
+    for i = 2:(length(tspan)-1)
+        t, x, v = verlet_hh2(a, tout[end], tspan[i+1], xout[end,:].', vout[end,:].', atol=atol, norm=norm, points=points)
+        
+        if points == :all
+            tout = [tout; t[2:end]]
+            xout = [xout; x[2:end,:]]
+            vout = [vout; v[2:end,:]]
+        elseif points == :specified
+            tout = [tout; t[end]]
+            xout = [xout; x[end,:]]
+            vout = [vout; v[end,:]]            
+        end
+    end
+    
+    return tout, xout, vout
+end
