@@ -43,8 +43,7 @@ export ode23, ode4, ode45, ode4s, ode4ms
 # Initialize variables.
 # Adapted from Cleve Moler's textbook
 # http://www.mathworks.com/moler/ncm/ode23tx.m
-function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T}; reltol = 1.e-5, abstol = 1.e-8)
-
+function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
     if reltol == 0
         warn("setting reltol = 0 gives a step size of zero")
     end
@@ -58,7 +57,8 @@ function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T}; rel
     y = y0
 
     tout = t
-    yout = y.'
+    yout = Array(typeof(y0),1)
+    yout[1] = y
 
     tlen = length(t)
 
@@ -101,7 +101,7 @@ function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T}; rel
             t = tnew
             y = ynew
             tout = [tout; t]
-            yout = [yout; y.']
+            push!(yout, y)
             s1 = s4   # Reuse final function value to start new step
         end
 
@@ -118,9 +118,10 @@ function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T}; rel
 
     end # while (t != tfinal)
 
-    return (tout, yout)
+    return tout, yout
 
 end # ode23
+
 
 
 # ode45 adapted from http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
@@ -180,9 +181,7 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-
-function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
-
+function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/5
 
@@ -196,10 +195,11 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
     h = (tfinal - t)/100  # initial guess at a step size
     x = x0
     tout = t            # first output time
-    xout = x.'          # first output solution
+    xout = Array(typeof(x0), 1)
+    xout[1] = x         # first output solution
 
-    k = zeros(eltype(x), length(c), length(x))
-    k[1,:] = F(t,x) # first stage
+    k = Array(typeof(x0), length(c))
+    k[1] = F(t,x) # first stage
 
     while t < tfinal && h >= hmin
         if t + h > tfinal
@@ -207,14 +207,14 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
         end
 
         for j = 2:length(c)
-            k[j,:] = F(t + h.*c[j], x + h.*(a[j,1:j-1]*k[1:j-1,:]).')
+            k[j] = F(t + h.*c[j], x + h.*(a[j,1:j-1]*k[1:j-1])[1])
         end
 
         # compute the 4th order estimate
-        x4 = x + h.*(b4*k).'
+        x4 = x + h.*(b4*k)[1]
 
         # compute the 5th order estimate
-        x5 = x + h.*(b5*k).'
+        x5 = x + h.*(b5*k)[1]
 
         # estimate the local truncation error
         gamma1 = x5 - x4
@@ -228,7 +228,7 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
             t = t + h
             x = x5    # <-- using the higher order estimate is called 'local extrapolation'
             tout = [tout; t]
-            xout = [xout; x.']
+            push!(xout, x)
 
             # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
             # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
@@ -238,9 +238,9 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
                 # This is part of the Dormand-Prince pair caveat.
                 # k[:,7] has already been computed, so use it instead of recomputing it
                 # again as k[:,1] during the next step.
-                k[1,:] = k[end,:]
+                k[1] = k[end]
             else
-                k[1,:] = F(t,x) # first stage
+                k[1] = F(t,x) # first stage
             end
         end
 
@@ -252,7 +252,7 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
       println("Step size grew too small. t=", t, ", h=", h, ", x=", x)
     end
 
-    return (tout, xout)
+    return tout, xout
 end
 
 # Both the Dormand-Prince and Fehlberg 4(5) coefficients are from a tableau in
@@ -273,7 +273,7 @@ const dp_coefficients = ([    0           0          0         0         0      
                          # 5th order b-coefficients
                          [35/384 0 500/1113 125/192 -2187/6784 11/84 0],
                          )
-ode45_dp(F, tspan, x0; kwargs...) = oderkf(F, tspan, x0, dp_coefficients...; kwargs...)
+ode45_dp(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, dp_coefficients...; kwargs...)
 
 # Fehlberg coefficients
 const fb_coefficients = ([    0         0          0         0        0
@@ -287,7 +287,7 @@ const fb_coefficients = ([    0         0          0         0        0
                          # 5th order b-coefficients
                          [16/135 0 6656/12825 28561/56430 -9/50 2/55],
                          )
-ode45_fb(F, tspan, x0; kwargs...) = oderkf(F, tspan, x0, fb_coefficients...; kwargs...)
+ode45_fb(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, fb_coefficients...; kwargs...)
 
 # Cash-Karp coefficients
 # Numerical Recipes in Fortran 77
@@ -302,7 +302,7 @@ const ck_coefficients = ([   0         0       0           0          0
                          # 5th order b-coefficients
                          [2825/27648 0 18575/48384 13525/55296 277/14336 1/4],
                          )
-ode45_ck(F, tspan, x0; kwargs...) = oderkf(F, tspan, x0, ck_coefficients...; kwargs...)
+ode45_ck(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, ck_coefficients...; kwargs...)
 
 # Use Dormand Prince version of ode45 by default
 const ode45 = ode45_dp
@@ -316,67 +316,77 @@ const ode45 = ode45_dp
 #   ODEFUN(T,X) must return a column vector corresponding to f(t,x). Each
 #   row in the solution array X corresponds to a time returned in the
 #   column vector T.
-function ode4{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T})
+function ode4(F, x0, tspan)
     h = diff(tspan)
-    x = Array(T, length(tspan), length(x0))
-    x[1,:] = x0
+    x = Array(typeof(x0), length(tspan))
+    x[1] = x0
 
-    midxdot = Array(T, 4, length(x0))
+    midxdot = Array(typeof(x0), 4)
     for i = 1:length(tspan)-1
         # Compute midstep derivatives
-        midxdot[1,:] = F(tspan[i],         x[i,:]')
-        midxdot[2,:] = F(tspan[i]+h[i]./2, x[i,:]' + midxdot[1,:]'.*h[i]./2)
-        midxdot[3,:] = F(tspan[i]+h[i]./2, x[i,:]' + midxdot[2,:]'.*h[i]./2)
-        midxdot[4,:] = F(tspan[i]+h[i],    x[i,:]' + midxdot[3,:]'.*h[i])
+        midxdot[1] = F(tspan[i],         x[i])
+        midxdot[2] = F(tspan[i]+h[i]./2, x[i] + midxdot[1].*h[i]./2)
+        midxdot[3] = F(tspan[i]+h[i]./2, x[i] + midxdot[2].*h[i]./2)
+        midxdot[4] = F(tspan[i]+h[i],    x[i] + midxdot[3].*h[i])
 
         # Integrate
-        x[i+1,:] = x[i,:] + 1./6.*h[i].*[1 2 2 1]*midxdot
+        x[i+1] = x[i] + 1/6 .*h[i].*([1 2 2 1]*midxdot)[1]
     end
-    return (tspan, x)
+    return [tspan], x
 end
 
 #ODEROSENBROCK Solve stiff differential equations, Rosenbrock method
 #    with provided coefficients.
-function oderosenbrock{T}(F::Function, G::Function, tspan::AbstractVector, x0::AbstractVector{T}, gamma, a, b, c)
+function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
+    # Crude forward finite differences estimator as fallback
+    # FIXME: This doesn't really work if x is anything but a Vector or a scalar
+    function FDJacobian(F, x, t)
+        ftx = F(t, x)
+        lx = max(length(x),1)
+        dFdx = zeros(eltype(x), lx, lx)
+        for j = 1:lx
+            dx = zeros(eltype(x), lx)
+            # The 100 below is heuristic
+            dx[j] = (x[j].+(x[j]==0))./100
+            dFdx[:,j] = (F(t,x+dx[j])-ftx)./dx[j]
+        end
+        return dFdx
+    end
+
+    if typeof(jacobian) == Function
+        G = jacobian
+    else
+        G = (t, x)->FDJacobian(F, x, t)
+    end
+
     h = diff(tspan)
-    x = Array(T, length(tspan), length(x0))
-    x[1,:] = x0
+    x = Array(typeof(x0), length(tspan))
+    x[1] = x0
 
     solstep = 1
     while tspan[solstep] < maximum(tspan)
         ts = tspan[solstep]
         hs = h[solstep]
-        xs = reshape(x[solstep,:], size(x0))
+        xs = x[solstep]
         dFdx = G(ts, xs)
-        jac = eye(size(dFdx,1))./gamma./hs-dFdx
-
-        g = zeros(size(a,1), length(x0))
-        g[1,:] = jac \ F(ts + b[1].*hs, xs)
-        for i = 2:size(a,1)
-            g[i,:] = jac \ (F(ts + b[i].*hs, xs + (a[i,1:i-1]*g[1:i-1,:]).') + (c[i,1:i-1]*g[1:i-1,:]).'./hs)
+        # FIXME
+        if size(dFdx,1) == 1
+            jac = 1/gamma/hs - dFdx[1]
+        else
+            jac = eye(dFdx)./gamma./hs - dFdx
         end
 
-        x[solstep+1,:] = x[solstep,:] + b*g
+        g = Array(typeof(x0), size(a,1))
+        g[1] = (jac \ F(ts + b[1].*hs, xs))
+        for i = 2:size(a,1)
+            g[i] = (jac \ (F(ts + b[i].*hs, xs + (a[i,1:i-1]*g[1:i-1])[1]) + (c[i,1:i-1]*g[1:i-1])[1]./hs))
+        end
+        x[solstep+1] = x[solstep] + (b*g)[1]
         solstep += 1
     end
-    return (tspan, x)
+    return [tspan], x
 end
 
-function oderosenbrock{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, gamma, a, b, c)
-    # Crude forward finite differences estimator as fallback
-    function jacobian(F::Function, t::Number, x::AbstractVector)
-        ftx = F(t, x)
-        dFdx = zeros(length(x), length(x))
-        for j = 1:length(x)
-            dx = zeros(size(x))
-            # The 100 below is heuristic
-            dx[j] = (x[j]+(x[j]==0))./100
-            dFdx[:,j] = (F(t,x+dx)-ftx)./dx[j]
-        end
-        return dFdx
-    end
-    oderosenbrock(F, (t, x)->jacobian(F, t, x), tspan, x0, gamma, a, b, c)
-end
 
 # Kaps-Rentrop coefficients
 const kr4_coefficients = (0.231,
@@ -389,8 +399,9 @@ const kr4_coefficients = (0.231,
                            -5.07167533877   0                0        0
                             6.02015272865   0.1597500684673  0        0
                            -1.856343618677 -8.50538085819   -2.08407513602 0],)
-ode4s_kr(F, tspan, x0) = oderosenbrock(F, tspan, x0, kr4_coefficients...)
-ode4s_kr(F, G, tspan, x0) = oderosenbrock(F, G, tspan, x0, kr4_coefficients...)
+                           
+ode4s_kr(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, kr4_coefficients...; jacobian=jacobian)
+
 # Shampine coefficients
 const s4_coefficients = (0.5,
                          [ 0    0    0 0
@@ -403,19 +414,16 @@ const s4_coefficients = (0.5,
                            372/25   12/5    0   0
                           -112/125 -54/125 -2/5 0],)
 
-
-
-ode4s_s(F, tspan, x0) = oderosenbrock(F, tspan, x0, s4_coefficients...)
-ode4s_s(F, G, tspan, x0) = oderosenbrock(F, G, tspan, x0, s4_coefficients...)
+ode4s_s(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, s4_coefficients...; jacobian=jacobian)
 
 # Use Shampine coefficients by default (matching Numerical Recipes)
 const ode4s = ode4s_s
 
 # ODE_MS Fixed-step, fixed-order multi-step numerical method with Adams-Bashforth-Moulton coefficients
-function ode_ms{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, order::Integer)
+function ode_ms(F, x0, tspan, order::Integer)
     h = diff(tspan)
-    x = zeros(T, length(tspan), length(x0))
-    x[1,:] = x0
+    x = Array(typeof(x0), length(tspan))
+    x[1] = x0
 
     if 1 <= order <= 4
         b = [ 1      0      0     0
@@ -438,13 +446,13 @@ function ode_ms{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, or
     for i = 1:length(tspan)-1
         # Need to run the first several steps at reduced order
         steporder = min(i, order)
-        xdot[i,:] = F(tspan[i], x[i,:]')
-        x[i+1,:] = x[i,:] + b[steporder,1:steporder]*xdot[i-(steporder-1):i,:].*h[i]
+        xdot[i] = F(tspan[i], x[i])
+        x[i+1] = x[i] + (b[steporder,1:steporder]*xdot[i-(steporder-1):i])[1].*h[i]
     end
-    return (tspan, x)
+    return [tspan], x
 end
 
 # Use order 4 by default
-ode4ms(F, tspan, x0) = ode_ms(F, tspan, x0, 4)
+ode4ms(F, x0, tspan) = ode_ms(F, x0, tspan, 4)
 
 end # module ODE
