@@ -122,7 +122,8 @@ end # ode23
 
 
 # ode45 adapted from http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
-
+# (a newer version (v1.15) can be found here https://sites.google.com/site/comperem/home/ode_solvers)
+#
 # ode45 (v1.11) integrates a system of ordinary differential equations using
 # 4th & 5th order embedded formulas from Dormand & Prince or Fehlberg.
 #
@@ -177,7 +178,6 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-
 function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a, b4, b5)
     tol = 1.0e-5
 
@@ -197,23 +197,11 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
     xout = x.'          # first output solution
 
     k = zeros(eltype(x), length(c), length(x))
+    k[1,:] = F(t,x) # first stage
 
     while t < tfinal && h >= hmin
         if t + h > tfinal
             h = tfinal - t
-        end
-
-        # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
-        # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
-        #        s is the number of intermediate RK stages on [t (t+h)] (Dormand-Prince has s=7 stages)
-        if -eps() < c[end]-1 < eps() && t != tspan[1]
-            # Assign the last stage for x(k) as the first stage for computing x[k+1].
-            # This is part of the Dormand-Prince pair caveat.
-            # k[:,7] has already been computed, so use it instead of recomputing it
-            # again as k[:,1] during the next step.
-            k[1,:] = k[end,:]
-        else
-            k[1,:] = F(t,x) # first stage
         end
 
         for j = 2:length(c)
@@ -239,12 +227,22 @@ function oderkf{T}(F::Function, tspan::AbstractVector, x0::AbstractVector{T}, a,
             x = x5    # <-- using the higher order estimate is called 'local extrapolation'
             tout = [tout; t]
             xout = [xout; x.']
+
+            # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
+            # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
+            #        s is the number of intermediate RK stages on [t (t+h)] (Dormand-Prince has s=7 stages)
+            if c[end] == 1 && t != tspan[1]
+                # Assign the last stage for x(k) as the first stage for computing x[k+1].
+                # This is part of the Dormand-Prince pair caveat.
+                # k[:,7] has already been computed, so use it instead of recomputing it
+                # again as k[:,1] during the next step.
+                k[1,:] = k[end,:]
+            else
+                k[1,:] = F(t,x) # first stage
+            end
         end
 
         # Update the step size
-        if delta == 0.0
-            delta = 1e-16
-        end
         h = min(hmax, 0.8*h*(tau/delta)^pow)
     end # while (t < tfinal) & (h >= hmin)
 
