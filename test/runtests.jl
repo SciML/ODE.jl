@@ -5,11 +5,13 @@ tol = 1e-2
 
 solvers = [
     ODE.ode23,
+    ODE.ode23_bs,
+
     ODE.ode4,
     ODE.ode45_dp,
     ODE.ode45_fb,
     ODE.ode45_ck,
-    
+
     ODE.ode4ms,
     ODE.ode4s_s,
     ODE.ode4s_kr]
