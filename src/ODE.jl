@@ -183,9 +183,9 @@ end # ode23
 # modified: 17 January 2001
 function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
     # see p.91 in the Ascher & Petzold reference for more infomation.
-    pow = 1/5
+    pow = 1/p   # use the higher order to estimate the next step size
 
-    c = sum(a, 2)
+    c = sum(a, 2)   # consistency condition
 
     # Initialization
     t = tspan[1]
@@ -255,13 +255,28 @@ function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
     return tout, xout
 end
 
+# Bogacki–Shampine coefficients
+const bs_coefficients = (3,
+                         [    0           0      0      0
+                              1/2         0      0      0
+                              0         3/4      0      0
+                              2/9       1/3     4/9     0],
+                         # 2nd order b-coefficients
+                         [7/24 1/4 1/3 1/8],
+                         # 3rd order b-coefficients
+                         [2/9 1/3 4/9 0],
+                         )
+ode23_bs(F, tspan, x0) = oderkf(F, tspan, x0, bs_coefficients...)
+
+
 # Both the Dormand-Prince and Fehlberg 4(5) coefficients are from a tableau in
 # U.M. Ascher, L.R. Petzold, Computer Methods for  Ordinary Differential Equations
 # and Differential-Agebraic Equations, Society for Industrial and Applied Mathematics
 # (SIAM), Philadelphia, 1998
 #
 # Dormand-Prince coefficients
-const dp_coefficients = ([    0           0          0         0         0        0
+const dp_coefficients = (5,
+                         [    0           0          0         0         0        0
                               1/5         0          0         0         0        0
                               3/40        9/40       0         0         0        0
                              44/45      -56/15      32/9       0         0        0
@@ -276,7 +291,8 @@ const dp_coefficients = ([    0           0          0         0         0      
 ode45_dp(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, dp_coefficients...; kwargs...)
 
 # Fehlberg coefficients
-const fb_coefficients = ([    0         0          0         0        0
+const fb_coefficients = (5,
+                         [    0         0          0         0        0
                              1/4        0          0         0        0
                              3/32       9/32       0         0        0
                           1932/2197 -7200/2197  7296/2197    0        0
@@ -291,7 +307,8 @@ ode45_fb(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, fb_coefficients...; kwa
 
 # Cash-Karp coefficients
 # Numerical Recipes in Fortran 77
-const ck_coefficients = ([   0         0       0           0          0
+const ck_coefficients = (5,
+                         [   0         0       0           0          0
                              1/5       0       0           0          0
                              3/40      9/40    0           0          0
                              3/10     -9/10    6/5         0          0
@@ -306,6 +323,10 @@ ode45_ck(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, ck_coefficients...; kwa
 
 # Use Dormand Prince version of ode45 by default
 const ode45 = ode45_dp
+
+# some higher-order embedded methods can be found in:
+# P.J. Prince and J.R.Dormand: High order embedded Runge-Kutta formulae, Journal of Computational and Applied Mathematics 7(1), 1981.
+
 
 #ODE4    Solve non-stiff differential equations, fourth order
 #   fixed-step Runge-Kutta method.
