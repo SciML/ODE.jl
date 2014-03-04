@@ -45,6 +45,10 @@ export ode23, ode4, ode45, ode4s, ode4ms
 # http://www.mathworks.com/moler/ncm/ode23tx.m
 function ode23{T}(F::Function, tspan::AbstractVector, y0::AbstractVector{T}; reltol = 1.e-5, abstol = 1.e-8)
 
+    if reltol == 0
+        warn("setting reltol = 0 gives a step size of zero")
+    end
+
     threshold = abstol / reltol
 
     t = tspan[1]
