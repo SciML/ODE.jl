@@ -181,7 +181,7 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
+function oderkf(F, x0, tspan, p, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/p   # use the higher order to estimate the next step size
 
@@ -217,7 +217,7 @@ function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
         x5 = x + h.*(b5*k)[1]
 
         # estimate the local truncation error
-        gamma1 = x5 - x4
+        gamma1 = x4 - x5
 
         # Estimate the error and the acceptable error
         delta = norm(gamma1, Inf)              # actual error
@@ -233,7 +233,7 @@ function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
             # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
             # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
             #        s is the number of intermediate RK stages on [t (t+h)] (Dormand-Prince has s=7 stages)
-            if c[end] == 1 && t != tspan[1]
+            if c[end] == 1
                 # Assign the last stage for x(k) as the first stage for computing x[k+1].
                 # This is part of the Dormand-Prince pair caveat.
                 # k[:,7] has already been computed, so use it instead of recomputing it
