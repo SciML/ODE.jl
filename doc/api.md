@@ -10,18 +10,18 @@ t_out, y_out = odeXX(F, y0, tspan; kwargs...)
 
 Each (adaptive) solver accepts 3 arguments
 
-- `F`: the RHS of the ODE `dy/dt = F(t,y)`, which is a function of `t` and `y(t)` and returns `dy/dt::typeof(y./t)`
-- `y0`: initial value for `y`. The type of `y0` determines the element type of the `y_out` vector (`y_out::Vector{typeof(y0)}`)
-- `tspan`: Any iterable of sorted `t` values at which the solution (`y`) is requested. Most solvers will only consider `tspan[1]` and `tspan[end]`, and intermediary points will be interpolated. If `tspan[1] > tspan[end]` the integration is performed backwards.
+- `F`: the RHS of the ODE `dy/dt = F(t,y)`, which is a function of `t` and `y(t)` and returns `dy/dt::typeof(y/t)`
+- `y0`: initial value for `y`. The type of `y0`, promoted as necessary according to the numeric type used for the times, determines the element type of the `yout` vector (`yout::Vector{typeof(y0*one(t))}`)
+- `tspan`: Any iterable of sorted `t` values at which the solution (`y`) is requested. Most solvers will only consider `tspan[1]` and `tspan[end]`, and intermediary points will be interpolated. If `tspan[1] > tspan[end]` the integration is performed backwards.   The times are promoted as necessary to a common floating-point type.
 
 The solver returns two arrays
 
 - `tout`: Vector of points at which solutions were obtained (also see keyword `points`)
-- `yout`: solutions at times `tout`; if `points=:all | :specified` is used, `yout::Vector{typeof(y0)}`. Note that if `y0` is a vector, you can get a matlab-like matrix with `hcat(yout...)`.
+- `yout`: solutions at times `tout`, stored as a vector `yout` as described above. Note that if `y0` is a vector, you can get a matlab-like matrix with `hcat(yout...)`.
 
 Each solver might implement its own keywords, but the following keywords have a standardized interpretation across all solvers. Solvers should raise an error if a unrecognized keyword argument is used.
 
-- `norm`: user-supplied norm for determining the error `E` (default `Base.norm`)
+- `norm`: user-supplied norm for determining the error `E` (default `Base.vecnorm`)
 - `abstol` and/or `reltol`: an integration step is accepted if `E <= abstol || E <= reltol*abs(y)` (ideally we want both criteria for all solvers, **done** in #13)
 - `points=:all | :specified`: controls the type of output according to
  * `points==:all` (default) output is given for each value in `tspan` as well as for each intermediate point the solver used. 
