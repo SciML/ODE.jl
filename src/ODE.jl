@@ -181,7 +181,7 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf(F, x0, tspan, p, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
+function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/p   # use the higher order to estimate the next step size
 
@@ -206,18 +206,24 @@ function oderkf(F, x0, tspan, p, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
             h = tfinal - t
         end
 
+        #(p-1)th and pth order estimates
+        xs = x + h*bs[1]*k[1]
+        xp = x + h*bp[1]*k[1]
         for j = 2:length(c)
-            k[j] = F(t + h.*c[j], x + h.*(a[j,1:j-1]*k[1:j-1])[1])
+            dx = a[j,1]*k[1]
+            for i = 2:j-1
+                dx += a[j,i]*k[i]
+            end
+            k[j] = F(t + h*c[j], x + h*dx)
+
+            # compute the (p-1)th order estimate
+            xs = xs + h*bs[j]*k[j]
+            # compute the pth order estimate
+            xp = xp + h*bp[j]*k[j]
         end
 
-        # compute the 4th order estimate
-        x4 = x + h.*(b4*k)[1]
-
-        # compute the 5th order estimate
-        x5 = x + h.*(b5*k)[1]
-
         # estimate the local truncation error
-        gamma1 = x4 - x5
+        gamma1 = xs - xp
 
         # Estimate the error and the acceptable error
         delta = norm(gamma1, Inf)              # actual error
@@ -226,7 +232,7 @@ function oderkf(F, x0, tspan, p, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
         # Update the solution only if the error is acceptable
         if delta <= tau
             t = t + h
-            x = x5    # <-- using the higher order estimate is called 'local extrapolation'
+            x = xp    # <-- using the higher order estimate is called 'local extrapolation'
             tout = [tout; t]
             push!(xout, x)
 
@@ -404,15 +410,23 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
         if size(dFdx,1) == 1
             jac = 1/gamma/hs - dFdx[1]
         else
-            jac = eye(dFdx)./gamma./hs - dFdx
+            jac = eye(dFdx)/gamma/hs - dFdx
         end
 
         g = Array(typeof(x0), size(a,1))
-        g[1] = (jac \ F(ts + b[1].*hs, xs))
+        g[1] = (jac \ F(ts + b[1]*hs, xs))
+        x[solstep+1] = x[solstep] + b[1]*g[1]
+
         for i = 2:size(a,1)
-            g[i] = (jac \ (F(ts + b[i].*hs, xs + (a[i,1:i-1]*g[1:i-1])[1]) + (c[i,1:i-1]*g[1:i-1])[1]./hs))
+            dx = zero(x0)
+            dF = zero(x0/hs)
+            for j = 1:i-1
+                dx += a[i,j]*g[j]
+                dF += c[i,j]*g[j]
+            end
+            g[i] = (jac \ (F(ts + b[i]*hs, xs + dx) + dF/hs))
+            x[solstep+1] += b[i]*g[i]
         end
-        x[solstep+1] = x[solstep] + (b*g)[1]
         solstep += 1
     end
     return [tspan], x
@@ -478,7 +492,11 @@ function ode_ms(F, x0, tspan, order::Integer)
         # Need to run the first several steps at reduced order
         steporder = min(i, order)
         xdot[i] = F(tspan[i], x[i])
-        x[i+1] = x[i] + (b[steporder,1:steporder]*xdot[i-(steporder-1):i])[1].*h[i]
+
+        x[i+1] = x[i]
+        for j = 1:steporder
+            x[i+1] += h[i]*b[steporder, j]*xdot[i-(steporder-1) + (j-1)]
+        end
     end
     return [tspan], x
 end
