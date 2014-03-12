@@ -325,12 +325,12 @@ function ode4(F, x0, tspan)
     for i = 1:length(tspan)-1
         # Compute midstep derivatives
         midxdot[1] = F(tspan[i],         x[i])
-        midxdot[2] = F(tspan[i]+h[i]./2, x[i] + midxdot[1].*h[i]./2)
-        midxdot[3] = F(tspan[i]+h[i]./2, x[i] + midxdot[2].*h[i]./2)
+        midxdot[2] = 2*F(tspan[i]+h[i]./2, x[i] + midxdot[1].*h[i]./2)
+        midxdot[3] = 2*F(tspan[i]+h[i]./2, x[i] + midxdot[2].*h[i]./2)
         midxdot[4] = F(tspan[i]+h[i],    x[i] + midxdot[3].*h[i])
 
         # Integrate
-        x[i+1] = x[i] + 1/6 .*h[i].*([1 2 2 1]*midxdot)[1]
+        x[i+1] = x[i] + 1/6 .*h[i].*sum(midxdot)
     end
     return [tspan], x
 end
@@ -340,15 +340,25 @@ end
 function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
     # Crude forward finite differences estimator as fallback
     # FIXME: This doesn't really work if x is anything but a Vector or a scalar
-    function FDJacobian(F, x, t)
+    function fdjacobian(F, x::Number, t)
+        ftx = F(t, x)        
+
+        # The 100 below is heuristic
+        dx = (x .+ (x==0))./100
+        dFdx = (F(t,x+dx)-ftx)./dx
+
+        return dFdx
+    end
+
+    function fdjacobian(F, x, t)
         ftx = F(t, x)
         lx = max(length(x),1)
         dFdx = zeros(eltype(x), lx, lx)
         for j = 1:lx
-            dx = zeros(eltype(x), lx)
             # The 100 below is heuristic
-            dx[j] = (x[j].+(x[j]==0))./100
-            dFdx[:,j] = (F(t,x+dx[j])-ftx)./dx[j]
+            dx = zeros(eltype(x), lx)
+            dx[j] = (x[j] .+ (x[j]==0))./100
+            dFdx[:,j] = (F(t,x+dx)-ftx)./dx[j]
         end
         return dFdx
     end
@@ -356,7 +366,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
     if typeof(jacobian) == Function
         G = jacobian
     else
-        G = (t, x)->FDJacobian(F, x, t)
+        G = (t, x)->fdjacobian(F, x, t)
     end
 
     h = diff(tspan)
