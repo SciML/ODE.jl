@@ -190,9 +190,10 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     # Initialization
     t = tspan[1]
     tfinal = tspan[end]
-    hmax = (tfinal - t)/2.5
-    hmin = (tfinal - t)/1e9
-    h = (tfinal - t)/100  # initial guess at a step size
+    tdir = sign(tfinal - t)
+    hmax = abs(tfinal - t)/2.5
+    hmin = abs(tfinal - t)/1e9
+    h = tdir*abs(tfinal - t)/100  # initial guess at a step size
     x = x0
     tout = t            # first output time
     xout = Array(typeof(x0), 1)
@@ -201,8 +202,8 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     k = Array(typeof(x0), length(c))
     k[1] = F(t,x) # first stage
 
-    while t < tfinal && h >= hmin
-        if t + h > tfinal
+    while abs(t) != abs(tfinal) && abs(h) >= hmin
+        if abs(h) > abs(tfinal-t)
             h = tfinal - t
         end
 
@@ -254,8 +255,8 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
         h = min(hmax, 0.8*h*(tau/delta)^pow)
     end # while (t < tfinal) & (h >= hmin)
 
-    if t < tfinal
-      println("Step size grew too small. t=", t, ", h=", h, ", x=", x)
+    if abs(t) < abs(tfinal)
+      println("Step size grew too small. t=", t, ", h=", abs(h), ", x=", x)
     end
 
     return tout, xout
