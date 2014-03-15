@@ -44,4 +44,9 @@ for solver in solvers
     @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
 end
 
+println("using ODE.verlet")
+t,x,v=ODE.verlet((t,x)-> -x, [0,2pi], 2., 1.)
+@test maximum(abs([v - cos(t)+2*sin(t), x - 2*cos(t)-sin(t)])) < tol
+
+
 println("All looks OK")
