@@ -107,10 +107,6 @@ function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, pa
     end
 
     while true
-        #if nstep == 4
-        #    println(y)
-        #    exit()
-        #end
         if nstep > nmax
             error("Exit at x=$x. More than nmax=$nmax steps needed.")
         end
@@ -126,7 +122,7 @@ function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, pa
             f(k1, x, y, params)
         end
 
-        y1, err = dopcore(nstep, f, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, atol, rtol, params)
+        y1, err = dopcore(n, f, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, atol, rtol, params)
         xph = x+h
         nfcn += 11
 
@@ -237,7 +233,7 @@ function hinit(n::Int64, f::Function, x::Float64, y::Vector{Float64}, xend::Floa
     return h*posneg
 end
 
-function dopcore(m::Int64, f::Function, x::Float64, y::Vector{Float64}, h::Float64, k1::Vector{Float64}, k2::Vector{Float64}, k3::Vector{Float64}, k4::Vector{Float64}, k5::Vector{Float64}, k6::Vector{Float64}, k7::Vector{Float64}, k8::Vector{Float64}, k9::Vector{Float64}, k10::Vector{Float64}, atol::Vector{Float64}, rtol::Vector{Float64}, params::Any)
+function dopcore(n::Int64, f::Function, x::Float64, y::Vector{Float64}, h::Float64, k1::Vector{Float64}, k2::Vector{Float64}, k3::Vector{Float64}, k4::Vector{Float64}, k5::Vector{Float64}, k6::Vector{Float64}, k7::Vector{Float64}, k8::Vector{Float64}, k9::Vector{Float64}, k10::Vector{Float64}, atol::Vector{Float64}, rtol::Vector{Float64}, params::Any)
     a21 =    5.26001519587677318785587544488e-2
     a31 =    1.97250569845378994544595329183e-2
     a32 =    5.91751709536136983633785987549e-2
@@ -342,10 +338,6 @@ function dopcore(m::Int64, f::Function, x::Float64, y::Vector{Float64}, h::Float
     er11 =  0.8192320648511571246570742613e-01
     er12 = -0.2235530786388629525884427845e-01
     
-    #if m == 2
-    #    println(y)
-    #end
-    n=6
     y1 = zeros(n)
     for i = 1:n
         y1[i] = y[i] + h*a21*k1[i]
