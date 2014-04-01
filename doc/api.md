@@ -1,4 +1,6 @@
 #General API for all solvers
+**This is a working draft for how the API might look like in the future**
+
 Please open pull requests or issues to propose changes or clarifications.
 
 ##Basic interface
