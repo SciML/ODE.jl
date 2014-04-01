@@ -1,8 +1,15 @@
-function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, params::Any; rtol::Vector{Float64}=[1e-6], atol::Vector{Float64}=[sqrt(eps())],
-    uround::Float64=2.3e-16, safe::Float64=0.9, fac1::Float64=0.333, fac2::Float64=6.0,
-    beta::Float64=0.0, maxstepsize::Float64=xend-x, initialstep::Float64=0.0,
+abstract ODEProblem
+
+type ODEProblemFunction <: ODEProblem
+    f::Function
+end
+
+function dop853(F::Function, y0, tspan;
+    reltol::Vector{Float64}=[1e-6], abstol::Vector{Float64}=[sqrt(eps())],
+    uround::Float64=eps(), safe::Float64=0.9, fac1::Float64=0.333, fac2::Float64=6.0,
+    beta::Float64=0.0, maxstepsize::Float64=tspan[end]-tspan[1], initialstep::Float64=0.0,
     maxsteps::Int64=100000, printmessages::Bool=false, nstiff::Int64=1000,
-    iout::Int64=0, solout::Function=s(x...)=return, dense::Vector{Int64}=[1:length(yin)])
+    iout::Int64=0, solout::Function=s(x...)=return, dense::Vector{Int64}=[1:length(y0)])
 
     c14 = 0.1e+00
     c15 = 0.2e+00
@@ -58,7 +65,9 @@ function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, pa
 
     irtrn = 0
 
-    n = length(yin)
+    x = tspan[1]
+    xend = tspan[end]
+    n = length(y0)
     nrd = length(dense)
     nfcn = 0
     nstep = 0
@@ -75,32 +84,32 @@ function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, pa
     k9 = zeros(n)
     k10 = zeros(n)
     y = zeros(n)
-    copy!(y, yin)
+    copy!(y, y0)
     facold = 1e-4
     expo1 = 1.0/8.0 - beta*0.2
     facc1 = 1.0/fac1
     facc2 = 1.0/fac2
     posneg = sign(xend-x)
-    atol = length(atol) == 1 ? fill(atol[1], n) : atol
-    rtol = length(rtol) == 1 ? fill(rtol[1], n) : rtol
+    abstol = length(abstol) == 1 ? fill(abstol[1], n) : abstol
+    reltol = length(reltol) == 1 ? fill(reltol[1], n) : reltol
     last = false
     hlamb = 0.0
     iasti = 0
-    f(k1, x, y, params)
+    F(k1, x, y)
     nfcn += 1
     hmax = abs(maxstepsize)
     nmax = maxsteps
     h = initialstep
     iord = 8
     if h == 0.0
-        h = hinit(n, f, x, y, xend, posneg, k1, k2, k3, iord, hmax, atol, rtol, params)
+        h = hinit(n, F, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
         nfcn += 1
     end
     reject = false
     xold = x
     if iout != 0
         #hout = 1.0
-        irtrn = solout(naccpt+1, xold, x, y, con, icomp, params)
+        irtrn = solout(naccpt+1, xold, x, y, con, icomp)
         if irtrn < 0
             return y
         end
@@ -119,10 +128,10 @@ function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, pa
         end
         nstep += 1
         if irtrn >= 2
-            f(k1, x, y, params)
+            F(k1, x, y)
         end
 
-        y1, err = dopcore(n, f, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, atol, rtol, params)
+        y1, err = dopcore(n, F, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
         xph = x+h
         nfcn += 11
 
@@ -133,7 +142,7 @@ function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, pa
         if err <= 1.0
             facold = max(err, 1e-4)
             naccpt += 1
-            f(k4, xph, k5, params)
+            F(k4, xph, k5,)
             nfcn += 1
             # Stiffness detection
             if mod(naccpt, nstiff) == 0 || iasti > 0
@@ -200,11 +209,11 @@ function dop853(f::Function, x::Float64, yin::Vector{Float64}, xend::Float64, pa
     end
 end
 
-function hinit(n::Int64, f::Function, x::Float64, y::Vector{Float64}, xend::Float64, posneg::Float64, f0::AbstractArray{Float64,1}, f1::AbstractArray{Float64,1}, y0::AbstractArray{Float64,1}, iord::Int64, hmax::Float64, atol::Vector{Float64}, rtol::Vector{Float64}, params::Any)
+function hinit(n::Int64, F::Function, x::Float64, y::Vector{Float64}, xend::Float64, posneg::Float64, f0::AbstractArray{Float64,1}, f1::AbstractArray{Float64,1}, y0::AbstractArray{Float64,1}, iord::Int64, hmax::Float64, abstol::Vector{Float64}, reltol::Vector{Float64})
     dnf = 0.0
     dny = 0.0
     for i = 1:n
-        sk = atol[i] + rtol[i]*abs(y[i])
+        sk = abstol[i] + reltol[i]*abs(y[i])
         dnf += (f0[i]/sk)^2
         dny += (y[i]/sk)^2
     end
@@ -216,10 +225,10 @@ function hinit(n::Int64, f::Function, x::Float64, y::Vector{Float64}, xend::Floa
     h = min(h, hmax)
     h = h*posneg
     y1 = y + h*y0
-    f(f1, x+h, y1, params)
+    F(f1, x+h, y1)
     der2 = 0.0
     for i = 1:n
-        sk = atol[i] + rtol[i]*abs(y[i])
+        sk = abstol[i] + reltol[i]*abs(y[i])
         der2 += ((f1[i]-f0[i])/sk)^2
     end
     der2 = sqrt(der2)/h
@@ -233,7 +242,7 @@ function hinit(n::Int64, f::Function, x::Float64, y::Vector{Float64}, xend::Floa
     return h*posneg
 end
 
-function dopcore(n::Int64, f::Function, x::Float64, y::Vector{Float64}, h::Float64, k1::Vector{Float64}, k2::Vector{Float64}, k3::Vector{Float64}, k4::Vector{Float64}, k5::Vector{Float64}, k6::Vector{Float64}, k7::Vector{Float64}, k8::Vector{Float64}, k9::Vector{Float64}, k10::Vector{Float64}, atol::Vector{Float64}, rtol::Vector{Float64}, params::Any)
+function dopcore(n::Int64, F::Function, x::Float64, y::Vector{Float64}, h::Float64, k1::Vector{Float64}, k2::Vector{Float64}, k3::Vector{Float64}, k4::Vector{Float64}, k5::Vector{Float64}, k6::Vector{Float64}, k7::Vector{Float64}, k8::Vector{Float64}, k9::Vector{Float64}, k10::Vector{Float64}, abstol::Vector{Float64}, reltol::Vector{Float64})
     a21 =    5.26001519587677318785587544488e-2
     a31 =    1.97250569845378994544595329183e-2
     a32 =    5.91751709536136983633785987549e-2
@@ -342,50 +351,50 @@ function dopcore(n::Int64, f::Function, x::Float64, y::Vector{Float64}, h::Float
     for i = 1:n
         y1[i] = y[i] + h*a21*k1[i]
     end
-    f(k2, x+c2*h, y1, params)
+    F(k2, x+c2*h, y1)
     for i = 1:n
         y1[i] = y[i] + h*(a31*k1[i] + a32*k2[i])
     end
-    f(k3, x+c3*h, y1, params)
+    F(k3, x+c3*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a41*k1[i]+a43*k3[i])  
     end
-    f(k4, x+c4*h, y1, params)
+    F(k4, x+c4*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a51*k1[i]+a53*k3[i]+a54*k4[i])
     end
-    f(k5, x+c5*h, y1, params)
+    F(k5, x+c5*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a61*k1[i]+a64*k4[i]+a65*k5[i])
     end
-    f(k6, x+c6*h, y1, params)
+    F(k6, x+c6*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a71*k1[i]+a74*k4[i]+a75*k5[i]+a76*k6[i])
     end
-    f(k7, x+c7*h, y1, params)
+    F(k7, x+c7*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a81*k1[i]+a84*k4[i]+a85*k5[i]+a86*k6[i]+a87*k7[i])  
     end
-    f(k8, x+c8*h, y1, params)
+    F(k8, x+c8*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a91*k1[i]+a94*k4[i]+a95*k5[i]+a96*k6[i]+a97*k7[i]+a98*k8[i])
     end
-    f(k9, x+c9*h, y1, params)
+    F(k9, x+c9*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a101*k1[i]+a104*k4[i]+a105*k5[i]+a106*k6[i]
            +a107*k7[i]+a108*k8[i]+a109*k9[i])
     end
-    f(k10, x+c10*h, y1, params)
+    F(k10, x+c10*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a111*k1[i]+a114*k4[i]+a115*k5[i]+a116*k6[i]
            +a117*k7[i]+a118*k8[i]+a119*k9[i]+a1110*k10[i])
     end
-    f(k2, x+c11*h, y1, params)
+    F(k2, x+c11*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a121*k1[i]+a124*k4[i]+a125*k5[i]+a126*k6[i]
            +a127*k7[i]+a128*k8[i]+a129*k9[i]+a1210*k10[i]+a1211*k2[i])
     end
-    f(k3, x+h, y1, params)
+    F(k3, x+h, y1)
     for i = 1:n
         k4[i] = b1*k1[i]+b6*k6[i]+b7*k7[i]+b8*k8[i]+b9*k9[i]+b10*k10[i]+b11*k2[i]+b12*k3[i]
         k5[i] = y[i]+h*k4[i]
@@ -395,7 +404,7 @@ function dopcore(n::Int64, f::Function, x::Float64, y::Vector{Float64}, h::Float
     err = 0.0
     err2 = 0.0
     for i = 1:n
-        sk = atol[i] + rtol[i]*max(abs(y[i]),abs(k5[i]))
+        sk = abstol[i] + reltol[i]*max(abs(y[i]),abs(k5[i]))
         erri = k4[i] - bhh1*k1[i] - bhh2*k9[i] - bhh3*k3[i]
         err2 += (erri/sk)*(erri/sk)
         erri = er1*k1[i] + er6*k6[i] + er7*k7[i] + er8*k8[i] + er9*k9[i] + er10*k10[i] + er11*k2[i] + er12*k3[i]
