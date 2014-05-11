@@ -15,4 +15,6 @@ before_install:
 script:
     - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir())/ODE`); Pkg.pin("ODE"); Pkg.resolve()'
     - julia -e 'using ODE; @assert isdefined(:ODE); @assert typeof(ODE) === Module'
-    - julia test/runtests.jl
+    - julia --code-coverage test/runtests.jl
+after_success:
+    - julia -e 'cd(Pkg.dir("ODE")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
