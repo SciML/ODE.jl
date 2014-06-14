@@ -273,7 +273,7 @@ const bs_coefficients = (3,
                          # 3rd order b-coefficients
                          [2/9 1/3 4/9 0],
                          )
-ode23_bs(F, tspan, x0) = oderkf(F, tspan, x0, bs_coefficients...)
+ode23_bs(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, bs_coefficients...; kwargs...)
 
 
 # Both the Dormand-Prince and Fehlberg 4(5) coefficients are from a tableau in
@@ -369,7 +369,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
     # Crude forward finite differences estimator as fallback
     # FIXME: This doesn't really work if x is anything but a Vector or a scalar
     function fdjacobian(F, x::Number, t)
-        ftx = F(t, x)        
+        ftx = F(t, x)
 
         # The 100 below is heuristic
         dx = (x .+ (x==0))./100
@@ -445,7 +445,7 @@ const kr4_coefficients = (0.231,
                            -5.07167533877   0                0        0
                             6.02015272865   0.1597500684673  0        0
                            -1.856343618677 -8.50538085819   -2.08407513602 0],)
-                           
+
 ode4s_kr(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, kr4_coefficients...; jacobian=jacobian)
 
 # Shampine coefficients
