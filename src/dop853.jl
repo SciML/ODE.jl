@@ -103,7 +103,7 @@ function dop853(F::Function, y0, tspan;
     iord = 8
     if h == 0.0
         h = hinit(n, F, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
-	println("hinit = $h")
+	printmessages && println("hinit = $h")
         nfcn += 1
     end
     reject = false
@@ -133,7 +133,7 @@ function dop853(F::Function, y0, tspan;
         end
 
         y1, err = dopcore(n, F, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
-	println("error is $err")
+	printmessages && println("error is $err")
         xph = x+h
         nfcn += 11
 
@@ -183,7 +183,7 @@ function dop853(F::Function, y0, tspan;
             copy!(y, k5)
             xold = x
             x = xph
-            println(x)
+            printmessages && println(x)
             # if
             # solout
             # end
