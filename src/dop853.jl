@@ -7,7 +7,7 @@ end
 function dop853(F::Function, y0, tspan;
     reltol::Vector{Float64}=[1e-6], abstol::Vector{Float64}=[sqrt(eps())],
     uround::Float64=eps(), safe::Float64=0.9, fac1::Float64=0.333, fac2::Float64=6.0,
-    beta::Float64=0.0, maxstepsize::Float64=tspan[end]-tspan[1], initialstep::Float64=1e-7,
+    beta::Float64=0.0, maxstepsize::Float64=tspan[end]-tspan[1], initialstep::Float64=0.0,
     maxsteps::Int64=100000, printmessages::Bool=false, nstiff::Int64=1000,
     iout::Int64=0, solout::Function=s(x...)=return, dense::Vector{Int64}=[1:length(y0)])
 
