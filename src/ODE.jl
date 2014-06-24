@@ -335,7 +335,7 @@ const ode45 = ode45_dp
 # P.J. Prince and J.R.Dormand: High order embedded Runge-Kutta formulae, Journal of Computational and Applied Mathematics 7(1), 1981.
 
 
-#ODE4    Solve non-stiff differential equations, fourth order
+#ODE4  Solve non-stiff differential equations, fourth order
 #   fixed-step Runge-Kutta method.
 #
 #   [T,X] = ODE4(ODEFUN, TSPAN, X0) with TSPAN = [T0:H:TFINAL]
