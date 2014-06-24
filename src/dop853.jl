@@ -4,12 +4,13 @@ type ODEProblemFunction <: ODEProblem
     f::Function
 end
 
-function dop853(F::Function, y0, tspan;
-    reltol::Vector{Float64}=[1e-6], abstol::Vector{Float64}=[sqrt(eps())],
-    uround::Float64=eps(), safe::Float64=0.9, fac1::Float64=0.333, fac2::Float64=6.0,
-    beta::Float64=0.0, maxstepsize::Float64=tspan[end]-tspan[1], initialstep::Float64=0.0,
-    maxsteps::Int64=100000, printmessages::Bool=false, nstiff::Int64=1000,
-    iout::Int64=0, solout::Function=s(x...)=return, dense::Vector{Int64}=[1:length(y0)])
+function dop853(F, y0, tspan;
+    reltol=[1e-6], abstol=[sqrt(eps())],
+    safe=0.9, fac1=0.333, fac2=6.0, beta=0.0,
+    maxstep=tspan[end]-tspan[1], initstep=0.0,
+    maxsteps=100000, printmessages=false, nstiff=1000,
+    iout=0, solout=s(x...)=return, dense=[1:length(y0)],
+    points=:all)
 
     c14 = 0.1e+00
     c15 = 0.2e+00
@@ -67,6 +68,9 @@ function dop853(F::Function, y0, tspan;
 
     x = tspan[1]
     xend = tspan[end]
+    tout = Array(typeof(tspan[1]),0)
+    yout = Array(typeof(y0*one(x)),0)
+
     n = length(y0)
     nrd = length(dense)
     nfcn = 0
@@ -84,6 +88,7 @@ function dop853(F::Function, y0, tspan;
     k9 = zeros(n)
     k10 = zeros(n)
     y = zeros(n)
+    y1 = zeros(n)
     copy!(y, y0)
     facold = 1e-4
     expo1 = 1.0/8.0 - beta*0.2
@@ -97,9 +102,9 @@ function dop853(F::Function, y0, tspan;
     iasti = 0
     F(k1, x, y)
     nfcn += 1
-    hmax = abs(maxstepsize)
+    hmax = abs(maxstep)
     nmax = maxsteps
-    h = initialstep
+    h = initstep
     iord = 8
     if h == 0.0
         h = hinit(n, F, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
@@ -119,7 +124,7 @@ function dop853(F::Function, y0, tspan;
         if nstep > nmax
             error("Exit at x=$x. More than nmax=$nmax steps needed.")
         end
-        if 0.1*abs(h) <= abs(x)*uround
+        if 0.1*abs(h) <= abs(x)*eps()
             error("Exit at x=$x. Step size too small, h=$h.")
         end
         if (x+1.01*h-xend)*posneg > 0.0
@@ -131,7 +136,7 @@ function dop853(F::Function, y0, tspan;
             F(k1, x, y)
         end
 
-        y1, err = dopcore(n, F, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
+        err = dopcore(y1, n, F, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
         xph = x+h
         nfcn += 11
 
@@ -181,6 +186,10 @@ function dop853(F::Function, y0, tspan;
             copy!(y, k5)
             xold = x
             x = xph
+            if points == :all
+                push!(tout, x)
+                push!(yout, y1)
+            end
             # if
             # solout
             # end
@@ -188,7 +197,11 @@ function dop853(F::Function, y0, tspan;
             if last
                 h = hnew
                 idid = 1
-                return y
+                if points == :last
+                    push!(yout, y1)
+                    push!(tout, x)
+                end
+                return yout, tout
             end
             if abs(hnew) > hmax
                 hnew = posneg*hmax  
@@ -206,6 +219,15 @@ function dop853(F::Function, y0, tspan;
             last = false
         end
         h = hnew
+    end
+end
+
+function denseout(ind, t, told, h, coeff, dense)
+    if ~in(ind, dense)
+        error("No dense output available for component: $ind.")
+    else
+        s = (t - told)/h
+        s1 = 1.0 - s
     end
 end
 
@@ -242,7 +264,7 @@ function hinit(n::Int64, F::Function, x::Float64, y::Vector{Float64}, xend::Floa
     return h*posneg
 end
 
-function dopcore(n::Int64, F::Function, x::Float64, y::Vector{Float64}, h::Float64, k1::Vector{Float64}, k2::Vector{Float64}, k3::Vector{Float64}, k4::Vector{Float64}, k5::Vector{Float64}, k6::Vector{Float64}, k7::Vector{Float64}, k8::Vector{Float64}, k9::Vector{Float64}, k10::Vector{Float64}, abstol::Vector{Float64}, reltol::Vector{Float64})
+function dopcore(y1::Vector, n::Int64, F::Function, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
     a21 =    5.26001519587677318785587544488e-2
     a31 =    1.97250569845378994544595329183e-2
     a32 =    5.91751709536136983633785987549e-2
@@ -347,7 +369,6 @@ function dopcore(n::Int64, F::Function, x::Float64, y::Vector{Float64}, h::Float
     er11 =  0.8192320648511571246570742613e-01
     er12 = -0.2235530786388629525884427845e-01
     
-    y1 = zeros(n)
     for i = 1:n
         y1[i] = y[i] + h*a21*k1[i]
     end
@@ -415,5 +436,5 @@ function dopcore(n::Int64, F::Function, x::Float64, y::Vector{Float64}, h::Float
         deno = 1.0
     end
     err = abs(h)*err*sqrt(1.0/(n*deno))
-    return y1, err
+    return err
 end
