@@ -1,6 +1,6 @@
 Various basic Ordinary Differential Equation solvers implemented in Julia.
 
-[![Build Status](https://travis-ci.org/JuliaLang/ODE.jl.png)](https://travis-ci.org/JuliaLang/ODE.jl)
+[![Build Status](https://travis-ci.org/JuliaLang/ODE.jl.png)](https://travis-ci.org/JuliaLang/ODE.jl) [![Coverage Status](https://img.shields.io/coveralls/JuliaLang/ODE.jl.svg)](https://coveralls.io/r/JuliaLang/ODE.jl)
 
 Pull requests are always highly welcome to fix bugs, add solvers, or
 anything else!

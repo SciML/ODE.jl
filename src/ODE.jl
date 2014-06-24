@@ -182,18 +182,19 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
+function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     # see p.91 in the Ascher & Petzold reference for more infomation.
-    pow = 1/5
+    pow = 1/p   # use the higher order to estimate the next step size
 
-    c = sum(a, 2)
+    c = sum(a, 2)   # consistency condition
 
     # Initialization
     t = tspan[1]
     tfinal = tspan[end]
-    hmax = (tfinal - t)/2.5
-    hmin = (tfinal - t)/1e9
-    h = (tfinal - t)/100  # initial guess at a step size
+    tdir = sign(tfinal - t)
+    hmax = abs(tfinal - t)/2.5
+    hmin = abs(tfinal - t)/1e9
+    h = tdir*abs(tfinal - t)/100  # initial guess at a step size
     x = x0
     tout = t            # first output time
     xout = Array(typeof(x0), 1)
@@ -202,23 +203,29 @@ function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
     k = Array(typeof(x0), length(c))
     k[1] = F(t,x) # first stage
 
-    while t < tfinal && h >= hmin
-        if t + h > tfinal
+    while abs(t) != abs(tfinal) && abs(h) >= hmin
+        if abs(h) > abs(tfinal-t)
             h = tfinal - t
         end
 
+        #(p-1)th and pth order estimates
+        xs = x + h*bs[1]*k[1]
+        xp = x + h*bp[1]*k[1]
         for j = 2:length(c)
-            k[j] = F(t + h.*c[j], x + h.*(a[j,1:j-1]*k[1:j-1])[1])
+            dx = a[j,1]*k[1]
+            for i = 2:j-1
+                dx += a[j,i]*k[i]
+            end
+            k[j] = F(t + h*c[j], x + h*dx)
+
+            # compute the (p-1)th order estimate
+            xs = xs + h*bs[j]*k[j]
+            # compute the pth order estimate
+            xp = xp + h*bp[j]*k[j]
         end
 
-        # compute the 4th order estimate
-        x4 = x + h.*(b4*k)[1]
-
-        # compute the 5th order estimate
-        x5 = x + h.*(b5*k)[1]
-
         # estimate the local truncation error
-        gamma1 = x5 - x4
+        gamma1 = xs - xp
 
         # Estimate the error and the acceptable error
         delta = norm(gamma1, Inf)              # actual error
@@ -227,14 +234,14 @@ function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
         # Update the solution only if the error is acceptable
         if delta <= tau
             t = t + h
-            x = x5    # <-- using the higher order estimate is called 'local extrapolation'
+            x = xp    # <-- using the higher order estimate is called 'local extrapolation'
             tout = [tout; t]
             push!(xout, x)
 
             # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
             # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
             #        s is the number of intermediate RK stages on [t (t+h)] (Dormand-Prince has s=7 stages)
-            if c[end] == 1 && t != tspan[1]
+            if c[end] == 1
                 # Assign the last stage for x(k) as the first stage for computing x[k+1].
                 # This is part of the Dormand-Prince pair caveat.
                 # k[:,7] has already been computed, so use it instead of recomputing it
@@ -249,12 +256,26 @@ function oderkf(F, x0, tspan, a, b4, b5; reltol = 1.0e-5, abstol = 1.0e-8)
         h = min(hmax, 0.8*h*(tau/delta)^pow)
     end # while (t < tfinal) & (h >= hmin)
 
-    if t < tfinal
-      println("Step size grew too small. t=", t, ", h=", h, ", x=", x)
+    if abs(t) < abs(tfinal)
+      println("Step size grew too small. t=", t, ", h=", abs(h), ", x=", x)
     end
 
     return tout, xout
 end
+
+# Bogacki–Shampine coefficients
+const bs_coefficients = (3,
+                         [    0           0      0      0
+                              1/2         0      0      0
+                              0         3/4      0      0
+                              2/9       1/3     4/9     0],
+                         # 2nd order b-coefficients
+                         [7/24 1/4 1/3 1/8],
+                         # 3rd order b-coefficients
+                         [2/9 1/3 4/9 0],
+                         )
+ode23_bs(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, bs_coefficients...; kwargs...)
+
 
 # Both the Dormand-Prince and Fehlberg 4(5) coefficients are from a tableau in
 # U.M. Ascher, L.R. Petzold, Computer Methods for  Ordinary Differential Equations
@@ -262,7 +283,8 @@ end
 # (SIAM), Philadelphia, 1998
 #
 # Dormand-Prince coefficients
-const dp_coefficients = ([    0           0          0         0         0        0
+const dp_coefficients = (5,
+                         [    0           0          0         0         0        0
                               1/5         0          0         0         0        0
                               3/40        9/40       0         0         0        0
                              44/45      -56/15      32/9       0         0        0
@@ -277,7 +299,8 @@ const dp_coefficients = ([    0           0          0         0         0      
 ode45_dp(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, dp_coefficients...; kwargs...)
 
 # Fehlberg coefficients
-const fb_coefficients = ([    0         0          0         0        0
+const fb_coefficients = (5,
+                         [    0         0          0         0        0
                              1/4        0          0         0        0
                              3/32       9/32       0         0        0
                           1932/2197 -7200/2197  7296/2197    0        0
@@ -292,7 +315,8 @@ ode45_fb(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, fb_coefficients...; kwa
 
 # Cash-Karp coefficients
 # Numerical Recipes in Fortran 77
-const ck_coefficients = ([   0         0       0           0          0
+const ck_coefficients = (5,
+                         [   0         0       0           0          0
                              1/5       0       0           0          0
                              3/40      9/40    0           0          0
                              3/10     -9/10    6/5         0          0
@@ -307,6 +331,10 @@ ode45_ck(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, ck_coefficients...; kwa
 
 # Use Dormand Prince version of ode45 by default
 const ode45 = ode45_dp
+
+# some higher-order embedded methods can be found in:
+# P.J. Prince and J.R.Dormand: High order embedded Runge-Kutta formulae, Journal of Computational and Applied Mathematics 7(1), 1981.
+
 
 #ODE4    Solve non-stiff differential equations, fourth order
 #   fixed-step Runge-Kutta method.
@@ -342,7 +370,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
     # Crude forward finite differences estimator as fallback
     # FIXME: This doesn't really work if x is anything but a Vector or a scalar
     function fdjacobian(F, x::Number, t)
-        ftx = F(t, x)        
+        ftx = F(t, x)
 
         # The 100 below is heuristic
         dx = (x .+ (x==0))./100
@@ -384,15 +412,23 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
         if size(dFdx,1) == 1
             jac = 1/gamma/hs - dFdx[1]
         else
-            jac = eye(dFdx)./gamma./hs - dFdx
+            jac = eye(dFdx)/gamma/hs - dFdx
         end
 
         g = Array(typeof(x0), size(a,1))
-        g[1] = (jac \ F(ts + b[1].*hs, xs))
+        g[1] = (jac \ F(ts + b[1]*hs, xs))
+        x[solstep+1] = x[solstep] + b[1]*g[1]
+
         for i = 2:size(a,1)
-            g[i] = (jac \ (F(ts + b[i].*hs, xs + (a[i,1:i-1]*g[1:i-1])[1]) + (c[i,1:i-1]*g[1:i-1])[1]./hs))
+            dx = zero(x0)
+            dF = zero(x0/hs)
+            for j = 1:i-1
+                dx += a[i,j]*g[j]
+                dF += c[i,j]*g[j]
+            end
+            g[i] = (jac \ (F(ts + b[i]*hs, xs + dx) + dF/hs))
+            x[solstep+1] += b[i]*g[i]
         end
-        x[solstep+1] = x[solstep] + (b*g)[1]
         solstep += 1
     end
     return [tspan], x
@@ -410,7 +446,7 @@ const kr4_coefficients = (0.231,
                            -5.07167533877   0                0        0
                             6.02015272865   0.1597500684673  0        0
                            -1.856343618677 -8.50538085819   -2.08407513602 0],)
-                           
+
 ode4s_kr(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, kr4_coefficients...; jacobian=jacobian)
 
 # Shampine coefficients
@@ -458,7 +494,11 @@ function ode_ms(F, x0, tspan, order::Integer)
         # Need to run the first several steps at reduced order
         steporder = min(i, order)
         xdot[i] = F(tspan[i], x[i])
-        x[i+1] = x[i] + (b[steporder,1:steporder]*xdot[i-(steporder-1):i])[1].*h[i]
+
+        x[i+1] = x[i]
+        for j = 1:steporder
+            x[i+1] += h[i]*b[steporder, j]*xdot[i-(steporder-1) + (j-1)]
+        end
     end
     return [tspan], x
 end
