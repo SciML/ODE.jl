@@ -77,18 +77,19 @@ function dop853(F, y0, tspan;
     nstep = 0
     naccpt = 0
     nrejct = 0
-    k1 = zeros(n)
-    k2 = zeros(n)
-    k3 = zeros(n)
-    k4 = zeros(n)
-    k5 = zeros(n)
-    k6 = zeros(n)
-    k7 = zeros(n)
-    k8 = zeros(n)
-    k9 = zeros(n)
-    k10 = zeros(n)
-    y = zeros(n)
-    y1 = zeros(n)
+    k1 = 0. * y0
+    k2 = 0. * y0
+    k3 = 0. * y0
+    k4 = 0. * y0
+    k5 = 0. * y0
+    k6 = 0. * y0
+    k7 = 0. * y0
+    k8 = 0. * y0
+    k9 = 0. * y0
+    k10 = 0. * y0
+    y = 0. * y0
+    y1 = 0. * y0
+
     copy!(y, y0)
     facold = 1e-4
     expo1 = 1.0/8.0 - beta*0.2
@@ -108,6 +109,7 @@ function dop853(F, y0, tspan;
     iord = 8
     if h == 0.0
         h = hinit(n, F, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
+	printmessages && println("hinit = $h")
         nfcn += 1
     end
     reject = false
@@ -147,7 +149,7 @@ function dop853(F, y0, tspan;
         if err <= 1.0
             facold = max(err, 1e-4)
             naccpt += 1
-            F(k4, xph, k5,)
+            F(k4, xph, k5)
             nfcn += 1
             # Stiffness detection
             if mod(naccpt, nstiff) == 0 || iasti > 0
@@ -204,12 +206,12 @@ function dop853(F, y0, tspan;
                 return yout, tout
             end
             if abs(hnew) > hmax
-                hnew = posneg*hmax  
+                hnew = posneg*hmax
             end
-            if reject 
+            if reject
                 hnew = posneg*min(abs(hnew),abs(h))
             end
-            reject = false 
+            reject = false
         else
             hnew = h/min(facc1,fac11/safe)
             reject = true
@@ -231,7 +233,7 @@ function denseout(ind, t, told, h, coeff, dense)
     end
 end
 
-function hinit(n::Int64, F::Function, x::Float64, y::Vector{Float64}, xend::Float64, posneg::Float64, f0::AbstractArray{Float64,1}, f1::AbstractArray{Float64,1}, y0::AbstractArray{Float64,1}, iord::Int64, hmax::Float64, abstol::Vector{Float64}, reltol::Vector{Float64})
+function hinit(n::Int64, F::Function, x::Float64, y::Vector, xend::Float64, posneg::Float64, f0::AbstractVector, f1::AbstractVector, y0::AbstractVector, iord::Int64, hmax::Float64, abstol::Vector{Float64}, reltol::Vector{Float64})
     dnf = 0.0
     dny = 0.0
     for i = 1:n
@@ -239,10 +241,10 @@ function hinit(n::Int64, F::Function, x::Float64, y::Vector{Float64}, xend::Floa
         dnf += (f0[i]/sk)^2
         dny += (y[i]/sk)^2
     end
-    if dnf <= 1e-10 || dny <= 1e-10
+    if maximum(abs(dnf)) <= 1e-10 || maximum(abs(dny)) <= 1e-10
         h = 1e-6
     else
-        h = sqrt(dny/dnf)*0.01
+        h = sqrt(maximum(abs(dny/dnf)))*0.01
     end
     h = min(h, hmax)
     h = h*posneg
@@ -253,8 +255,8 @@ function hinit(n::Int64, F::Function, x::Float64, y::Vector{Float64}, xend::Floa
         sk = abstol[i] + reltol[i]*abs(y[i])
         der2 += ((f1[i]-f0[i])/sk)^2
     end
-    der2 = sqrt(der2)/h
-    der12 = max(abs(der2), sqrt(dnf))
+    der2 = sqrt(maximum(abs(der2)))/h
+    der12 = max(maximum(abs(der2)), sqrt(maximum(abs(dnf))))
     if der12 <= 1e-15
         h1 = max(1e-6, abs(h)*1e-3)
     else
@@ -378,7 +380,7 @@ function dopcore(y1::Vector, n::Int64, F::Function, x::Float64, y::Vector, h::Fl
     end
     F(k3, x+c3*h, y1)
     for i = 1:n
-        y1[i] = y[i]+h*(a41*k1[i]+a43*k3[i])  
+        y1[i] = y[i]+h*(a41*k1[i]+a43*k3[i])
     end
     F(k4, x+c4*h, y1)
     for i = 1:n
@@ -394,7 +396,7 @@ function dopcore(y1::Vector, n::Int64, F::Function, x::Float64, y::Vector, h::Fl
     end
     F(k7, x+c7*h, y1)
     for i = 1:n
-        y1[i] = y[i]+h*(a81*k1[i]+a84*k4[i]+a85*k5[i]+a86*k6[i]+a87*k7[i])  
+        y1[i] = y[i]+h*(a81*k1[i]+a84*k4[i]+a85*k5[i]+a86*k6[i]+a87*k7[i])
     end
     F(k8, x+c8*h, y1)
     for i = 1:n
@@ -425,16 +427,16 @@ function dopcore(y1::Vector, n::Int64, F::Function, x::Float64, y::Vector, h::Fl
     err = 0.0
     err2 = 0.0
     for i = 1:n
-        sk = abstol[i] + reltol[i]*max(abs(y[i]),abs(k5[i]))
+        sk = abstol[i] + reltol[i]*max(maximum(abs(y[i])), maximum(abs(k5[i])))
         erri = k4[i] - bhh1*k1[i] - bhh2*k9[i] - bhh3*k3[i]
         err2 += (erri/sk)*(erri/sk)
         erri = er1*k1[i] + er6*k6[i] + er7*k7[i] + er8*k8[i] + er9*k9[i] + er10*k10[i] + er11*k2[i] + er12*k3[i]
         err += (erri/sk)*(erri/sk)
-    end 
-    deno = err + 0.01*err2
+    end
+    deno = maximum(abs(err)) + 0.01*maximum(abs(err2))
     if deno <= 0.0
         deno = 1.0
     end
     err = abs(h)*err*sqrt(1.0/(n*deno))
-    return err
+    return maximum(abs(err))
 end
