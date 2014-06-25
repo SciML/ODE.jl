@@ -122,6 +122,25 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
 
 end # ode23
 
+# helper functions
+maxeps(x::FloatingPoint, y::FloatingPoint) = max(eps(abs(x)), eps(abs(y)))
+
+# `isapprox` with configurable tolerance
+function approxeq(x::FloatingPoint, y::FloatingPoint;
+	rtol::FloatingPoint=cbrt(maxeps(x,y)), atol::FloatingPoint=sqrt(maxeps(x,y)))
+    abs(x-y) <= atol + rtol*max(abs(x), abs(y))
+end
+
+# an extension of the `in` statement for floating point values
+function approxin(c::FloatingPoint, span::AbstractVector{Float64}; atol::FloatingPoint=.1)
+#for some strange reason AbstractVector{FloatingPoint} does not work here!
+    truth = map(elem -> approxeq(c, elem; atol=atol), span)
+    for elem in truth
+        elem && return true
+    end
+    return false
+end
+
 
 
 # ode45 adapted from http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
@@ -181,7 +200,11 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
+function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
+	initstep = sign(tspan[end] - tspan[1])*abs(tspan[end] - tspan[1])/100,
+	minstep = abs(tspan[end] - tspan[1])/1e9,
+	maxstep = abs(tspan[end] - tspan[1])/2.5,
+	points = :all)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/p   # use the higher order to estimate the next step size
 
@@ -191,9 +214,9 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     t = tspan[1]
     tfinal = tspan[end]
     tdir = sign(tfinal - t)
-    hmax = abs(tfinal - t)/2.5
-    hmin = abs(tfinal - t)/1e9
-    h = tdir*abs(tfinal - t)/100  # initial guess at a step size
+    hmax = maxstep
+    hmin = minstep
+    h = initstep
     x = x0
     tout = t            # first output time
     xout = Array(typeof(x0), 1)
@@ -234,8 +257,10 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
         if delta <= tau
             t = t + h
             x = xp    # <-- using the higher order estimate is called 'local extrapolation'
-            tout = [tout; t]
-            push!(xout, x)
+	    if points == :all || approxin(t, tspan; atol=.02)
+		    tout = [tout; t]
+		    push!(xout, x)
+	    end
 
             # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
             # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
