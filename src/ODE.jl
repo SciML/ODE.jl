@@ -5,7 +5,7 @@ module ODE
 using Polynomial
 
 ## minimal function export list
-export ode23, ode4, ode45, ode4s, ode4ms, dop853
+export ode23, ode4, ode45, ode4s, ode4ms, dop853, ODEProblem
 
 ## complete function export list
 #export ode23, ode4,

@@ -4,7 +4,11 @@ type ODEProblemFunction <: ODEProblem
     f::Function
 end
 
-function dop853(F, y0, tspan;
+F!(p::ODEProblemFunction, y, x, t) = copy!(y, p.f(x, t))
+
+dop853(f::Function, y0, tspan; args...) = dop853(F!, ODEProblemFunction(f), y0, tspan; args...)
+
+function dop853(F!::Function, p::ODEProblem, y0, tspan;
     reltol=[1e-6], abstol=[sqrt(eps())],
     safe=0.9, fac1=0.333, fac2=6.0, beta=0.0,
     maxstep=tspan[end]-tspan[1], initstep=0.0,
@@ -101,14 +105,14 @@ function dop853(F, y0, tspan;
     last = false
     hlamb = 0.0
     iasti = 0
-    F(k1, x, y)
+    F!(p, k1, x, y)
     nfcn += 1
     hmax = abs(maxstep)
     nmax = maxsteps
     h = initstep
     iord = 8
     if h == 0.0
-        h = hinit(n, F, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
+        h = hinit(n, F!, p, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
 	printmessages && println("hinit = $h")
         nfcn += 1
     end
@@ -135,10 +139,10 @@ function dop853(F, y0, tspan;
         end
         nstep += 1
         if irtrn >= 2
-            F(k1, x, y)
+            F!(p, k1, x, y)
         end
 
-        err = dopcore(y1, n, F, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
+        err = dopcore(y1, n, F!, p, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
         xph = x+h
         nfcn += 11
 
@@ -149,7 +153,7 @@ function dop853(F, y0, tspan;
         if err <= 1.0
             facold = max(err, 1e-4)
             naccpt += 1
-            F(k4, xph, k5)
+            F!(p, k4, xph, k5)
             nfcn += 1
             # Stiffness detection
             if mod(naccpt, nstiff) == 0 || iasti > 0
@@ -233,7 +237,7 @@ function denseout(ind, t, told, h, coeff, dense)
     end
 end
 
-function hinit(n::Int64, F::Function, x::Float64, y::Vector, xend::Float64, posneg::Float64, f0::AbstractVector, f1::AbstractVector, y0::AbstractVector, iord::Int64, hmax::Float64, abstol::Vector{Float64}, reltol::Vector{Float64})
+function hinit(n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, xend::Float64, posneg::Float64, f0::AbstractVector, f1::AbstractVector, y0::AbstractVector, iord::Int64, hmax::Float64, abstol::Vector{Float64}, reltol::Vector{Float64})
     dnf = 0.0
     dny = 0.0
     for i = 1:n
@@ -249,7 +253,7 @@ function hinit(n::Int64, F::Function, x::Float64, y::Vector, xend::Float64, posn
     h = min(h, hmax)
     h = h*posneg
     y1 = y + h*y0
-    F(f1, x+h, y1)
+    F!(p, f1, x+h, y1)
     der2 = 0.0
     for i = 1:n
         sk = abstol[i] + reltol[i]*abs(y[i])
@@ -266,7 +270,7 @@ function hinit(n::Int64, F::Function, x::Float64, y::Vector, xend::Float64, posn
     return h*posneg
 end
 
-function dopcore(y1::Vector, n::Int64, F::Function, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
+function dopcore(y1::Vector, n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
     a21 =    5.26001519587677318785587544488e-2
     a31 =    1.97250569845378994544595329183e-2
     a32 =    5.91751709536136983633785987549e-2
@@ -370,54 +374,54 @@ function dopcore(y1::Vector, n::Int64, F::Function, x::Float64, y::Vector, h::Fl
     er10 =  0.3341791187130174790297318841e+00
     er11 =  0.8192320648511571246570742613e-01
     er12 = -0.2235530786388629525884427845e-01
-    
+
     for i = 1:n
         y1[i] = y[i] + h*a21*k1[i]
     end
-    F(k2, x+c2*h, y1)
+    F!(p, k2, x+c2*h, y1)
     for i = 1:n
         y1[i] = y[i] + h*(a31*k1[i] + a32*k2[i])
     end
-    F(k3, x+c3*h, y1)
+    F!(p, k3, x+c3*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a41*k1[i]+a43*k3[i])
     end
-    F(k4, x+c4*h, y1)
+    F!(p, k4, x+c4*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a51*k1[i]+a53*k3[i]+a54*k4[i])
     end
-    F(k5, x+c5*h, y1)
+    F!(p, k5, x+c5*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a61*k1[i]+a64*k4[i]+a65*k5[i])
     end
-    F(k6, x+c6*h, y1)
+    F!(p, k6, x+c6*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a71*k1[i]+a74*k4[i]+a75*k5[i]+a76*k6[i])
     end
-    F(k7, x+c7*h, y1)
+    F!(p, k7, x+c7*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a81*k1[i]+a84*k4[i]+a85*k5[i]+a86*k6[i]+a87*k7[i])
     end
-    F(k8, x+c8*h, y1)
+    F!(p, k8, x+c8*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a91*k1[i]+a94*k4[i]+a95*k5[i]+a96*k6[i]+a97*k7[i]+a98*k8[i])
     end
-    F(k9, x+c9*h, y1)
+    F!(p, k9, x+c9*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a101*k1[i]+a104*k4[i]+a105*k5[i]+a106*k6[i]
            +a107*k7[i]+a108*k8[i]+a109*k9[i])
     end
-    F(k10, x+c10*h, y1)
+    F!(p, k10, x+c10*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a111*k1[i]+a114*k4[i]+a115*k5[i]+a116*k6[i]
            +a117*k7[i]+a118*k8[i]+a119*k9[i]+a1110*k10[i])
     end
-    F(k2, x+c11*h, y1)
+    F!(p, k2, x+c11*h, y1)
     for i = 1:n
         y1[i] = y[i]+h*(a121*k1[i]+a124*k4[i]+a125*k5[i]+a126*k6[i]
            +a127*k7[i]+a128*k8[i]+a129*k9[i]+a1210*k10[i]+a1211*k2[i])
     end
-    F(k3, x+h, y1)
+    F!(p, k3, x+h, y1)
     for i = 1:n
         k4[i] = b1*k1[i]+b6*k6[i]+b7*k7[i]+b8*k8[i]+b9*k9[i]+b10*k10[i]+b11*k2[i]+b12*k3[i]
         k5[i] = y[i]+h*k4[i]
