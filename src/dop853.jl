@@ -4,9 +4,14 @@ type ODEProblemFunction <: ODEProblem
     f::Function
 end
 
-F!(p::ODEProblemFunction, y, x, t) = copy!(y, p.f(x, t))
+F!(p::ODEProblemFunction, y, x, t) = copy!(y, [p.f(x, t)])
 
-dop853(f::Function, y0, tspan; args...) = dop853(F!, ODEProblemFunction(f), y0, tspan; args...)
+dop853(f::Function, y0::Vector, tspan; args...) = dop853(F!, ODEProblemFunction(f), y0, tspan; args...)
+
+function dop853(f::Function, y0::Number, tspan; args...)
+    tout, yout = dop853(F!, ODEProblemFunction(f), [y0], tspan; args...)
+    return tout, vcat(yout...)
+end
 
 function dop853(F!::Function, p::ODEProblem, y0, tspan;
     reltol=[1e-6], abstol=[sqrt(eps())],
@@ -15,6 +20,7 @@ function dop853(F!::Function, p::ODEProblem, y0, tspan;
     maxsteps=100000, printmessages=false, nstiff=1000,
     iout=0, solout=s(x...)=return, dense=[1:length(y0)],
     points=:all)
+
 
     c14 = 0.1e+00
     c15 = 0.2e+00
@@ -75,6 +81,11 @@ function dop853(F!::Function, p::ODEProblem, y0, tspan;
     tout = Array(typeof(tspan[1]),0)
     yout = Array(typeof(y0*one(x)),0)
 
+    if points == :all
+        push!(tout, x)
+        push!(yout, y0)
+    end
+
     n = length(y0)
     nrd = length(dense)
     nfcn = 0
@@ -92,7 +103,6 @@ function dop853(F!::Function, p::ODEProblem, y0, tspan;
     k9 = 0. * y0
     k10 = 0. * y0
     y = 0. * y0
-    y1 = 0. * y0
 
     copy!(y, y0)
     facold = 1e-4
@@ -142,7 +152,7 @@ function dop853(F!::Function, p::ODEProblem, y0, tspan;
             F!(p, k1, x, y)
         end
 
-        err = dopcore(y1, n, F!, p, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
+        y1, err = dopcore(n, F!, p, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
         xph = x+h
         nfcn += 11
 
@@ -204,10 +214,9 @@ function dop853(F!::Function, p::ODEProblem, y0, tspan;
                 h = hnew
                 idid = 1
                 if points == :last
-                    push!(yout, y1)
-                    push!(tout, x)
+                    return x, y1
                 end
-                return yout, tout
+                return tout, yout
             end
             if abs(hnew) > hmax
                 hnew = posneg*hmax
@@ -270,7 +279,7 @@ function hinit(n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, xen
     return h*posneg
 end
 
-function dopcore(y1::Vector, n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
+function dopcore(n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
     a21 =    5.26001519587677318785587544488e-2
     a31 =    1.97250569845378994544595329183e-2
     a32 =    5.91751709536136983633785987549e-2
@@ -375,6 +384,8 @@ function dopcore(y1::Vector, n::Int64, F!::Function, p::ODEProblem, x::Float64, 
     er11 =  0.8192320648511571246570742613e-01
     er12 = -0.2235530786388629525884427845e-01
 
+    y1 = 0.0 * y
+
     for i = 1:n
         y1[i] = y[i] + h*a21*k1[i]
     end
@@ -442,5 +453,5 @@ function dopcore(y1::Vector, n::Int64, F!::Function, p::ODEProblem, x::Float64, 
         deno = 1.0
     end
     err = abs(h)*err*sqrt(1.0/(n*deno))
-    return maximum(abs(err))
+    return y1, maximum(abs(err))
 end
