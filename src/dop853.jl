@@ -9,7 +9,7 @@ F!(p::ODEProblemFunction, y, x, t) = copy!(y, [p.f(x, t)])
 dop853(f::Function, y0::Vector, tspan; args...) = dop853(ODEProblemFunction(f), y0, tspan; args...)
 
 function dop853(f::Function, y0::Number, tspan; args...)
-    tout, yout = dop853(F!, ODEProblemFunction(f), [y0], tspan; args...)
+    tout, yout = dop853(ODEProblemFunction(f), [y0], tspan; args...)
     return tout, vcat(yout...)
 end
 
