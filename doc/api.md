@@ -28,6 +28,7 @@ Each solver might implement its own keywords, but the following keywords have a 
 - `points=:all | :specified`: controls the type of output according to
  * `points==:all` (default) output is given for each value in `tspan` as well as for each intermediate point the solver used. 
  * `points==:specified` output is given only for each value in `tspan`.
+- `refine `: dense output support. If `refine` is 1(default), the solver returns solutions only at the end of each time step. If refine is `n>1`, the solver subdivides each time step into `n` smaller intervals and returns solutions at each time point, using interpolation formulas.
 - `maxstep`, `minstep` and `initstep`: determine the maximal, minimal and initial integration step.
 - `retries = 0` Sometimes an integration step takes you out of the region where `F(t,y)` has a valid solution and F might throw `DomainError` or other exceptions. `retries` sets a limit to the number of times the solver might try with a smaller step. 
 
