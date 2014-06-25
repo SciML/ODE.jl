@@ -122,25 +122,16 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
 
 end # ode23
 
+
 # helper functions
-maxeps(x::FloatingPoint, y::FloatingPoint) = max(eps(abs(x)), eps(abs(y)))
-
-# `isapprox` with configurable tolerance
-function approxeq(x::FloatingPoint, y::FloatingPoint;
-	rtol::FloatingPoint=cbrt(maxeps(x,y)), atol::FloatingPoint=sqrt(maxeps(x,y)))
-    abs(x-y) <= atol + rtol*max(abs(x), abs(y))
-end
-
 # an extension of the `in` statement for floating point values
-function approxin(c::FloatingPoint, span::AbstractVector{Float64}; atol::FloatingPoint=.1)
-#for some strange reason AbstractVector{FloatingPoint} does not work here!
-    truth = map(elem -> approxeq(c, elem; atol=atol), span)
+function approxin{T<:FloatingPoint}(c::FloatingPoint, span::AbstractVector{T}; atol::FloatingPoint=.1)
+    truth = map(elem -> isapprox(c, elem; atol=atol), span)
     for elem in truth
         elem && return true
     end
     return false
 end
-
 
 
 # ode45 adapted from http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
