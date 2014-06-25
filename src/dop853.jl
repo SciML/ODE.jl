@@ -6,14 +6,14 @@ end
 
 F!(p::ODEProblemFunction, y, x, t) = copy!(y, [p.f(x, t)])
 
-dop853(f::Function, y0::Vector, tspan; args...) = dop853(F!, ODEProblemFunction(f), y0, tspan; args...)
+dop853(f::Function, y0::Vector, tspan; args...) = dop853(ODEProblemFunction(f), y0, tspan; args...)
 
 function dop853(f::Function, y0::Number, tspan; args...)
     tout, yout = dop853(F!, ODEProblemFunction(f), [y0], tspan; args...)
     return tout, vcat(yout...)
 end
 
-function dop853(F!::Function, p::ODEProblem, y0, tspan;
+function dop853(p::ODEProblem, y0, tspan;
     reltol=[1e-6], abstol=[sqrt(eps())],
     safe=0.9, fac1=0.333, fac2=6.0, beta=0.0,
     maxstep=tspan[end]-tspan[1], initstep=0.0,
@@ -122,7 +122,7 @@ function dop853(F!::Function, p::ODEProblem, y0, tspan;
     h = initstep
     iord = 8
     if h == 0.0
-        h = hinit(n, F!, p, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
+        h = hinit(n, p, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
 	printmessages && println("hinit = $h")
         nfcn += 1
     end
@@ -152,7 +152,7 @@ function dop853(F!::Function, p::ODEProblem, y0, tspan;
             F!(p, k1, x, y)
         end
 
-        y1, err = dopcore(n, F!, p, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
+        y1, err = dopcore(n, p, x, y, h, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, abstol, reltol)
         xph = x+h
         nfcn += 11
 
@@ -246,7 +246,7 @@ function denseout(ind, t, told, h, coeff, dense)
     end
 end
 
-function hinit(n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, xend::Float64, posneg::Float64, f0::AbstractVector, f1::AbstractVector, y0::AbstractVector, iord::Int64, hmax::Float64, abstol::Vector{Float64}, reltol::Vector{Float64})
+function hinit(n::Int64, p::ODEProblem, x::Float64, y::Vector, xend::Float64, posneg::Float64, f0::AbstractVector, f1::AbstractVector, y0::AbstractVector, iord::Int64, hmax::Float64, abstol::Vector{Float64}, reltol::Vector{Float64})
     dnf = 0.0
     dny = 0.0
     for i = 1:n
@@ -279,7 +279,7 @@ function hinit(n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, xen
     return h*posneg
 end
 
-function dopcore(n::Int64, F!::Function, p::ODEProblem, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
+function dopcore(n::Int64, p::ODEProblem, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
     a21 =    5.26001519587677318785587544488e-2
     a31 =    1.97250569845378994544595329183e-2
     a32 =    5.91751709536136983633785987549e-2
