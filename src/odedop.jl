@@ -1,9 +1,3 @@
-abstract ODEProblem
-
-type ODEProblemFunction
-    f::Function
-end
-
 type DOP853
     a21::Float64
     a31::Float64
@@ -393,19 +387,31 @@ const dop853coeff = DOP853(5.26001519587677318785587544488e-2,
     2.9475147891527723389556272149e0,
     -9.15095847217987001081870187138e0)
 
+abstract ODEProblem
+
+type ODEProblemFunction
+    f::Function
+end
+
 F!(p::ODEProblemFunction, y, x, t) = copy!(y, [p.f(x, t)])
 
+dop853(p, y0, tspan; args...) = odedop(dop853coeff, p, y0, tspan; args...)
+dopri5(p, y0, tspan; args...) = odedop(dopri5coeff, p, y0, tspan; args...)
+
 dop853(f::Function, y0::Vector, tspan; args...) = dop853(ODEProblemFunction(f), y0, tspan; args...)
+dopri5(f::Function, y0::Vector, tspan; args...) = dopri5(ODEProblemFunction(f), y0, tspan; args...)
 
 function dop853(f::Function, y0::Number, tspan; args...)
     tout, yout = dop853(ODEProblemFunction(f), [y0], tspan; args...)
     return tout, vcat(yout...)
 end
 
+function dopri5(f::Function, y0::Number, tspan; args...)
+    tout, yout = dopri5(ODEProblemFunction(f), [y0], tspan; args...)
+    return tout, vcat(yout...)
+end
 
-dop853(p, y0, tspan; args...) = dop853(dop853coeff, p, y0, tspan; args...)
-
-function dop853(coeff, p, y0, tspan;
+function odedop(coeff, p, y0, tspan;
     reltol=[1e-6], abstol=[sqrt(eps())],
     safe=0.9, fac1=0.333, fac2=6.0, beta=0.0,
     maxstep=tspan[end]-tspan[1], initstep=0.0,
@@ -511,8 +517,13 @@ function dop853(coeff, p, y0, tspan;
                 stnum = 0.0
                 stden = 0.0
                 for i = 1:n
-                    stnum += (k4[i] - k3[i])^2
-                    stden += (k5[i] - y1[i])^2
+                    if typeof(coeff) == DOP853
+                        stnum += (k4[i] - k3[i])^2
+                        stden += (k5[i] - y1[i])^2
+                    elseif typeof(coeff) == DOPRI5
+                        stnum += (k2[i] - k6[i])^2
+                        stden += (y1[i] - k7[i])^2
+                    end
                 end
                 if stden > 0.0
                     hlamb = abs(h)*sqrt(stnum/stden)
@@ -538,8 +549,13 @@ function dop853(coeff, p, y0, tspan;
                 for (i,j) in enumerate(dense)
                 end
             end
-            copy!(k1, k4)
-            copy!(y, k5)
+            if typeof(coeff) == DOP853
+                copy!(k1, k4)
+                copy!(y, k5)
+            elseif typeof(coeff) == DOPRI5
+                copy!(k1, k2)
+                copy!(y, y1)
+            end
             xold = x
             x = xph
             if points == :all
@@ -689,5 +705,46 @@ function dopcore(c::DOP853, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::
         deno = 1.0
     end
     err = abs(h)*err*sqrt(1.0/(n*deno))
+    return y1, maximum(abs(err))
+end
+
+function dopcore(c::DOPRI5, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
+    y1 = 0.0 * y
+
+    for i = 1:n
+        y1[i] = y[i] + h*c.a21*k1[i]
+    end
+    F!(p, k2, x+c.c2*h, y1)
+    for i = 1:n
+        y1[i] = y[i] + h*(c.a31*k1[i] + c.a32*k2[i])
+    end
+    F!(p, k3, x+c.c3*h, y1)
+    for i = 1:n
+        y1[i] = y[i]+h*(c.a41*k1[i]+c.a42*k2[i]+c.a43*k3[i])
+    end
+    F!(p, k4, x+c.c4*h, y1)
+    for i = 1:n
+        y1[i] = y[i]+h*(c.a51*k1[i]+c.a52*k2[i]+c.a53*k3[i]+c.a54*k4[i])
+    end
+    F!(p, k5, x+c.c5*h, y1)
+    for i = 1:n
+        k7[i] = y[i]+h*(c.a61*k1[i]+c.a62*k2[i]+c.a63*k3[i]+c.a64*k4[i]+c.a65*k5[i])
+    end
+    F!(p, k6, x+h, k7)
+    for i = 1:n
+        y1[i] = y[i]+h*(c.a71*k1[i]+c.a73*k3[i]+c.a74*k4[i]+c.a75*k5[i]+c.a76*k6[i])
+    end
+    F!(p, k2, x+h, y1)
+    for i = 1:n
+        k4[i] = (c.e1*k1[i]+c.e3*k3[i]+c.e4*k4[i]+c.e5*k5[i]+c.e6*k6[i]+c.e7*k2[i])*h
+    end
+
+    # Error estimation
+    err = 0.0
+    for i = 1:n
+        sk = abstol[i] + reltol[i]*max(maximum(abs(y[i])), maximum(abs(y1[i])))
+        err += (k4[i]/sk)*(k4[i]/sk)
+    end
+    err = sqrt(err/n)
     return y1, maximum(abs(err))
 end
