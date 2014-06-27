@@ -707,7 +707,10 @@ function dopcore(c::DOP853, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::
         deno = 1.0
     end
     err = abs(h)*err*sqrt(1.0/(n*deno))
-    return y1, maximum(abs(err)), 11
+
+    # Number of function evaluations
+    neval = 11
+    return y1, maximum(abs(err)), neval
 end
 
 function dopcore(c::DOPRI5, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
@@ -748,5 +751,8 @@ function dopcore(c::DOPRI5, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::
         err += (k4[i]/sk)*(k4[i]/sk)
     end
     err = sqrt(err/n)
-    return y1, maximum(abs(err)), 6
+
+    # Number of function evaluations
+    neval = 6
+    return y1, maximum(abs(err)), neval
 end
