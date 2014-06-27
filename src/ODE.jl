@@ -13,7 +13,7 @@ export ode23, ode4, ode45, ode4s, ode4ms, ode78, dop853, ODEProblem
 #    oderosenbrock, ode4s, ode4s_kr, ode4s_s,
 #    ode4ms, ode_ms
 
-include("dop853.jl")
+include("odedop.jl")
 
 #ODE23  Solve non-stiff differential equations.
 #
