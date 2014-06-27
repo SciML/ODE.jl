@@ -191,14 +191,42 @@ end
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
+
+# estimator for initial step based on book
+# "Solving Ordinary Differential Equations I" by Hairer et al., p.169
+function hinit(F, x0, t0, p, reltol, abstol)
+        tau = max(reltol*norm(x0, Inf), abstol)
+	d0 = norm(x0, Inf)/tau
+	f0 = F(t0, x0)
+	d1 = norm(f0, Inf)/tau
+	if d0 < 1e-5 || d1 < 1e-5
+		h0 = 1e-6
+	else
+	        h0 = 1e-2d0/d1
+	end
+	# perform Euler step
+	x1 = x0 + h0*f0
+	f1 = F(t0 + h0, x1)
+	# estimate second derivative
+	d2 = norm(f1 - f0, Inf)/(tau*h0)
+	if max(d1, d2) <= 1e-15
+		h1 = max(1e-6, 1e-3h0)
+	else
+		pow = -(2. + log10(max(d1, d2)))/(p+1.)
+		h1 = 10.^pow
+	end
+	h = min(100.0h0, h1)
+end
+
+
 function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
-	initstep = sign(tspan[end] - tspan[1])*abs(tspan[end] - tspan[1])/100,
+	initstep = hinit(F, x0, tspan[1], p, reltol, abstol),
 	minstep = abs(tspan[end] - tspan[1])/1e9,
 	maxstep = abs(tspan[end] - tspan[1])/2.5,
 	points = :all)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/p   # use the higher order to estimate the next step size
-
+    @show initstep
     c = sum(a, 2)   # consistency condition
 
     # Initialization
