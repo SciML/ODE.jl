@@ -468,7 +468,9 @@ function odedop(coeff, p, y0, tspan;
     iord = 8
     if h == 0.0
         h = hinit(n, p, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
-	printmessages && println("hinit = $h")
+        if printmessages
+            println("hinit = $h")
+        end
         nfcn += 1
     end
     reject = false
@@ -497,10 +499,10 @@ function odedop(coeff, p, y0, tspan;
             F!(p, k1, x, y)
         end
 
-        y1, err = dopcore(coeff, n, p, x, y, h, k1, k2, k3, k4, k5, k6, k7,
+        y1, err, ncore = dopcore(coeff, n, p, x, y, h, k1, k2, k3, k4, k5, k6, k7,
         k8, k9, k10, abstol, reltol)
         xph = x+h
-        nfcn += 11
+        nfcn += ncore
 
         fac11 = err^expo1
         fac = fac11/facold^beta
@@ -705,7 +707,7 @@ function dopcore(c::DOP853, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::
         deno = 1.0
     end
     err = abs(h)*err*sqrt(1.0/(n*deno))
-    return y1, maximum(abs(err))
+    return y1, maximum(abs(err)), 11
 end
 
 function dopcore(c::DOPRI5, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
@@ -746,5 +748,5 @@ function dopcore(c::DOPRI5, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::
         err += (k4[i]/sk)*(k4[i]/sk)
     end
     err = sqrt(err/n)
-    return y1, maximum(abs(err))
+    return y1, maximum(abs(err)), 6
 end
