@@ -412,12 +412,12 @@ function dopri5(f::Function, y0::Number, tspan; args...)
 end
 
 function odedop(coeff, p, y0, tspan;
-    reltol=[1e-6], abstol=[sqrt(eps())],
-    safe=0.9, fac1=0.333, fac2=6.0, beta=0.0,
-    maxstep=tspan[end]-tspan[1], initstep=0.0,
-    maxsteps=100000, printmessages=false, nstiff=1000,
-    iout=0, solout=s(x...)=return, dense=[1:length(y0)],
-    points=:all)
+    reltol::Vector{Float64}=[1e-6], abstol::Vector{Float64}=[sqrt(eps())],
+    safe::Float64=0.9, fac1::Float64=0.333, fac2::Float64=6.0, beta::Float64=0.0,
+    maxstep::Float64=tspan[end]-tspan[1], initstep=0.0,
+    maxsteps::Int64=100000, printmessages::Bool=false, nstiff::Int64=1000,
+    iout::Int64=0, solout::Function=s(x...)=return, dense::Vector{Int64}=[1:length(y0)],
+    points::Symbol=:all)
 
     irtrn = 0
 
@@ -551,13 +551,8 @@ function odedop(coeff, p, y0, tspan;
                 for (i,j) in enumerate(dense)
                 end
             end
-            if typeof(coeff) == DOP853
-                copy!(k1, k4)
-                copy!(y, k5)
-            elseif typeof(coeff) == DOPRI5
-                copy!(k1, k2)
-                copy!(y, y1)
-            end
+            copy!(k1, k4)
+            copy!(y, k5)
             xold = x
             x = xph
             if points == :all
@@ -571,10 +566,14 @@ function odedop(coeff, p, y0, tspan;
             if last
                 h = hnew
                 idid = 1
+                stats = ["function_calls"=>nfcn,
+                "steps"=>nstep,
+                "accepted"=>naccpt,
+                "rejected"=>nrejct]
                 if points == :last
-                    return x, y1
+                    return x, y1, stats
                 end
-                return tout, yout
+                return tout, yout, stats
             end
             if abs(hnew) > hmax
                 hnew = posneg*hmax
@@ -727,28 +726,29 @@ function dopcore(c::DOPRI5, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::
     for i = 1:n
         y1[i] = y[i]+h*(c.a41*k1[i]+c.a42*k2[i]+c.a43*k3[i])
     end
-    F!(p, k4, x+c.c4*h, y1)
+    F!(p, k8, x+c.c4*h, y1)
     for i = 1:n
-        y1[i] = y[i]+h*(c.a51*k1[i]+c.a52*k2[i]+c.a53*k3[i]+c.a54*k4[i])
+        y1[i] = y[i]+h*(c.a51*k1[i]+c.a52*k2[i]+c.a53*k3[i]+c.a54*k8[i])
     end
-    F!(p, k5, x+c.c5*h, y1)
+    F!(p, k9, x+c.c5*h, y1)
     for i = 1:n
-        k7[i] = y[i]+h*(c.a61*k1[i]+c.a62*k2[i]+c.a63*k3[i]+c.a64*k4[i]+c.a65*k5[i])
+        k7[i] = y[i]+h*(c.a61*k1[i]+c.a62*k2[i]+c.a63*k3[i]+c.a64*k8[i]+c.a65*k9[i])
     end
     F!(p, k6, x+h, k7)
     for i = 1:n
-        y1[i] = y[i]+h*(c.a71*k1[i]+c.a73*k3[i]+c.a74*k4[i]+c.a75*k5[i]+c.a76*k6[i])
+        y1[i] = y[i]+h*(c.a71*k1[i]+c.a73*k3[i]+c.a74*k8[i]+c.a75*k9[i]+c.a76*k6[i])
     end
-    F!(p, k2, x+h, y1)
+    F!(p, k4, x+h, y1)
     for i = 1:n
-        k4[i] = (c.e1*k1[i]+c.e3*k3[i]+c.e4*k4[i]+c.e5*k5[i]+c.e6*k6[i]+c.e7*k2[i])*h
+        k8[i] = (c.e1*k1[i]+c.e3*k3[i]+c.e4*k8[i]+c.e5*k9[i]+c.e6*k6[i]+c.e7*k4[i])*h
+        k5[i] = y1[i]
     end
 
     # Error estimation
     err = 0.0
     for i = 1:n
         sk = abstol[i] + reltol[i]*max(maximum(abs(y[i])), maximum(abs(y1[i])))
-        err += (k4[i]/sk)*(k4[i]/sk)
+        err += (k8[i]/sk)*(k8[i]/sk)
     end
     err = sqrt(err/n)
 
