@@ -465,7 +465,7 @@ function odedop(coeff, p, y0, tspan;
     hmax = abs(maxstep)
     nmax = maxsteps
     h = initstep
-    iord = 8
+    iord = order(coeff)
     if h == 0.0
         h = hinit(n, p, x, y, xend, posneg, k1, k2, k3, iord, hmax, abstol, reltol)
         if printmessages
@@ -511,8 +511,6 @@ function odedop(coeff, p, y0, tspan;
         if err <= 1.0
             facold = max(err, 1e-4)
             naccpt += 1
-            F!(p, k4, xph, k5)
-            nfcn += 1
             # Stiffness detection
             if mod(naccpt, nstiff) == 0 || iasti > 0
                 nonsti = 0
@@ -557,7 +555,7 @@ function odedop(coeff, p, y0, tspan;
             x = xph
             if points == :all
                 push!(tout, x)
-                push!(yout, y1)
+                push!(yout, copy(k5))
             end
             # if
             # solout
@@ -636,6 +634,9 @@ function hinit(n::Int64, p, x::Float64, y::Vector, xend::Float64, posneg::Float6
     return h*posneg
 end
 
+order(c::DOP853) = 8
+order(c::DOPRI5) = 5
+
 function dopcore(c::DOP853, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
     y1 = 0.0 * y
 
@@ -707,8 +708,10 @@ function dopcore(c::DOP853, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::
     end
     err = abs(h)*err*sqrt(1.0/(n*deno))
 
+    F!(p, k4, x+h, k5)
+
     # Number of function evaluations
-    neval = 11
+    neval = 12
     return y1, maximum(abs(err)), neval
 end
 
