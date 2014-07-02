@@ -413,7 +413,8 @@ end
 
 function odedop(coeff, p, y0, tspan;
     reltol::Vector{Float64}=[1e-6], abstol::Vector{Float64}=[sqrt(eps())],
-    safe::Float64=0.9, fac1::Float64=0.333, fac2::Float64=6.0, beta::Float64=0.0,
+    safe::Float64=0.9, fac1::Float64=getfac1(coeff),
+    fac2::Float64=getfac2(coeff), beta::Float64=getbeta(coeff),
     maxstep::Float64=tspan[end]-tspan[1], initstep=0.0,
     maxsteps::Int64=100000, printmessages::Bool=false, nstiff::Int64=1000,
     iout::Int64=0, solout::Function=s(x...)=return, dense::Vector{Int64}=[1:length(y0)],
@@ -451,7 +452,7 @@ function odedop(coeff, p, y0, tspan;
 
     copy!(y, y0)
     facold = 1e-4
-    expo1 = 1.0/8.0 - beta*0.2
+    expo1 = getexpo1(coeff, beta)
     facc1 = 1.0/fac1
     facc2 = 1.0/fac2
     posneg = sign(xend-x)
@@ -569,7 +570,7 @@ function odedop(coeff, p, y0, tspan;
                 "accepted"=>naccpt,
                 "rejected"=>nrejct]
                 if points == :last
-                    return x, y1, stats
+                    return x, k5, stats
                 end
                 return tout, yout, stats
             end
@@ -636,6 +637,14 @@ end
 
 order(c::DOP853) = 8
 order(c::DOPRI5) = 5
+getfac1(c::DOP853) = 0.333
+getfac1(c::DOPRI5) = 0.2
+getfac2(c::DOP853) = 6.0
+getfac2(c::DOPRI5) = 10.0
+getbeta(c::DOP853) = 0.0
+getbeta(c::DOPRI5) = 0.04
+getexpo1(c::DOP853, beta) = 1.0/8.0 - beta*0.2
+getexpo1(c::DOPRI5, beta) = 0.2 - beta*0.75
 
 function dopcore(c::DOP853, n::Int64, p, x::Float64, y::Vector, h::Float64, k1::Vector, k2::Vector, k3::Vector, k4::Vector, k5::Vector, k6::Vector, k7::Vector, k8::Vector, k9::Vector, k10::Vector, abstol::Vector, reltol::Vector)
     y1 = 0.0 * y
