@@ -393,7 +393,7 @@ type ODEProblemFunction
     f::Function
 end
 
-F!(p::ODEProblemFunction, y, x, t) = copy!(y, [p.f(x, t)])
+F!(p::ODEProblemFunction, y, x, t) = copy!(y, p.f(x, t))
 
 dop853(p, y0, tspan; args...) = odedop(dop853coeff, p, y0, tspan; args...)
 dopri5(p, y0, tspan; args...) = odedop(dopri5coeff, p, y0, tspan; args...)
