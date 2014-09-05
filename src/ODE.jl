@@ -5,7 +5,12 @@ module ODE
 using Polynomial
 
 ## minimal function export list
-export ode23, ode4, ode45, ode4s, ode4ms, ode78
+# adaptive non-stiff:
+export ode23, ode45, ode78
+# adaptive stiff:
+export ode23s
+# non-adaptive:
+export ode4s, ode4ms, ode4
 
 ## complete function export list
 #export ode23, ode4,
@@ -391,33 +396,151 @@ function ode4(F, x0, tspan)
     return [tspan], x
 end
 
-#ODEROSENBROCK Solve stiff differential equations, Rosenbrock method
-#    with provided coefficients.
-function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
-    # Crude forward finite differences estimator as fallback
-    # FIXME: This doesn't really work if x is anything but a Vector or a scalar
-    function fdjacobian(F, x::Number, t)
-        ftx = F(t, x)
+###############################################################################
+## STIFF SOLVERS
+###############################################################################
 
+# Crude forward finite differences estimator of Jacobian as fallback
+
+# FIXME: This doesn't really work if x is anything but a Vector or a scalar
+function fdjacobian(F, x::Number, t)
+    ftx = F(t, x)
+
+    # The 100 below is heuristic
+    dx = (x .+ (x==0))./100
+    dFdx = (F(t,x+dx)-ftx)./dx
+
+    return dFdx
+end
+
+function fdjacobian(F, x, t)
+    ftx = F(t, x)
+    lx = max(length(x),1)
+    dFdx = zeros(eltype(x), lx, lx)
+    for j = 1:lx
         # The 100 below is heuristic
-        dx = (x .+ (x==0))./100
-        dFdx = (F(t,x+dx)-ftx)./dx
+        dx = zeros(eltype(x), lx)
+        dx[j] = (x[j] .+ (x[j]==0))./100
+        dFdx[:,j] = (F(t,x+dx)-ftx)./dx[j]
+    end
+    return dFdx
+end
 
-        return dFdx
+# ODE23S  Solve stiff systems based on a modified Rosenbrock triple
+# (also used by MATLABS ODE23s); see Sec. 4.1 in
+#
+# [SR97] L.F. Shampine and M.W. Reichelt: "The MATLAB ODE Suite," SIAM Journal on Scientific Computing, Vol. 18, 1997, pp. 1–22
+#
+# supports keywords: points = :all | :specified (using dense output)
+#                    jacobian = G(t,y)::Function | nothing (FD)
+function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
+                                                jacobian=nothing,
+                                                points=:all,
+                                                norm=Base.norm)
+
+    # select method for computing the Jacobian
+    if typeof(jacobian) == Function
+        jac = jacobian
+    else
+        # fallback finite-difference
+        jac = (t, y)->fdjacobian(F, y, t)
     end
 
-    function fdjacobian(F, x, t)
-        ftx = F(t, x)
-        lx = max(length(x),1)
-        dFdx = zeros(eltype(x), lx, lx)
-        for j = 1:lx
-            # The 100 below is heuristic
-            dx = zeros(eltype(x), lx)
-            dx[j] = (x[j] .+ (x[j]==0))./100
-            dFdx[:,j] = (F(t,x+dx)-ftx)./dx[j]
+    # constants
+    const d = 1/(2 + sqrt(2))
+    const e32 = 6 + sqrt(2)
+
+
+    # initialization
+    t = tspan[1]
+    tfinal = tspan[end]
+    tdir = sign(tfinal - t)
+
+    hmax = abs(tfinal - t)/10
+    hmin = abs(tfinal - t)/1e9
+    h = tdir*abs(tfinal - t)/100  # initial step size
+
+    y = y0
+    tout = Array(typeof(t), 1)
+    tout[1] = t         # first output time
+    yout = Array(typeof(y0), 1)
+    yout[1] = copy(y)         # first output solution
+
+    F0 = F(t,y)
+
+    J = jac(t,y)    # get Jacobian of F wrt y
+
+    while abs(t) < abs(tfinal) && hmin < abs(h)
+        if abs(t-tfinal) < abs(h)
+            h = tfinal - t
         end
-        return dFdx
+
+        if size(J,1) == 1
+            W = one(J) - h*d*J
+        else
+            # note: if there is a mass matrix M on the lhs of the ODE, i.e.,
+            #   M * dy/dt = F(t,y)
+            # we can simply replace eye(J) by M in the following expression
+            # (see Sec. 5 in [SR97])
+
+            W = lufact( eye(J) - h*d*J )
+        end
+
+        # approximate time-derivative of F
+        T = h*d*(F(t + h/100, y) - F0)/(h/100)
+
+        # modified Rosenbrock formula
+        k1 = W\(F0 + T)
+        F1 = F(t + 0.5*h, y + 0.5*h*k1)
+        k2 = W\(F1 - k1) + k1
+        ynew = y + h*k2
+        F2 = F(t + h, ynew)
+        k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
+
+        err = (h/6)*norm(k1 - 2*k2 + k3) # error estimate
+        delta = max(reltol*max(norm(y),norm(ynew)), abstol) # allowable error
+
+        # check if new solution is acceptable
+        if  err <= delta
+
+            if points==:specified || points==:all
+                # only points in tspan are requested
+                # -> find relevant points in (t,t+h]
+                for toi in tspan[(tspan.>t) & (tspan.<=t+h)]
+                    # rescale to (0,1]
+                    s = (toi-t)/h
+
+                    # use interpolation formula to get solutions at t=toi
+                    push!(tout, toi)
+                    push!(yout, y + h*( k1*s*(1-s)/(1-2*d) + k2*s*(s-2*d)/(1-2*d)))
+                end
+            end
+            if (points==:all) && (tout[end]!=t+h)
+                # add the intermediate points
+                push!(tout, t + h)
+                push!(yout, ynew)
+            end
+
+            # update solution
+            t = t + h
+            y = ynew
+
+            F0 = F2         # use FSAL property
+            J = jac(t,y)    # get Jacobian of F wrt y
+                            # for new solution
+        end
+
+        # update of the step size
+        h = tdir*min( hmax, abs(h)*0.8*(delta/err)^(1/3) )
     end
+
+    return tout, yout
+end
+
+
+#ODEROSENBROCK Solve stiff differential equations, Rosenbrock method
+#   with provided coefficients.
+function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
 
     if typeof(jacobian) == Function
         G = jacobian
@@ -493,7 +616,9 @@ ode4s_s(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, s4_coeffic
 # Use Shampine coefficients by default (matching Numerical Recipes)
 const ode4s = ode4s_s
 
-# ODE_MS Fixed-step, fixed-order multi-step numerical method with Adams-Bashforth-Moulton coefficients
+
+# ODE_MS Fixed-step, fixed-order multi-step numerical method
+#   with Adams-Bashforth-Moulton coefficients
 function ode_ms(F, x0, tspan, order::Integer)
     h = diff(tspan)
     x = Array(typeof(x0), length(tspan))

@@ -12,6 +12,8 @@ solvers = [
     ODE.ode45_fb,
     ODE.ode45_ck,
 
+    ODE.ode23s,
+
     ODE.ode4ms,
     ODE.ode4s_s,
     ODE.ode4s_kr,
@@ -30,7 +32,7 @@ for solver in solvers
     # dt
     t,y=solver((t,y)->2t, 0., [0:.001:1])
     @test maximum(abs(y-t.^2)) < tol
-    
+
     # dy
     # -- = y ==> y = y0*e.^t
     # dt
