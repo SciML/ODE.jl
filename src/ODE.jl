@@ -366,7 +366,7 @@ const ode45 = ode45_dp
 #ODE4  Solve non-stiff differential equations, fourth order
 #   fixed-step Runge-Kutta method.
 #
-#   [T,X] = ODE4(ODEFUN, TSPAN, X0) with TSPAN = [T0:H:TFINAL]
+#   [T,X] = ODE4(ODEFUN, X0, TSPAN) with TSPAN = [T0:H:TFINAL]
 #   integrates the system of differential equations x' = f(t,x) from time
 #   T0 to TFINAL in steps of H with initial conditions X0. Function
 #   ODEFUN(T,X) must return a column vector corresponding to f(t,x). Each
