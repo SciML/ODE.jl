@@ -5,7 +5,7 @@ Various basic Ordinary Differential Equation solvers implemented in Julia.
 Pull requests are always highly welcome to fix bugs, add solvers, or anything else!
 
 # API discussions
-There are currently discussions about how the Julian API for ODE solvers should look like, and the current documentation is more like a wishlist than a documentation. The API has changed considerably since the 0.1 release, so be carefull when you upgrade after the next version is released. 
+There are currently discussions about how the Julian API for ODE solvers should look like, and the current documentation is more like a wishlist than a documentation. The API has changed considerably since the 0.1 release, so be carefull when you upgrade after the next version is released.
 # Current status of the project
 
 The current release, v0.1, contains the basic functionality that was moved here when the package was originally moved here from Base. Although quite poorly tested, at least some of the functionality, especially the `ode45` solver, is quite reliable. However, that version is almost entirely undocumented, and will probably stay that way.
@@ -18,10 +18,12 @@ Currently, `ODE` exports the following adaptive solvers:
 * `ode45`: 4th order adaptive solver with 5th order error control, using the Dormand Prince coefficients. Fehlberg and Cash-Karp coefficients are also available.
 * `ode78`: 7th order adaptive solver with 8th order error control, using the Fehlberg coefficients
 
+* `ode23s`: 2nd/3rd order adaptive solver for stiff problems, using a modified Rosenbrock triple
+
 all of which have the following basic API:
 
     tout, yout = odeXX(F, y0, tspan)
-    
+
 to solve the explicit ODE defined by dy/dt = F(t,y). A few other solvers are also exported, see the source code for details.
 
 # Need something long-term reliable right now?
