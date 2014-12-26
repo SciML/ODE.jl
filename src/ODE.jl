@@ -2,7 +2,7 @@
 
 module ODE
 
-using Polynomial
+using Polynomials
 
 ## minimal function export list
 # adaptive non-stiff:
@@ -616,6 +616,10 @@ ode4s_s(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, s4_coeffic
 # Use Shampine coefficients by default (matching Numerical Recipes)
 const ode4s = ode4s_s
 
+const ms_coefficients4 = [ 1      0      0     0
+                          -1/2    3/2    0     0
+                          5/12  -4/3  23/12 0
+                          -9/24   37/24 -59/24 55/24]
 
 # ODE_MS Fixed-step, fixed-order multi-step numerical method
 #   with Adams-Bashforth-Moulton coefficients
@@ -625,17 +629,18 @@ function ode_ms(F, x0, tspan, order::Integer)
     x[1] = x0
 
     if 1 <= order <= 4
-        b = [ 1      0      0     0
-             -1/2    3/2    0     0
-             5/12  -16/12  23/12 0
-             -9/24   37/24 -59/24 55/24]
+        b = ms_coefficients4
     else
-        for steporder = size(b,1):order
-            s = steporder - 1
-            for j = 0:s
+        b = zeros(order, order)
+        b[1:4, 1:4] = ms_coefficients4
+        for s = 5:order
+            for j = 0:(s - 1)
                 # Assign in correct order for multiplication below
-                #                    (a factor depending on j and s)      .* (an integral of a polynomial with -(0:s), except -j, as roots)
-                b[steporder,s-j+1] = (-1).^j./factorial(j)./factorial(s-j).*diff(polyval(polyint(poly(diagm(-[0:j-1; j+1:s]))),0:1))
+                #  (a factor depending on j and s) .* (an integral of a polynomial with -(0:s), except -j, as roots)
+                p_int = polyint(poly(diagm(-[0:j - 1; j + 1:s - 1])))
+                p_int_val = diff(polyval(p_int, 0:1))[1]
+                b[s, s - j] = ((-1)^j / factorial(j)
+                               / factorial(s - 1 - j) * p_int_val)
             end
         end
     end

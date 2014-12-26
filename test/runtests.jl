@@ -3,6 +3,8 @@ using Base.Test
 
 tol = 1e-2
 
+ode5ms(F, x0, tspan) = ODE.ode_ms(F, x0, tspan, 5)
+
 solvers = [
     ODE.ode23,
     ODE.ode23_bs,
@@ -17,7 +19,8 @@ solvers = [
     ODE.ode4ms,
     ODE.ode4s_s,
     ODE.ode4s_kr,
-    ODE.ode78_fb]
+    ODE.ode78_fb,
+    ode5ms]
 
 for solver in solvers
     println("using $solver")
