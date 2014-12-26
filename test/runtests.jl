@@ -17,10 +17,10 @@ solvers = [
     ODE.ode23s,
 
     ODE.ode4ms,
+    ode5ms,
     ODE.ode4s_s,
     ODE.ode4s_kr,
-    ODE.ode78_fb,
-    ode5ms]
+    ODE.ode78_fb]
 
 for solver in solvers
     println("using $solver")
