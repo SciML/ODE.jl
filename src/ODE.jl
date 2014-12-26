@@ -638,9 +638,8 @@ function ode_ms(F, x0, tspan, order::Integer)
                 # Assign in correct order for multiplication below
                 #  (a factor depending on j and s) .* (an integral of a polynomial with -(0:s), except -j, as roots)
                 p_int = polyint(poly(diagm(-[0:j - 1; j + 1:s - 1])))
-                p_int_val = diff(polyval(p_int, 0:1))[1]
                 b[s, s - j] = ((-1)^j / factorial(j)
-                               / factorial(s - 1 - j) * p_int_val)
+                               / factorial(s - 1 - j) * polyval(p_int, 1))
             end
         end
     end
