@@ -457,7 +457,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     tdir = sign(tfinal - t)
 
     hmax = abs(tfinal - t)/10
-    hmin = abs(tfinal - t)/1e9
+    hmin = abs(tfinal - t)/1e18
     h = tdir*abs(tfinal - t)/100  # initial step size
 
     y = y0
