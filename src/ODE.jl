@@ -128,6 +128,16 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
 end # ode23
 
 
+# helper functions
+# an extension of the `in` statement for floating point values
+function approxin{T<:FloatingPoint}(c::FloatingPoint, span::AbstractVector{T}; atol::FloatingPoint=.1)
+    truth = map(elem -> isapprox(c, elem; atol=atol), span)
+    for elem in truth
+        elem && return true
+    end
+    return false
+end
+
 
 # ode45 adapted from http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
 # (a newer version (v1.15) can be found here https://sites.google.com/site/comperem/home/ode_solvers)
@@ -186,19 +196,51 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
+
+# estimator for initial step based on book
+# "Solving Ordinary Differential Equations I" by Hairer et al., p.169
+function hinit(F, x0, t0, p, reltol, abstol)
+        tau = max(reltol*norm(x0, Inf), abstol)
+	d0 = norm(x0, Inf)/tau
+	f0 = F(t0, x0)
+	d1 = norm(f0, Inf)/tau
+	if d0 < 1e-5 || d1 < 1e-5
+		h0 = 1e-6
+	else
+	        h0 = 1e-2d0/d1
+	end
+	# perform Euler step
+	x1 = x0 + h0*f0
+	f1 = F(t0 + h0, x1)
+	# estimate second derivative
+	d2 = norm(f1 - f0, Inf)/(tau*h0)
+	if max(d1, d2) <= 1e-15
+		h1 = max(1e-6, 1e-3h0)
+	else
+		pow = -(2. + log10(max(d1, d2)))/(p+1.)
+		h1 = 10.^pow
+	end
+	h = min(100.0h0, h1)
+end
+
+
+function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
+	initstep = hinit(F, x0, tspan[1], p, reltol, abstol),
+	minstep = abs(tspan[end] - tspan[1])/1e9,
+	maxstep = abs(tspan[end] - tspan[1])/2.5,
+	points = :all)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/p   # use the higher order to estimate the next step size
-
+    @show initstep
     c = sum(a, 2)   # consistency condition
 
     # Initialization
     t = tspan[1]
     tfinal = tspan[end]
     tdir = sign(tfinal - t)
-    hmax = abs(tfinal - t)/2.5
-    hmin = abs(tfinal - t)/1e9
-    h = tdir*abs(tfinal - t)/100  # initial guess at a step size
+    hmax = maxstep
+    hmin = minstep
+    h = initstep
     x = x0
     tout = t            # first output time
     xout = Array(typeof(x0), 1)
@@ -239,8 +281,10 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
         if delta <= tau
             t = t + h
             x = xp    # <-- using the higher order estimate is called 'local extrapolation'
-            tout = [tout; t]
-            push!(xout, x)
+	    if points == :all || approxin(t, tspan; atol=.02)
+		    tout = [tout; t]
+		    push!(xout, x)
+	    end
 
             # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
             # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
