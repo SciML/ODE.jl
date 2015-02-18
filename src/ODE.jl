@@ -61,7 +61,7 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
     hmax = abs(0.1*(tfinal-t))
     y = y0
 
-    tout = t
+    tout = [t]
     yout = Array(typeof(y0),1)
     yout[1] = y
 
@@ -105,7 +105,7 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
         if err <= reltol
             t = tnew
             y = ynew
-            tout = [tout; t]
+            push!(tout, t)
             push!(yout, y)
             s1 = s4   # Reuse final function value to start new step
         end
@@ -200,7 +200,7 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     hmin = abs(tfinal - t)/1e9
     h = tdir*abs(tfinal - t)/100  # initial guess at a step size
     x = x0
-    tout = t            # first output time
+    tout = [t]            # first output time
     xout = Array(typeof(x0), 1)
     xout[1] = x         # first output solution
 
@@ -239,7 +239,7 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
         if delta <= tau
             t = t + h
             x = xp    # <-- using the higher order estimate is called 'local extrapolation'
-            tout = [tout; t]
+            push!(tout, t)
             push!(xout, x)
 
             # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
@@ -261,7 +261,7 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     end # while (t < tfinal) & (h >= hmin)
 
     if abs(t) < abs(tfinal)
-      println("Step size grew too small. t=", t, ", h=", abs(h), ", x=", x)
+        error("Step size grew too small. t=$t, h=$(abs(h)), x=$x")
     end
 
     return tout, xout
@@ -393,7 +393,7 @@ function ode4(F, x0, tspan)
         # Integrate
         x[i+1] = x[i] + 1/6 .*h[i].*sum(midxdot)
     end
-    return [tspan], x
+    return [tspan;], x
 end
 
 ###############################################################################
@@ -581,7 +581,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
         end
         solstep += 1
     end
-    return [tspan], x
+    return [tspan;], x
 end
 
 
@@ -656,7 +656,7 @@ function ode_ms(F, x0, tspan, order::Integer)
             x[i+1] += h[i]*b[steporder, j]*xdot[i-(steporder-1) + (j-1)]
         end
     end
-    return [tspan], x
+    return [tspan;], x
 end
 
 # Use order 4 by default
