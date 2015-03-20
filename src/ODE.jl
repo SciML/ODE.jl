@@ -48,7 +48,7 @@ export ode4s, ode4ms, ode4
 # Initialize variables.
 # Adapted from Cleve Moler's textbook
 # http://www.mathworks.com/moler/ncm/ode23tx.m
-function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
+function ode23(F, y0, tspan, params...; reltol = 1.e-5, abstol = 1.e-8)
     if reltol == 0
         warn("setting reltol = 0 gives a step size of zero")
     end
@@ -69,7 +69,7 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
 
     # Compute initial step size.
 
-    s1 = F(t, y)
+    s1 = F(t, y, params...)
     r = norm(s1./max(abs(y), threshold), Inf) + realmin() # TODO: fix type bug in max()
     h = tdir*0.8*reltol^(1/3)/r
 
@@ -89,11 +89,11 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
 
         # Attempt a step.
 
-        s2 = F(t+h/2, y+h/2*s1)
-        s3 = F(t+3*h/4, y+3*h/4*s2)
+        s2 = F(t+h/2, y+h/2*s1, params...)
+        s3 = F(t+3*h/4, y+3*h/4*s2, params...)
         tnew = t + h
         ynew = y + h*(2*s1 + 3*s2 + 4*s3)/9
-        s4 = F(tnew, ynew)
+        s4 = F(tnew, ynew, params...)
 
         # Estimate the error.
 
