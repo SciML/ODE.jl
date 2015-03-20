@@ -19,38 +19,42 @@ export ode4s, ode4ms, ode4
 #    ode4ms, ode_ms
 
 
-#ODE23  Solve non-stiff differential equations.
+# ode23: Solve non-stiff differential equations.
 #
-#   ODE23(F,TSPAN,Y0) with TSPAN = [T0 TFINAL] integrates the system
-#   of differential equations dy/dt = f(t,y) from t = T0 to t = TFINAL.
-#   The initial condition is y(T0) = Y0.
+#   ode23(f, y0, tspan) with tspan = [t0, t_final] integrates the system
+#   of differential equations dy/dt = f(t,y) from t = t0 to t = t_final.
+#   Here, y may be a scalar or a vector.
+#   The initial condition is y(t0) = y0.
 #
 #   The first argument, F, is a function handle or an anonymous function
 #   that defines f(t,y).  This function must have two input arguments,
-#   t and y, and must return a column vector of the derivatives, dy/dt.
+#   t and y, and must return a vector of the derivatives, dy/dt.
 #
-#   With two output arguments, [T,Y] = ODE23(...) returns a column
-#   vector T and an array Y where Y(:,k) is the solution at T(k).
+#   ode23 returns the pair (tout, yout),
+#   where tout is the vector of times and yout an array of solutions:
+#   yout[k,:] is the solution at time tout(k)
 #
-#   More than four input arguments, ODE23(F,TSPAN,Y0,RTOL,P1,P2,...),
-#   are passed on to F, F(T,Y,P1,P2,...).
+#   Parameters may be passed through to the function F by adding additional
+#   arguments:
+#   ode23(f, y0, tspan, p1, p2, ...)
+#   calls f(t, y, p1, p2, ...).
 #
-#   ODE23 uses the Runge-Kutta (2,3) method of Bogacki and Shampine (BS23).
+#   Keyword arguments reltol and abstol specify the relative and absolute
+#   tolerances, respectively; their default values are reltol=1.e-5; abstol=1.e-8.
 #
-#   Example
+#   ode23 uses the Runge-Kutta (2,3) method of Bogacki and Shampine (BS23).
+#
+#   Example:
 #      tspan = [0, 2*pi]
 #      y0 = [1, 0]
 #      F = (t, y) -> [0 1; -1 0]*y
-#      ode23(F, tspan, y0)
-#
-#   See also ODE23.
+#      ode23(F, y0, tspan)
 
-# Initialize variables.
 # Adapted from Cleve Moler's textbook
 # http://www.mathworks.com/moler/ncm/ode23tx.m
 function ode23(F, y0, tspan, params...; reltol = 1.e-5, abstol = 1.e-8)
     if reltol == 0
-        warn("setting reltol = 0 gives a step size of zero")
+        warn("Setting reltol = 0 gives a step size of zero")
     end
 
     threshold = abstol / reltol
