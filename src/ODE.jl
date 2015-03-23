@@ -2,6 +2,8 @@
 
 module ODE
 
+VERSION < v"0.4-" && using Docile
+
 using Polynomials
 
 ## minimal function export list
@@ -13,44 +15,62 @@ export ode23s
 export ode4s, ode4ms, ode4
 
 ## complete function export list
-#export ode23, ode4,
+# export ode23, ode4,
 #    oderkf, ode45, ode45_dp, ode45_fb, ode45_ck,
 #    oderosenbrock, ode4s, ode4s_kr, ode4s_s,
 #    ode4ms, ode_ms
 
 
-#ODE23  Solve non-stiff differential equations.
-#
-#   ODE23(F,TSPAN,Y0) with TSPAN = [T0 TFINAL] integrates the system
-#   of differential equations dy/dt = f(t,y) from t = T0 to t = TFINAL.
-#   The initial condition is y(T0) = Y0.
-#
-#   The first argument, F, is a function handle or an anonymous function
-#   that defines f(t,y).  This function must have two input arguments,
-#   t and y, and must return a column vector of the derivatives, dy/dt.
-#
-#   With two output arguments, [T,Y] = ODE23(...) returns a column
-#   vector T and an array Y where Y(:,k) is the solution at T(k).
-#
-#   More than four input arguments, ODE23(F,TSPAN,Y0,RTOL,P1,P2,...),
-#   are passed on to F, F(T,Y,P1,P2,...).
-#
-#   ODE23 uses the Runge-Kutta (2,3) method of Bogacki and Shampine (BS23).
-#
-#   Example
-#      tspan = [0, 2*pi]
-#      y0 = [1, 0]
-#      F = (t, y) -> [0 1; -1 0]*y
-#      ode23(F, tspan, y0)
-#
-#   See also ODE23.
+@doc doc"""
+`ode23`: Solve non-stiff differential equations.
 
-# Initialize variables.
-# Adapted from Cleve Moler's textbook
-# http://www.mathworks.com/moler/ncm/ode23tx.m
-function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
+`ode23(f, y0, tspan)` with `tspan = [t0, t_final]` integrates the system
+of differential equations \$dy/dt = f(t,y)\$ from \$t = t_0\$ to \$t = t_\mathrm{final}\$.
+Here, \$y\$ may be a scalar or a vector.
+The initial condition is \$y(t0) = y_0\$.
+
+The first argument, `F`, is a function that defines \$f(t,y)\$.
+This function must have at least two input arguments,
+`t` and `y`, and must return a vector of the derivatives, \$dy_i/dt\$.
+
+`ode23` returns the tuple `(tout, yout)`,
+where `tout` is the vector of times and yout an array of solutions:
+`yout[k,:]` is the solution at time `tout(k)`.
+
+Parameters may be passed through to the function `F` by adding additional
+arguments:
+`ode23(f, y0, tspan, p1, p2, ...)`
+calls `f(t, y, p1, p2, ...)`.
+
+Keyword arguments `reltol` and `abstol` specify the relative and absolute
+tolerances, respectively; their default values are `reltol=1.e-5`
+and `abstol=1.e-8`.
+
+`ode23` uses the Runge-Kutta (2,3) method of Bogacki and Shampine (BS23).
+
+Example of the basic use of `ode23`:
+```
+    tspan = [0., 2*pi]
+    y0 = [1.0, 0.0]
+    F = (t, y) -> [0.0 1.0; -1.0 0.0]*y
+    ode23(F, y0, tspan)
+```
+
+Example of passing through parameters:
+```
+    tspan = [0, 2*pi]
+    F(t, y, α, β) = -α*y + β
+    y0 = 1.0
+    α, β = 1.0, 0.5
+    ode23(F, y0, tspan, α, β)
+```
+
+The code for `ode23` was adapted from Cleve Moler's textbook:
+<http://www.mathworks.com/moler/ncm/ode23tx.m>
+""" ->
+function ode23(F, y0, tspan, params...; reltol = 1.e-5, abstol = 1.e-8)
     if reltol == 0
-        warn("setting reltol = 0 gives a step size of zero")
+        warn("Setting reltol = 0 gives a step size of zero")
     end
 
     threshold = abstol / reltol
@@ -69,7 +89,7 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
 
     # Compute initial step size.
 
-    s1 = F(t, y)
+    s1 = F(t, y, params...)
     r = norm(s1./max(abs(y), threshold), Inf) + realmin() # TODO: fix type bug in max()
     h = tdir*0.8*reltol^(1/3)/r
 
@@ -89,11 +109,11 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
 
         # Attempt a step.
 
-        s2 = F(t+h/2, y+h/2*s1)
-        s3 = F(t+3*h/4, y+3*h/4*s2)
+        s2 = F(t+h/2, y+h/2*s1, params...)
+        s3 = F(t+3*h/4, y+3*h/4*s2, params...)
         tnew = t + h
         ynew = y + h*(2*s1 + 3*s2 + 4*s3)/9
-        s4 = F(tnew, ynew)
+        s4 = F(tnew, ynew, params...)
 
         # Estimate the error.
 

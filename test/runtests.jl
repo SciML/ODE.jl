@@ -52,6 +52,19 @@ for solver in solvers
     @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
 end
 
+# Test ode23 with parameters:
+
+solver = ode23
+println("using $solver with parameters")
+# dy
+# -- = -αy ==> y = y0*e.^(-αt)
+# dt
+
+for α in 1.0:1.0:10.
+    t,y=solver((t,y,α)->-α*y, 1., [0:.001:1;], α)
+    @test maximum(abs(y-e.^(-α*t))) < tol
+end
+
 # rober testcase from http://www.unige.ch/~hairer/testset/testset.html
 let
     println("ROBER test case")
@@ -70,5 +83,8 @@ let
               0.9999999791665050] # reference solution at tspan[2]
     @test norm(refsol-y[end], Inf) < 2e-10
 end
+
+
+
 
 println("All looks OK")
