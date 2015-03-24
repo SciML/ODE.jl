@@ -63,7 +63,8 @@ let
         ydot
     end
     t = [0., 1e11]
-    t,y = ode23s(f, [1.0, 0.0, 0.0], t; abstol=1e-8, reltol=1e-8)
+    t,y = ode23s(f, [1.0, 0.0, 0.0], t; abstol=1e-8, reltol=1e-8,
+                                        maxstep=1e11/10, minstep=1e11/1e18)
 
     refsol = [0.2083340149701255e-07,
               0.8333360770334713e-13,

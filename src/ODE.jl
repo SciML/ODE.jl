@@ -18,6 +18,32 @@ export ode4s, ode4ms, ode4
 #    oderosenbrock, ode4s, ode4s_kr, ode4s_s,
 #    ode4ms, ode_ms
 
+# estimator for initial step based on book
+# "Solving Ordinary Differential Equations I" by Hairer et al., p.169
+function hinit(F, x0, t0, p, reltol, abstol)
+    tau = max(reltol*norm(x0, Inf), abstol)
+    d0 = norm(x0, Inf)/tau
+    f0 = F(t0, x0)
+    d1 = norm(f0, Inf)/tau
+    if d0 < 1e-5 || d1 < 1e-5
+        h0 = 1e-6
+	else
+        h0 = 1e-2d0/d1
+	end
+    # perform Euler step
+    x1 = x0 + h0*f0
+    f1 = F(t0 + h0, x1)
+    # estimate second derivative
+    d2 = norm(f1 - f0, Inf)/(tau*h0)
+    if max(d1, d2) <= 1e-15
+        h1 = max(1e-6, 1e-3*h0)
+	else
+        pow = -(2. + log10(max(d1, d2)))/(p + 1.)
+        h1 = 10.^pow
+	end
+	h = min(100.0*h0, h1)
+end
+
 
 #ODE23  Solve non-stiff differential equations.
 #
@@ -186,7 +212,11 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
+function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
+                                            norm=Base.norm,
+                                            minstep=abs(tspan[end] - tspan[1])/1e9,
+                                            maxstep=abs(tspan[end] - tspan[1])/2.5,
+                                            initstep=0.)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/p   # use the higher order to estimate the next step size
 
@@ -196,9 +226,14 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
     t = tspan[1]
     tfinal = tspan[end]
     tdir = sign(tfinal - t)
-    hmax = abs(tfinal - t)/2.5
-    hmin = abs(tfinal - t)/1e9
-    h = tdir*abs(tfinal - t)/100  # initial guess at a step size
+    hmax = maxstep
+    hmin = minstep
+    h = initstep
+    if h == 0.
+      # initial guess at a step size
+      h = hinit(F, x0, t, p, reltol, abstol)
+    end
+    h = tdir*min(h, hmax)
     x = x0
     tout = [t]            # first output time
     xout = Array(typeof(x0), 1)
@@ -257,7 +292,7 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
         end
 
         # Update the step size
-        h = min(hmax, 0.8*h*(tau/delta)^pow)
+        h = tdir*min(hmax, 0.8*abs(h)*(tau/delta)^pow)
     end # while (t < tfinal) & (h >= hmin)
 
     if abs(t) < abs(tfinal)
@@ -436,7 +471,11 @@ end
 function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
                                                 jacobian=nothing,
                                                 points=:all,
-                                                norm=Base.norm)
+                                                norm=Base.norm,
+                                                minstep=abs(tspan[end] - tspan[1])/1e18,
+                                                maxstep=abs(tspan[end] - tspan[1])/2.5,
+                                                initstep=0.)
+
 
     # select method for computing the Jacobian
     if typeof(jacobian) == Function
@@ -456,9 +495,14 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     tfinal = tspan[end]
     tdir = sign(tfinal - t)
 
-    hmax = abs(tfinal - t)/10
-    hmin = abs(tfinal - t)/1e18
-    h = tdir*abs(tfinal - t)/100  # initial step size
+    hmax = maxstep
+    hmin = minstep
+    h = initstep
+    if h == 0.
+      # initial guess at a step size
+      h = hinit(F, y0, t, 3, reltol, abstol)
+    end
+    h = tdir*min(h, hmax)
 
     y = y0
     tout = Array(typeof(t), 1)
