@@ -87,14 +87,12 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
     hmax = abs(0.1*(tfinal-t))
     y = y0
 
-    tout = [t]
+    tout = Array(typeof(t), 1)
+    tout[1] = t         # first output time
     yout = Array(typeof(y0),1)
-    yout[1] = y
-
-    tlen = length(t)
+    yout[1] = y         # first output solution
 
     # Compute initial step size.
-
     s1 = F(t, y)
     r = norm(s1./max(abs(y), threshold), Inf) + realmin() # TODO: fix type bug in max()
     h = tdir*0.8*reltol^(1/3)/r
@@ -235,7 +233,8 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
     end
     h = tdir*min(h, hmax)
     x = x0
-    tout = [t]            # first output time
+    tout = Array(typeof(t), 1)
+    tout[1] = t         # first output time
     xout = Array(typeof(x0), 1)
     xout[1] = x         # first output solution
 
