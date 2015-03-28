@@ -18,6 +18,41 @@ export ode4s, ode4ms, ode4
 #    oderosenbrock, ode4s, ode4s_kr, ode4s_s,
 #    ode4ms, ode_ms
 
+###############################################################################
+## HELPER FUNCTIONS
+###############################################################################
+
+# estimator for initial step based on book
+# "Solving Ordinary Differential Equations I" by Hairer et al., p.169
+function hinit(F, x0, t0, p, reltol, abstol)
+    tau = max(reltol*norm(x0, Inf), abstol)
+    d0 = norm(x0, Inf)/tau
+    f0 = F(t0, x0)
+    d1 = norm(f0, Inf)/tau
+    if d0 < 1e-5 || d1 < 1e-5
+        h0 = 1e-6
+    else
+        h0 = 0.01*(d0/d1)
+    end
+    # perform Euler step
+    x1 = x0 + h0*f0
+    f1 = F(t0 + h0, x1)
+    # estimate second derivative
+    d2 = norm(f1 - f0, Inf)/(tau*h0)
+    if max(d1, d2) <= 1e-15
+        h1 = max(1e-6, 1e-3*h0)
+    else
+        pow = -(2. + log10(max(d1, d2)))/(p + 1.)
+        h1 = 10.^pow
+    end
+    h = min(100*h0, h1), f0
+end
+
+###############################################################################
+## NON-STIFF SOLVERS
+###############################################################################
+
+# NOTE: in the near future ode23 will be replaced by ode23_bs
 
 #ODE23  Solve non-stiff differential equations.
 #
@@ -61,14 +96,12 @@ function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
     hmax = abs(0.1*(tfinal-t))
     y = y0
 
-    tout = [t]
+    tout = Array(typeof(t), 1)
+    tout[1] = t         # first output time
     yout = Array(typeof(y0),1)
-    yout[1] = y
-
-    tlen = length(t)
+    yout[1] = y         # first output solution
 
     # Compute initial step size.
-
     s1 = F(t, y)
     r = norm(s1./max(abs(y), threshold), Inf) + realmin() # TODO: fix type bug in max()
     h = tdir*0.8*reltol^(1/3)/r
@@ -186,28 +219,37 @@ end # ode23
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
-function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
+function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
+                                            norm=Base.norm,
+                                            minstep=abs(tspan[end] - tspan[1])/1e9,
+                                            maxstep=abs(tspan[end] - tspan[1])/2.5,
+                                            initstep=0.)
     # see p.91 in the Ascher & Petzold reference for more infomation.
     pow = 1/p   # use the higher order to estimate the next step size
 
     c = sum(a, 2)   # consistency condition
+    k = Array(typeof(x0), length(c))
 
     # Initialization
     t = tspan[1]
     tfinal = tspan[end]
     tdir = sign(tfinal - t)
-    hmax = abs(tfinal - t)/2.5
-    hmin = abs(tfinal - t)/1e9
-    h = tdir*abs(tfinal - t)/100  # initial guess at a step size
+
+    h = initstep
+    if h == 0.
+      # initial guess at a step size
+      h, k[1] = hinit(F, x0, t, p, reltol, abstol)
+    else
+      k[1] = F(t, x0) # first stage
+    end
+    h = tdir*min(h, maxstep)
     x = x0
-    tout = [t]            # first output time
+    tout = Array(typeof(t), 1)
+    tout[1] = t         # first output time
     xout = Array(typeof(x0), 1)
     xout[1] = x         # first output solution
 
-    k = Array(typeof(x0), length(c))
-    k[1] = F(t,x) # first stage
-
-    while abs(t) != abs(tfinal) && abs(h) >= hmin
+    while abs(t) != abs(tfinal) && abs(h) >= minstep
         if abs(h) > abs(tfinal-t)
             h = tfinal - t
         end
@@ -257,8 +299,8 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
         end
 
         # Update the step size
-        h = min(hmax, 0.8*h*(tau/delta)^pow)
-    end # while (t < tfinal) & (h >= hmin)
+        h = tdir*min(maxstep, 0.8*abs(h)*(tau/delta)^pow)
+    end # while (t < tfinal) & (h >= minstep)
 
     if abs(t) < abs(tfinal)
         error("Step size grew too small. t=$t, h=$(abs(h)), x=$x")
@@ -266,6 +308,7 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8)
 
     return tout, xout
 end
+
 
 # Bogacki–Shampine coefficients
 const bs_coefficients = (3,
@@ -302,6 +345,7 @@ const dp_coefficients = (5,
                          )
 ode45_dp(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, dp_coefficients...; kwargs...)
 
+
 # Fehlberg coefficients
 const fb_coefficients = (5,
                          [    0         0          0         0        0
@@ -316,6 +360,7 @@ const fb_coefficients = (5,
                          [16/135 0 6656/12825 28561/56430 -9/50 2/55],
                          )
 ode45_fb(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, fb_coefficients...; kwargs...)
+
 
 # Cash-Karp coefficients
 # Numerical Recipes in Fortran 77
@@ -364,7 +409,7 @@ const ode78 = ode78_fb
 # Use Dormand Prince version of ode45 by default
 const ode45 = ode45_dp
 
-# some higher-order embedded methods can be found in:
+# more higher-order embedded methods can be found in:
 # P.J. Prince and J.R.Dormand: High order embedded Runge-Kutta formulae, Journal of Computational and Applied Mathematics 7(1), 1981.
 
 
@@ -427,7 +472,7 @@ function fdjacobian(F, x, t)
 end
 
 # ODE23S  Solve stiff systems based on a modified Rosenbrock triple
-# (also used by MATLABS ODE23s); see Sec. 4.1 in
+# (also used by MATLAB's ODE23s); see Sec. 4.1 in
 #
 # [SR97] L.F. Shampine and M.W. Reichelt: "The MATLAB ODE Suite," SIAM Journal on Scientific Computing, Vol. 18, 1997, pp. 1–22
 #
@@ -436,7 +481,11 @@ end
 function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
                                                 jacobian=nothing,
                                                 points=:all,
-                                                norm=Base.norm)
+                                                norm=Base.norm,
+                                                minstep=abs(tspan[end] - tspan[1])/1e18,
+                                                maxstep=abs(tspan[end] - tspan[1])/2.5,
+                                                initstep=0.)
+
 
     # select method for computing the Jacobian
     if typeof(jacobian) == Function
@@ -456,9 +505,14 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     tfinal = tspan[end]
     tdir = sign(tfinal - t)
 
-    hmax = abs(tfinal - t)/10
-    hmin = abs(tfinal - t)/1e18
-    h = tdir*abs(tfinal - t)/100  # initial step size
+    h = initstep
+    if h == 0.
+      # initial guess at a step size
+      h, F0 = hinit(F, y0, t, 3, reltol, abstol)      
+    else
+      F0 = F(t,y0)
+    end
+    h = tdir*min(h, maxstep)
 
     y = y0
     tout = Array(typeof(t), 1)
@@ -466,11 +520,10 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     yout = Array(typeof(y0), 1)
     yout[1] = copy(y)         # first output solution
 
-    F0 = F(t,y)
 
     J = jac(t,y)    # get Jacobian of F wrt y
 
-    while abs(t) < abs(tfinal) && hmin < abs(h)
+    while abs(t) < abs(tfinal) && minstep < abs(h)
         if abs(t-tfinal) < abs(h)
             h = tfinal - t
         end
@@ -531,7 +584,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         end
 
         # update of the step size
-        h = tdir*min( hmax, abs(h)*0.8*(delta/err)^(1/3) )
+        h = tdir*min( maxstep, abs(h)*0.8*(delta/err)^(1/3) )
     end
 
     return tout, yout
