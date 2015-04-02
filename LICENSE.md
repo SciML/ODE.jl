@@ -1,14 +1,3 @@
-ode23_ncm
-=========
-
-The ode23_ncm function is adapted from Chapter 7 of the book Numerical Computing
-with Matlab by Cleve Moler. The original source is at:
-http://www.mathworks.in/moler/ncm/ode23tx.m
-
-The code carries the following notice:
-
->   Copyright 2012 Cleve Moler and The MathWorks, Inc.
-
 oderkf
 ======
 

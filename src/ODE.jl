@@ -13,7 +13,7 @@ export ode23s
 export ode4s, ode4ms, ode4
 
 ## complete function export list
-#export ode23, ode23_ncm, ode4,
+#export ode23, ode4,
 #    oderkf, ode45, ode45_dp, ode45_fb, ode45_ck,
 #    oderosenbrock, ode4s, ode4s_kr, ode4s_s,
 #    ode4ms, ode_ms
@@ -51,10 +51,6 @@ end
 ###############################################################################
 ## NON-STIFF SOLVERS
 ###############################################################################
-
-# Cleve Moler's ode23
-include("ode23_ncm.jl")
-
 
 # ODERKF based on
 #

@@ -7,7 +7,6 @@ ode5ms(F, x0, tspan) = ODE.ode_ms(F, x0, tspan, 5)
 
 solvers = [
     ODE.ode23,
-    ODE.ode23_ncm,
 
     ODE.ode4,
     ODE.ode45_dp,
