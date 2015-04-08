@@ -52,173 +52,17 @@ end
 ## NON-STIFF SOLVERS
 ###############################################################################
 
-# NOTE: in the near future ode23 will be replaced by ode23_bs
-
-#ODE23  Solve non-stiff differential equations.
+# ODERKF based on
 #
-#   ODE23(F,TSPAN,Y0) with TSPAN = [T0 TFINAL] integrates the system
-#   of differential equations dy/dt = f(t,y) from t = T0 to t = TFINAL.
-#   The initial condition is y(T0) = Y0.
-#
-#   The first argument, F, is a function handle or an anonymous function
-#   that defines f(t,y).  This function must have two input arguments,
-#   t and y, and must return a column vector of the derivatives, dy/dt.
-#
-#   With two output arguments, [T,Y] = ODE23(...) returns a column
-#   vector T and an array Y where Y(:,k) is the solution at T(k).
-#
-#   More than four input arguments, ODE23(F,TSPAN,Y0,RTOL,P1,P2,...),
-#   are passed on to F, F(T,Y,P1,P2,...).
-#
-#   ODE23 uses the Runge-Kutta (2,3) method of Bogacki and Shampine (BS23).
-#
-#   Example
-#      tspan = [0, 2*pi]
-#      y0 = [1, 0]
-#      F = (t, y) -> [0 1; -1 0]*y
-#      ode23(F, tspan, y0)
-#
-#   See also ODE23.
-
-# Initialize variables.
-# Adapted from Cleve Moler's textbook
-# http://www.mathworks.com/moler/ncm/ode23tx.m
-function ode23(F, y0, tspan; reltol = 1.e-5, abstol = 1.e-8)
-    if reltol == 0
-        warn("setting reltol = 0 gives a step size of zero")
-    end
-
-    threshold = abstol / reltol
-
-    t = tspan[1]
-    tfinal = tspan[end]
-    tdir = sign(tfinal - t)
-    hmax = abs(0.1*(tfinal-t))
-    y = y0
-
-    tout = Array(typeof(t), 1)
-    tout[1] = t         # first output time
-    yout = Array(typeof(y0),1)
-    yout[1] = y         # first output solution
-
-    # Compute initial step size.
-    s1 = F(t, y)
-    r = norm(s1./max(abs(y), threshold), Inf) + realmin() # TODO: fix type bug in max()
-    h = tdir*0.8*reltol^(1/3)/r
-
-    # The main loop.
-
-    while t != tfinal
-
-        hmin = 16*eps()*abs(t)
-        if abs(h) > hmax; h = tdir*hmax; end
-        if abs(h) < hmin; h = tdir*hmin; end
-
-        # Stretch the step if t is close to tfinal.
-
-        if 1.1*abs(h) >= abs(tfinal - t)
-            h = tfinal - t
-        end
-
-        # Attempt a step.
-
-        s2 = F(t+h/2, y+h/2*s1)
-        s3 = F(t+3*h/4, y+3*h/4*s2)
-        tnew = t + h
-        ynew = y + h*(2*s1 + 3*s2 + 4*s3)/9
-        s4 = F(tnew, ynew)
-
-        # Estimate the error.
-
-        e = h*(-5*s1 + 6*s2 + 8*s3 - 9*s4)/72
-        err = norm(e./max(max(abs(y), abs(ynew)), threshold), Inf) + realmin()
-
-        # Accept the solution if the estimated error is less than the tolerance.
-
-        if err <= reltol
-            t = tnew
-            y = ynew
-            push!(tout, t)
-            push!(yout, y)
-            s1 = s4   # Reuse final function value to start new step
-        end
-
-        # Compute a new step size.
-
-        h = h*min(5, 0.8*(reltol/err)^(1/3))
-
-        # Exit early if step size is too small.
-
-        if abs(h) <= hmin
-            println("Step size ", h, " too small at t = ", t)
-            t = tfinal
-        end
-
-    end # while (t != tfinal)
-
-    return tout, yout
-
-end # ode23
-
-
-
 # ode45 adapted from http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
 # (a newer version (v1.15) can be found here https://sites.google.com/site/comperem/home/ode_solvers)
-#
-# ode45 (v1.11) integrates a system of ordinary differential equations using
-# 4th & 5th order embedded formulas from Dormand & Prince or Fehlberg.
-#
-# The Fehlberg 4(5) pair is established and works well, however, the
-# Dormand-Prince 4(5) pair minimizes the local truncation error in the
-# 5th-order estimate which is what is used to step forward (local extrapolation.)
-# Generally it produces more accurate results and costs roughly the same
-# computationally.  The Dormand-Prince pair is the default.
-#
-# This is a 4th-order accurate integrator therefore the local error normally
-# expected would be O(h^5).  However, because this particular implementation
-# uses the 5th-order estimate for xout (i.e. local extrapolation) moving
-# forward with the 5th-order estimate should yield errors on the order of O(h^6).
-#
-# The order of the RK method is the order of the local *truncation* error, d.
-# The local truncation error is defined as the principle error term in the
-# portion of the Taylor series expansion that gets dropped.  This portion of
-# the Taylor series exapansion is within the group of terms that gets multipled
-# by h in the solution definition of the general RK method.  Therefore, the
-# order-p solution created by the RK method will be roughly accurate to
-# within O(h^(p+1)).  The difference between two different-order solutions is
-# the definition of the "local error," l.  This makes the local error, l, as
-# large as the error in the lower order method, which is the truncation
-# error, d, times h, resulting in O(h^(p+1)).
-# Summary:   For an RK method of order-p,
-#            - the local truncation error is O(h^p)
-#            - the local error (used for stepsize adjustment) is O(h^(p+1))
-#
-# This requires 6 function evaluations per integration step.
-#
-# The error estimate formula and slopes are from
-# Numerical Methods for Engineers, 2nd Ed., Chappra & Cannle, McGraw-Hill, 1985
-#
-# Usage:
-#         (tout, xout) = ode45(F, tspan, x0)
-#
-# INPUT:
-# F     - User-defined function
-#         Call: xprime = F(t,x)
-#         t      - Time (scalar).
-#         x      - Solution column-vector.
-#         xprime - Returned derivative COLUMN-vector; xprime(i) = dx(i)/dt.
-# tspan - [ tstart, tfinal ]
-# x0    - Initial value COLUMN-vector.
-#
-# OUTPUT:
-# tout  - Returned integration time points (column-vector).
-# xout  - Returned solution, one solution column-vector per tout-value.
 #
 # Original Octave implementation:
 # Marc Compere
 # CompereM@asme.org
 # created : 06 October 1999
 # modified: 17 January 2001
+#
 function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
                                             norm=Base.norm,
                                             minstep=abs(tspan[end] - tspan[1])/1e9,
@@ -406,8 +250,12 @@ ode78_fb(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, fb_coefficients_78...; 
 # Use Fehlberg version of ode78 by default
 const ode78 = ode78_fb
 
-# Use Dormand Prince version of ode45 by default
+# Use Dormand-Prince version of ode45 by default
 const ode45 = ode45_dp
+
+# Use Bogacki–Shampine version of ode23 by default
+const ode23 = ode23_bs
+
 
 # more higher-order embedded methods can be found in:
 # P.J. Prince and J.R.Dormand: High order embedded Runge-Kutta formulae, Journal of Computational and Applied Mathematics 7(1), 1981.
@@ -508,7 +356,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     h = initstep
     if h == 0.
       # initial guess at a step size
-      h, F0 = hinit(F, y0, t, 3, reltol, abstol)      
+      h, F0 = hinit(F, y0, t, 3, reltol, abstol)
     else
       F0 = F(t,y0)
     end

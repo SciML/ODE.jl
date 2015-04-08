@@ -1,18 +1,7 @@
-ode23
-=====
+oderkf
+======
 
-The ode23 function is adapted from Chapter 7 of the book Numerical Computing
-with Matlab by Cleve Moler. The original source is at:
-http://www.mathworks.in/moler/ncm/ode23tx.m
-
-The code carries the following notice:
-
->   Copyright 2012 Cleve Moler and The MathWorks, Inc.
-
-ode45
-=====
-
-The ode45 function is adapted from this implementation for Octave, and
+The oderkf function is adapted from this implementation for Octave, and
 is available under the GPL.
 
 http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
@@ -35,3 +24,9 @@ ode4, ode4s, ode4ms
 ===================
 
 These are implemented by Patrick O'Leary, and available under the MIT License.
+
+ode23s
+======
+
+The ode23s functions is implemented by Alexander Croy, and available under the
+MIT License.
