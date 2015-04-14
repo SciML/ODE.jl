@@ -454,7 +454,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
     x[1] = x0
 
     solstep = 1
-    while abs(tspan[solstep]) < abs(maximum(tspan))
+    while solstep < length(tspan)
         ts = tspan[solstep]
         hs = h[solstep]
         xs = x[solstep]
