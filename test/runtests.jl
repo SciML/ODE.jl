@@ -19,6 +19,7 @@ solvers = [
     ode5ms,
     ODE.ode4s_s,
     ODE.ode4s_kr,
+
     ODE.ode78_fb]
 
 for solver in solvers
@@ -41,6 +42,9 @@ for solver in solvers
     t,y=solver((t,y)->y, 1., [0:.001:1;])
     @test maximum(abs(y-e.^t)) < tol
 
+    t,y=solver((t,y)->y, 1., [1:-.001:0;])
+    @test maximum(abs(y-e.^(t-1))) < tol
+ 
     # dv       dw
     # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
     # dt       dt

@@ -24,7 +24,7 @@ export ode4s, ode4ms, ode4
 
 # estimator for initial step based on book
 # "Solving Ordinary Differential Equations I" by Hairer et al., p.169
-function hinit(F, x0, t0, p, reltol, abstol)
+function hinit(F, x0, t0, tdir, p, reltol, abstol)
     tau = max(reltol*norm(x0, Inf), abstol)
     d0 = norm(x0, Inf)/tau
     f0 = F(t0, x0)
@@ -35,8 +35,8 @@ function hinit(F, x0, t0, p, reltol, abstol)
         h0 = 0.01*(d0/d1)
     end
     # perform Euler step
-    x1 = x0 + h0*f0
-    f1 = F(t0 + h0, x1)
+    x1 = x0 + tdir*h0*f0
+    f1 = F(t0 + tdir*h0, x1)
     # estimate second derivative
     d2 = norm(f1 - f0, Inf)/(tau*h0)
     if max(d1, d2) <= 1e-15
@@ -82,7 +82,7 @@ function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
     h = initstep
     if h == 0.
       # initial guess at a step size
-      h, k[1] = hinit(F, x0, t, p, reltol, abstol)
+      h, k[1] = hinit(F, x0, t, tdir, p, reltol, abstol)
     else
       k[1] = F(t, x0) # first stage
     end
@@ -356,7 +356,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     h = initstep
     if h == 0.
       # initial guess at a step size
-      h, F0 = hinit(F, y0, t, 3, reltol, abstol)
+      h, F0 = hinit(F, y0, t, tdir, 3, reltol, abstol)
     else
       F0 = F(t,y0)
     end
@@ -454,7 +454,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
     x[1] = x0
 
     solstep = 1
-    while tspan[solstep] < maximum(tspan)
+    while solstep < length(tspan)
         ts = tspan[solstep]
         hs = h[solstep]
         xs = x[solstep]
