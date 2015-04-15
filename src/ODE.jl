@@ -3,20 +3,57 @@
 module ODE
 
 using Polynomials
+using Compat
 
 ## minimal function export list
 # adaptive non-stiff:
-export ode23, ode45, ode78
+export ode45, ode78
+# non-adaptive non-stiff:
+export ode4, ode4ms
 # adaptive stiff:
 export ode23s
-# non-adaptive:
-export ode4s, ode4ms, ode4
+# non-adaptive stiff:
+export ode4s
 
-## complete function export list
-#export ode23, ode4,
-#    oderkf, ode45, ode45_dp, ode45_fb, ode45_ck,
-#    oderosenbrock, ode4s, ode4s_kr, ode4s_s,
-#    ode4ms, ode_ms
+## complete function export list: see runtests.jl
+
+###############################################################################
+## Coefficient Tableaus
+###############################################################################
+
+# Butcher Tableaus, or more generally coefficient tables
+# see Hairer & Wanner 1992, p. 134, 166
+
+abstract Tableau{Name, S, T<:Real}
+# Name is the name of the tableau/method (a symbol)
+# S is the number of stages (an int)
+# T is the type of the coefficients
+#
+# TODO: have a type parameter which specifies adaptive vs non-adaptive
+#
+# For all types of tableaus it assumes fields:
+# order::(Int...) # order of the method(s)
+#
+# For Runge-Kutta methods it assumes fields:
+# a::Matrix{T}  # SxS matrix
+# b::Matrix{T}  # 1 or 2 x S matrix (fixed step/ adaptive)
+# c::Vector{T}  # S
+#
+# For a tableau:
+#  c1  | a_11   ....   a_1s
+#  .   | a_21 .          .
+#  .   | a_31     .      .
+#  .   | ....         .  .
+#  c_s | a_s1  ....... a_ss
+# -----+--------------------
+#      | b_1     ...   b_s   this is the one used for stepping
+#      | b'_1    ...   b'_s  this is the one used for error-checking
+
+Base.eltype{N,S,T}(b::Tableau{N,S,T}) = T
+order(b::Tableau) = b.order
+# Subtypes need to define a convert method to convert to a different
+# eltype with signature:
+Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert method for concrete Tableau types")
 
 ###############################################################################
 ## HELPER FUNCTIONS
@@ -24,7 +61,9 @@ export ode4s, ode4ms, ode4
 
 # estimator for initial step based on book
 # "Solving Ordinary Differential Equations I" by Hairer et al., p.169
-function hinit(F, x0, t0, tdir, p, reltol, abstol)
+function hinit(F, x0, t0, tend, p, reltol, abstol)
+    tdir = sign(tend-t0)
+    tdir==0 && error("Zero time span")
     tau = max(reltol*norm(x0, Inf), abstol)
     d0 = norm(x0, Inf)/tau
     f0 = F(t0, x0)
@@ -45,249 +84,109 @@ function hinit(F, x0, t0, tdir, p, reltol, abstol)
         pow = -(2. + log10(max(d1, d2)))/(p + 1.)
         h1 = 10.^pow
     end
-    h = min(100*h0, h1), f0
+    return tdir*min(100*h0, h1), tdir, f0
+end
+
+# isoutofdomain takes the state and returns true if state is outside
+# of the allowed domain.  Used in adaptive step-control.
+isoutofdomain(x) = isnan(x)
+
+function make_consistent_types(fn, y0, tspan, btab::Tableau)
+    # There are a few types involved in a call to a ODE solver which
+    # somehow need to be consistent:
+    #
+    # Et = eltype(tspan)
+    # Ey = eltype(y0)
+    # Ef = eltype(Tf)
+    #
+    # There are also the types of the containers, but they are not
+    # needed as `similar` is used to make containers.
+    # Tt = typeof(tspan)
+    # Ty = typeof(y0)              # note, this can be a scalar
+    # Tf = typeof(F(tspan(1),y0))  # note, this can be a scalar
+    #
+    # Returns
+    # - Et: eltype of time, needs to be a real "continuous" type, at
+    #       the moment a FloatingPoint
+    # - Eyf: suitable eltype of y and f(t,y)
+    #   --> both of these are set to typeof(y0[1]/(tspan[end]-tspan[1]))
+    # - Ty: container type of y0
+    # - btab: tableau with entries converted to Et
+
+    # Needed interface:
+    # On components: /, -
+    # On container: eltype, promote_type
+    # On time container: eltype
+
+    Ty = typeof(y0)
+    Eyf = typeof(y0[1]/(tspan[end]-tspan[1]))
+
+    Et = eltype(tspan)
+    @assert Et<:Real
+    if !(Et<:FloatingPoint)
+        Et = promote_type(Et, Float64)
+    end
+
+    # if all are Floats, make them the same
+    if Et<:FloatingPoint &&  Eyf<:FloatingPoint
+        Et = promote_type(Et, Eyf)
+        Eyf = Et
+    end
+
+    !isleaftype(Et) && warn("The eltype(tspan) is not a concrete type!  Change type of tspan for better performance.")
+    !isleaftype(Eyf) && warn("The eltype(y0/tspan[1]) is not a concrete type!  Change type of y0 and/or tspan for better performance.")
+
+    btab_ = convert(Et, btab)
+    return Et, Eyf, Ty, btab_
 end
 
 ###############################################################################
 ## NON-STIFF SOLVERS
 ###############################################################################
 
-# ODERKF based on
-#
-# ode45 adapted from http://users.powernet.co.uk/kienzle/octave/matcompat/scripts/ode_v1.11/ode45.m
-# (a newer version (v1.15) can be found here https://sites.google.com/site/comperem/home/ode_solvers)
-#
-# Original Octave implementation:
-# Marc Compere
-# CompereM@asme.org
-# created : 06 October 1999
-# modified: 17 January 2001
-#
-function oderkf(F, x0, tspan, p, a, bs, bp; reltol = 1.0e-5, abstol = 1.0e-8,
-                                            norm=Base.norm,
-                                            minstep=abs(tspan[end] - tspan[1])/1e9,
-                                            maxstep=abs(tspan[end] - tspan[1])/2.5,
-                                            initstep=0.)
-    # see p.91 in the Ascher & Petzold reference for more infomation.
-    pow = 1/p   # use the higher order to estimate the next step size
+include("runge_kutta.jl")
 
-    c = sum(a, 2)   # consistency condition
-    k = Array(typeof(x0), length(c))
-
-    # Initialization
-    t = tspan[1]
-    tfinal = tspan[end]
-    tdir = sign(tfinal - t)
-
-    h = initstep
-    if h == 0.
-      # initial guess at a step size
-      h, k[1] = hinit(F, x0, t, tdir, p, reltol, abstol)
-    else
-      k[1] = F(t, x0) # first stage
-    end
-    h = tdir*min(h, maxstep)
-    x = x0
-    tout = Array(typeof(t), 1)
-    tout[1] = t         # first output time
-    xout = Array(typeof(x0), 1)
-    xout[1] = x         # first output solution
-
-    while abs(t) != abs(tfinal) && abs(h) >= minstep
-        if abs(h) > abs(tfinal-t)
-            h = tfinal - t
-        end
-
-        #(p-1)th and pth order estimates
-        xs = x + h*bs[1]*k[1]
-        xp = x + h*bp[1]*k[1]
-        for j = 2:length(c)
-            dx = a[j,1]*k[1]
-            for i = 2:j-1
-                dx += a[j,i]*k[i]
-            end
-            k[j] = F(t + h*c[j], x + h*dx)
-
-            # compute the (p-1)th order estimate
-            xs = xs + h*bs[j]*k[j]
-            # compute the pth order estimate
-            xp = xp + h*bp[j]*k[j]
-        end
-
-        # estimate the local truncation error
-        gamma1 = xs - xp
-
-        # Estimate the error and the acceptable error
-        delta = norm(gamma1, Inf)              # actual error
-        tau   = max(reltol*norm(x,Inf),abstol) # allowable error
-
-        # Update the solution only if the error is acceptable
-        if delta <= tau
-            t = t + h
-            x = xp    # <-- using the higher order estimate is called 'local extrapolation'
-            push!(tout, t)
-            push!(xout, x)
-
-            # Compute the slopes by computing the k[:,j+1]'th column based on the previous k[:,1:j] columns
-            # notes: k needs to end up as an Nxs, a is 7x6, which is s by (s-1),
-            #        s is the number of intermediate RK stages on [t (t+h)] (Dormand-Prince has s=7 stages)
-            if c[end] == 1
-                # Assign the last stage for x(k) as the first stage for computing x[k+1].
-                # This is part of the Dormand-Prince pair caveat.
-                # k[:,7] has already been computed, so use it instead of recomputing it
-                # again as k[:,1] during the next step.
-                k[1] = k[end]
-            else
-                k[1] = F(t,x) # first stage
-            end
-        end
-
-        # Update the step size
-        h = tdir*min(maxstep, 0.8*abs(h)*(tau/delta)^pow)
-    end # while (t < tfinal) & (h >= minstep)
-
-    if abs(t) < abs(tfinal)
-        error("Step size grew too small. t=$t, h=$(abs(h)), x=$x")
-    end
-
-    return tout, xout
-end
-
-
-# Bogacki–Shampine coefficients
-const bs_coefficients = (3,
-                         [    0           0      0      0
-                              1/2         0      0      0
-                              0         3/4      0      0
-                              2/9       1/3     4/9     0],
-                         # 2nd order b-coefficients
-                         [7/24 1/4 1/3 1/8],
-                         # 3rd order b-coefficients
-                         [2/9 1/3 4/9 0],
-                         )
-ode23_bs(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, bs_coefficients...; kwargs...)
-
-
-# Both the Dormand-Prince and Fehlberg 4(5) coefficients are from a tableau in
-# U.M. Ascher, L.R. Petzold, Computer Methods for  Ordinary Differential Equations
-# and Differential-Agebraic Equations, Society for Industrial and Applied Mathematics
-# (SIAM), Philadelphia, 1998
-#
-# Dormand-Prince coefficients
-const dp_coefficients = (5,
-                         [    0           0          0         0         0        0
-                              1/5         0          0         0         0        0
-                              3/40        9/40       0         0         0        0
-                             44/45      -56/15      32/9       0         0        0
-                          19372/6561 -25360/2187 64448/6561 -212/729     0        0
-                           9017/3168   -355/33   46732/5247   49/176 -5103/18656  0
-                             35/384       0        500/1113  125/192 -2187/6784  11/84],
-                         # 4th order b-coefficients
-                         [5179/57600 0 7571/16695 393/640 -92097/339200 187/2100 1/40],
-                         # 5th order b-coefficients
-                         [35/384 0 500/1113 125/192 -2187/6784 11/84 0],
-                         )
-ode45_dp(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, dp_coefficients...; kwargs...)
-
-
-# Fehlberg coefficients
-const fb_coefficients = (5,
-                         [    0         0          0         0        0
-                             1/4        0          0         0        0
-                             3/32       9/32       0         0        0
-                          1932/2197 -7200/2197  7296/2197    0        0
-                           439/216     -8       3680/513  -845/4104   0
-                            -8/27       2      -3544/2565 1859/4104 -11/40],
-                         # 4th order b-coefficients
-                         [25/216 0 1408/2565 2197/4104 -1/5 0],
-                         # 5th order b-coefficients
-                         [16/135 0 6656/12825 28561/56430 -9/50 2/55],
-                         )
-ode45_fb(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, fb_coefficients...; kwargs...)
-
-
-# Cash-Karp coefficients
-# Numerical Recipes in Fortran 77
-const ck_coefficients = (5,
-                         [   0         0       0           0          0
-                             1/5       0       0           0          0
-                             3/40      9/40    0           0          0
-                             3/10     -9/10    6/5         0          0
-                           -11/54      5/2   -70/27       35/27       0
-                          1631/55296 175/512 575/13824 44275/110592 253/4096],
-                         # 4th order b-coefficients
-                         [37/378 0 250/621 125/594 0 512/1771],
-                         # 5th order b-coefficients
-                         [2825/27648 0 18575/48384 13525/55296 277/14336 1/4],
-                         )
-ode45_ck(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, ck_coefficients...; kwargs...)
-
-
-# Fehlberg 7(8) coefficients
-# Values from pag. 65, Fehlberg, Erwin. "Classical fifth-, sixth-, seventh-, and eighth-order Runge-Kutta formulas with stepsize control".
-# National Aeronautics and Space Administration.
-const fb_coefficients_78 = (8,
-                            [     0      0      0       0        0         0       0       0     0      0    0 0
-                                  2/27   0      0       0        0         0       0       0     0      0    0 0
-                                  1/36   1/12   0       0        0         0       0       0     0      0    0 0
-                                  1/24   0      1/8     0        0         0       0       0     0      0    0 0
-                                  5/12   0    -25/16   25/16     0         0       0       0     0      0    0 0
-                                  1/20   0      0       1/4      1/5       0       0       0     0      0    0 0
-                                -25/108  0      0     125/108  -65/27    125/54    0       0     0      0    0 0
-                                 31/300  0      0       0       61/225    -2/9    13/900   0     0      0    0 0
-                                  2      0      0     -53/6    704/45   -107/9    67/90    3     0      0    0 0
-                                -91/108  0      0      23/108 -976/135   311/54  -19/60   17/6  -1/12   0    0 0
-                               2383/4100 0      0    -341/164 4496/1025 -301/82 2133/4100 45/82 45/164 18/41 0 0
-                                  3/205  0      0       0        0        -6/41   -3/205  -3/41  3/41   6/41 0 0
-                              -1777/4100 0      0    -341/164 4496/1025 -289/82 2193/4100 51/82 33/164 12/41 0 1],
-                            # 7th order b-coefficients
-                            [41/840 0 0 0 0 34/105 9/35 9/35 9/280 9/280 41/840 0 0],
-                            # 8th order b-coefficients
-                            [0 0 0 0 0 34/105 9/35 9/35 9/280 9/280 0 41/840 41/840],
-                            )
-ode78_fb(F, x0, tspan; kwargs...) = oderkf(F, x0, tspan, fb_coefficients_78...; kwargs...)
-
-# Use Fehlberg version of ode78 by default
-const ode78 = ode78_fb
-
-# Use Dormand-Prince version of ode45 by default
-const ode45 = ode45_dp
-
-# Use Bogacki–Shampine version of ode23 by default
-const ode23 = ode23_bs
-
-
-# more higher-order embedded methods can be found in:
-# P.J. Prince and J.R.Dormand: High order embedded Runge-Kutta formulae, Journal of Computational and Applied Mathematics 7(1), 1981.
-
-
-#ODE4  Solve non-stiff differential equations, fourth order
-#   fixed-step Runge-Kutta method.
-#
-#   [T,X] = ODE4(ODEFUN, X0, TSPAN) with TSPAN = [T0:H:TFINAL]
-#   integrates the system of differential equations x' = f(t,x) from time
-#   T0 to TFINAL in steps of H with initial conditions X0. Function
-#   ODEFUN(T,X) must return a column vector corresponding to f(t,x). Each
-#   row in the solution array X corresponds to a time returned in the
-#   column vector T.
-function ode4(F, x0, tspan)
+# ODE_MS Fixed-step, fixed-order multi-step numerical method
+#   with Adams-Bashforth-Moulton coefficients
+function ode_ms(F, x0, tspan, order::Integer)
     h = diff(tspan)
     x = Array(typeof(x0), length(tspan))
     x[1] = x0
 
-    midxdot = Array(typeof(x0), 4)
-    for i = 1:length(tspan)-1
-        # Compute midstep derivatives
-        midxdot[1] = F(tspan[i],         x[i])
-        midxdot[2] = 2*F(tspan[i]+h[i]./2, x[i] + midxdot[1].*h[i]./2)
-        midxdot[3] = 2*F(tspan[i]+h[i]./2, x[i] + midxdot[2].*h[i]./2)
-        midxdot[4] = F(tspan[i]+h[i],    x[i] + midxdot[3].*h[i])
+    if 1 <= order <= 4
+        b = ms_coefficients4
+    else
+        b = zeros(order, order)
+        b[1:4, 1:4] = ms_coefficients4
+        for s = 5:order
+            for j = 0:(s - 1)
+                # Assign in correct order for multiplication below
+                #  (a factor depending on j and s) .* (an integral of a polynomial with -(0:s), except -j, as roots)
+                p_int = polyint(poly(diagm(-[0:j - 1; j + 1:s - 1])))
+                b[s, s - j] = ((-1)^j / factorial(j)
+                               / factorial(s - 1 - j) * polyval(p_int, 1))
+            end
+        end
+    end
 
-        # Integrate
-        x[i+1] = x[i] + 1/6 .*h[i].*sum(midxdot)
+    # TODO: use a better data structure here (should be an order-element circ buffer)
+    xdot = similar(x)
+    for i = 1:length(tspan)-1
+        # Need to run the first several steps at reduced order
+        steporder = min(i, order)
+        xdot[i] = F(tspan[i], x[i])
+
+        x[i+1] = x[i]
+        for j = 1:steporder
+            x[i+1] += h[i]*b[steporder, j]*xdot[i-(steporder-1) + (j-1)]
+        end
     end
     return vcat(tspan), x
 end
+
+# Use order 4 by default
+ode4ms(F, x0, tspan) = ode_ms(F, x0, tspan, 4)
+ode5ms(F, x0, tspan) = ODE.ode_ms(F, x0, tspan, 5)
 
 ###############################################################################
 ## STIFF SOLVERS
@@ -351,14 +250,15 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     # initialization
     t = tspan[1]
     tfinal = tspan[end]
-    tdir = sign(tfinal - t)
+
 
     h = initstep
     if h == 0.
-      # initial guess at a step size
-      h, F0 = hinit(F, y0, t, tdir, 3, reltol, abstol)
+        # initial guess at a step size
+        h, tdir, F0 = hinit(F, y0, t, tfinal, 3, reltol, abstol)
     else
-      F0 = F(t,y0)
+        tdir = sign(tfinal - t)
+        F0 = F(t,y0)
     end
     h = tdir*min(h, maxstep)
 
@@ -366,7 +266,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     tout = Array(typeof(t), 1)
     tout[1] = t         # first output time
     yout = Array(typeof(y0), 1)
-    yout[1] = copy(y)         # first output solution
+    yout[1] = deepcopy(y)         # first output solution
 
 
     J = jac(t,y)    # get Jacobian of F wrt y
@@ -522,45 +422,5 @@ const ms_coefficients4 = [ 1      0      0     0
                           5/12  -4/3  23/12 0
                           -9/24   37/24 -59/24 55/24]
 
-# ODE_MS Fixed-step, fixed-order multi-step numerical method
-#   with Adams-Bashforth-Moulton coefficients
-function ode_ms(F, x0, tspan, order::Integer)
-    h = diff(tspan)
-    x = Array(typeof(x0), length(tspan))
-    x[1] = x0
-
-    if 1 <= order <= 4
-        b = ms_coefficients4
-    else
-        b = zeros(order, order)
-        b[1:4, 1:4] = ms_coefficients4
-        for s = 5:order
-            for j = 0:(s - 1)
-                # Assign in correct order for multiplication below
-                #  (a factor depending on j and s) .* (an integral of a polynomial with -(0:s), except -j, as roots)
-                p_int = polyint(poly(diagm(-[0:j - 1; j + 1:s - 1])))
-                b[s, s - j] = ((-1)^j / factorial(j)
-                               / factorial(s - 1 - j) * polyval(p_int, 1))
-            end
-        end
-    end
-
-    # TODO: use a better data structure here (should be an order-element circ buffer)
-    xdot = similar(x)
-    for i = 1:length(tspan)-1
-        # Need to run the first several steps at reduced order
-        steporder = min(i, order)
-        xdot[i] = F(tspan[i], x[i])
-
-        x[i+1] = x[i]
-        for j = 1:steporder
-            x[i+1] += h[i]*b[steporder, j]*xdot[i-(steporder-1) + (j-1)]
-        end
-    end
-    return vcat(tspan), x
-end
-
-# Use order 4 by default
-ode4ms(F, x0, tspan) = ode_ms(F, x0, tspan, 4)
 
 end # module ODE

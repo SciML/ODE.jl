@@ -15,7 +15,7 @@ Since then, quite a lot has happened in the package, and the best way to use cur
 Currently, `ODE` exports the following adaptive solvers:
 
 * `ode23`: 2nd order adaptive solver with 3rd order error control, using the Bogacki–Shampine coefficients
-* `ode45`: 4th order adaptive solver with 5th order error control, using the Dormand Prince coefficients. Fehlberg and Cash-Karp coefficients are also available.
+* `ode54`: 4th order adaptive solver with 5th order error control, using the Dormand Prince coefficients. Fehlberg and Cash-Karp coefficients are also available.
 * `ode78`: 7th order adaptive solver with 8th order error control, using the Fehlberg coefficients.
 
 * `ode23s`: 2nd/3rd order adaptive solver for stiff problems, using a modified Rosenbrock triple.
@@ -24,17 +24,19 @@ all of which have the following basic API:
 
     tout, yout = odeXX(F, y0, tspan; keywords...)
 
-to solve the explicit ODE defined by dy/dt = F(t,y). A few other solvers are also exported, see the source code for details.
+to solve the explicitly defined ODE by dy/dt = F(t,y). A few other solvers are also exported, see the source code for details.
 
 The adaptive solvers accept the following keywords
 - `norm`: user-supplied norm for determining the error `E` (default `Base.vecnorm`),
 - `abstol` and/or `reltol`: an integration step is accepted if `E <= abstol || E <= reltol*abs(y)` (defaults `reltol = 1e-5`, `abstol = 1e-8`),
 - `maxstep`, `minstep` and `initstep`: determine the maximal, minimal and initial integration step (defaults `minstep=|tspan[end] - tspan[1]|/1e9`, `maxstep=|tspan[end] - tspan[1]|/2.5` and automatic initial step estimation).
-
-Additionally, `ode23s` supports
 - `points=:all` (default): output is given for each value in `tspan` as well as for each intermediate point the solver used.
 - `points=:specified`: output is given only for each value in `tspan`.
+
+Additionally, `ode23s` solver supports
 - `jacobian = G(t,y)`: user-supplied Jacobian G(t,y) = dF(t,y)/dy (default estimate by finite-difference method).
+
+There are also fixed step Runge-Kutta and Rosenbrock solvers available.
 
 # Need something long-term reliable right now?
 
