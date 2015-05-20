@@ -75,4 +75,6 @@ let
     @test norm(refsol-y[end], Inf) < 2e-10
 end
 
+include("interface-tests.jl")
+
 println("All looks OK")
