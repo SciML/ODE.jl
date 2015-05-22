@@ -42,27 +42,44 @@ end
 # reference as t=2
 ##
 refsol = [0.1706167732170483e1, -0.8928097010247975e0]
+y0 = [2.,0.];
+tstart = 0.
+tend = 2.
+
+
 
 ###
 # Fixed step
 ###
+# nt = 50_000;
+# tspan = linspace(tstart, tend, nt)
 
-nt = 50_000;
-tspan = linspace(0.,2.0,nt)
-y0 = [2.,0.];
+# t,yout1 = ode4s(vdp, y0, tspan; jacobian=Jvdp)
+# @time t,yout1 = ode4s(vdp, y0, tspan; jacobian=Jvdp)
 
-t,yout1 = ode4s(vdp, y0, tspan; jacobian=Jvdp)
-@time t,yout1 = ode4s(vdp, y0, tspan; jacobian=Jvdp)
+# t,yout2 = ode_rosw_fixed(vdp_impl, Jvdp_impl, y0, tspan)
+# @time t,yout2 = ode_rosw_fixed(vdp_impl, Jvdp_impl, y0, tspan)
 
-t,yout2 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
-@time t,yout2 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
+# println("Fixed step: abs error of ode4s vs ref:")
+# println(yout1[end]-refsol)
+# println("Fixed step: abs error of ode_rosw vs ref:")
+# println(yout2[end]-refsol)
 
-println("Fixed step: abs error of ode4s vs ref:")
-println(yout1[end]-refsol)
-println("Fixed step: abs error of ode_rosw vs ref:")
-println(yout2[end]-refsol)
+# #### adaptive
+tspan = linspace(tstart, tend, 2)
 
-# #### adaptive rosw
+t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
+@time t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
+
+t,yout4 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
+@time t,yout4 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
+
+println("Adaptive step: abs error of ode23s vs ref:")
+println(yout3[end]-refsol)
+println("Adaptive step: abs error of ode_rosw vs ref:")
+println(yout4[end]-refsol)
+
+# rosw
 # @time yout3, ts, steps, dts, xerrs = rosw_runner_adaptive(
 #                      vdp_impl, Jvdp_impl, [0., 2.], y0;
 #                      reltol=reltol, abstol=abstol, dt0=1e-5, mindt=1e-8)

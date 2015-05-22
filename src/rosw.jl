@@ -1,7 +1,7 @@
 # Rosenbrock-Wanner methods
 ###########################
 
-export ode_rosw
+export ode_rosw, ode_rosw_fixed
 
 # Rosenbrock-W methods are typically specified for autonomous DAE:
 # Mẋ = f(x)
@@ -95,7 +95,7 @@ const bt_ros34pw2 = TableauRosW(:ros34pw2, (3,4), Float64,
 ###################
 # Fixed step solver
 ###################
-ode_rosw(fn, Jfn, y0, tspan) = oderosw_fixed(fn, Jfn, y0::AbstractVector, tspan, bt_ros34pw2)
+ode_rosw_fixed(fn, Jfn, y0, tspan) = oderosw_fixed(fn, Jfn, y0, tspan, bt_ros34pw2)
 function oderosw_fixed{N,S}(fn, Jfn, y0::AbstractVector, tspan,
                             btab::TableauRosW{N,S})
     # TODO: refactor with oderk_fixed
@@ -124,8 +124,131 @@ function linsolve(h, hprime, y0)
     return y0 - hprime(y0)\h(y0)
 end
 
+ode_rosw(fn, Jfn, y0, tspan;kwargs...) = oderosw_adapt(fn, Jfn, y0, tspan, bt_ros34pw2; kwargs...)
+function oderosw_adapt{N,S}(fn, Jfn, y0::AbstractVector, tspan, btab::TableauRosW{N,S};
+                            reltol = 1.0e-5, abstol = 1.0e-8,
+                            norm=Base.norm,
+                            minstep=abs(tspan[end] - tspan[1])/1e9,
+                            maxstep=abs(tspan[end] - tspan[1])/2.5,
+                            initstep=0.,
+                            points=:all
+                            )
+    fn_expl = (t,y)->fn(y, y*0)
+    Et, Eyf, Ty, btab = make_consistent_types(fn, y0, tspan, btab)
+    btab = tabletransform(btab)
+    # parameters
+    order = minimum(btab.order)
+    timeout_const = 5 # after step reduction do not increase step for
+                      # timeout_const steps
 
-function oderosw_adapt()
+    ## Initialization
+    dof = length(y0)
+    tspan = convert(Vector{Et}, tspan)
+    t = tspan[1]
+    tstart = tspan[1]
+    tend = tspan[end]
+
+    # work arrays:
+    y      = similar(y0, Eyf, dof)      # y at time t
+    y[:]   = y0
+    ytrial = similar(y0, Eyf, dof) # trial solution at time t+dt
+    yerr   = similar(y0, Eyf, dof) # error of trial solution
+    ks = Array(Ty, S)
+    # allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
+    ytmp   = similar(y0, Eyf, dof)
+
+    # output ys
+    nsteps_fixed = length(tspan) # these are always output
+    ys = Array(Ty, nsteps_fixed)
+    allocate!(ys, y0, dof)
+    ys[1] = y0
+
+    # Option points determines where solution is returned:
+    if points==:all
+        tspan_fixed = tspan
+        tspan = Et[tstart]
+        iter_fixed = 2 # index into tspan_fixed
+        sizehint!(tspan, nsteps_fixed)
+    elseif points!=:specified
+        error("Unrecognized option points==$points")
+    end
+    # Time
+    dt, tdir, ks[1] = hinit(fn_expl, y, tstart, tend, order, reltol, abstol) # sets ks[1]=f0
+    if initstep!=0
+        dt = sign(initstep)==tdir ? initstep : error("initstep has wrong sign.")
+    end
+    # Diagnostics
+    dts = Et[]
+    errs = Float64[]
+    steps = [0,0]  # [accepted, rejected]
+
+    ## Integration loop
+    laststep = false
+    timeout = 0 # for step-control
+    iter = 2 # the index into tspan and ys
+    while true
+        ytrial[:] = rosw_step(fn, Jfn, y, dt, btab, 1)
+        yerr[:] = ytrial - rosw_step(fn, Jfn, y, dt, btab, 2)
+        err, newdt, timeout = stepsize_hw92!(dt, tdir, y, ytrial, yerr, order, timeout,
+                                            dof, abstol, reltol, maxstep, norm)
+
+        if err<=1.0 # accept step
+            # diagnostics
+            steps[1] +=1
+            push!(dts, dt)
+            push!(errs, err)
+
+            # Output:
+            f0 = ks[1]
+            f1 = fn_expl(t+dt, ytrial)
+            if points==:specified
+                # interpolate onto given output points
+                while iter-1<nsteps_fixed && (tdir*tspan[iter]<tdir*(t+dt) || laststep) # output at all new times which are < t+dt
+                    hermite_interp!(ys[iter], tspan[iter], t, dt, y, ytrial, f0, f1) # TODO: 3rd order only!
+                    iter += 1
+                end
+            else
+                # first interpolate onto given output points
+                while iter_fixed-1<nsteps_fixed && tdir*t<tdir*tspan_fixed[iter_fixed]<tdir*(t+dt) # output at all new times which are < t+dt
+                    yout = hermite_interp(tspan_fixed[iter_fixed], t, dt, y, ytrial, f0, f1)
+                    index_or_push!(ys, iter, yout) # TODO: 3rd order only!
+                    push!(tspan, tspan_fixed[iter_fixed])
+                    iter_fixed += 1
+                    iter += 1
+                end
+                # but also output every step taken
+                index_or_push!(ys, iter, copy(ytrial))
+                push!(tspan, t+dt)
+                iter += 1
+            end
+            ks[1] = f1 # load ks[1]==f0 for next step
+
+            # Break if this was the last step:
+            laststep && break
+
+            # Swap bindings of y and ytrial, avoids one copy
+            y, ytrial = ytrial, y
+
+            # Update t to the time at the end of current step:
+            t += dt
+            dt = newdt
+
+            # Hit end point exactly if next step within 1% of end:
+            if tdir*(t+dt*1.01) >= tdir*tend
+                dt = tend-t
+                laststep = true # next step is the last, if it succeeds
+            end
+        elseif abs(newdt)<minstep  # minimum step size reached, break
+            println("Warning: dt < minstep.  Stopping.")
+            break
+        else # redo step with smaller dt
+            laststep = false
+            steps[2] +=1
+            dt = newdt
+            timeout = timeout_const
+        end
+    end
+    return tspan, ys
 
 end
 
