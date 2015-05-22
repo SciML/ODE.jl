@@ -23,6 +23,7 @@ solvers = [
            # fixed-step
            ODE.ode4s_s,
            ODE.ode4s_kr,
+#           ODE.ode_rosw,
            # adaptive
            ODE.ode23s]
 

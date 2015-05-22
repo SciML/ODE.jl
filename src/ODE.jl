@@ -423,4 +423,7 @@ const ms_coefficients4 = [ 1      0      0     0
                           -9/24   37/24 -59/24 55/24]
 
 
+## Rosenbrock-Wanner methods
+include("rosw.jl")
+
 end # module ODE
