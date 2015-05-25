@@ -69,9 +69,11 @@ tend = 2.
 tspan = linspace(tstart, tend, 2)
 
 t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
+gc()
 @time t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
 
 t,yout4 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
+gc()
 @time t,yout4 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
 
 println("Adaptive step: abs error of ode23s vs ref:")

@@ -63,9 +63,11 @@ end
 immutable TableauRosW_T{Name, S, T} <: Tableau{Name, S, T}
     order::(@compat(Tuple{Vararg{Int}})) # the order of the methods
     a::Matrix{T}  # this is TableauRosW.a transformed
-    γii::Vector{T}
     γinv::Matrix{T}
     b::Matrix{T} # this is TableauRosW.b transformed
+    # derived quantities:
+    γii::Vector{T}
+    c::Matrix{T} # = (tril(btab.γinv)-diagm(diag(btab.γinv)))
 end
 function tabletransform{Name,S,T}(rt::TableauRosW{Name,S,T})
     γii = diag(rt.γ)
@@ -74,7 +76,8 @@ function tabletransform{Name,S,T}(rt::TableauRosW{Name,S,T})
     bhat = similar(rt.b)
     bhat[1,:] = squeeze(rt.b[1,:]*γinv,1)
     bhat[2,:] = squeeze(rt.b[2,:]*γinv,1)
-    return TableauRosW_T{Name,S,T}(rt.order, ahat, γii, γinv, bhat)
+    c = (tril(γinv)-diagm(diag(γinv)))
+    return TableauRosW_T{Name,S,T}(rt.order, ahat, γinv, bhat, γii, c)
 end
 
 
@@ -114,7 +117,7 @@ function oderosw_fixed{N,S}(fn, Jfn, y0::AbstractVector, tspan,
     ytmp = similar(y0, Eyf, dof)
     for i=1:length(tspan)-1
         dt = tspan[i+1]-tspan[i]
-        ys[i+1] = rosw_step(fn, Jfn, ys[i], dt, btab, 2)
+        ys[i+1] = rosw_step!(fn, Jfn, ys[i], dt, btab, 2)
     end
     return tspan, ys
 end
@@ -133,6 +136,9 @@ function oderosw_adapt{N,S}(fn, Jfn, y0::AbstractVector, tspan, btab::TableauRos
                             initstep=0.,
                             points=:all
                             )
+    # TODO: refactor with oderk_adapt
+
+    ## Figure types
     fn_expl = (t,y)->fn(y, y*0)
     Et, Eyf, Ty, btab = make_consistent_types(fn, y0, tspan, btab)
     btab = tabletransform(btab)
@@ -141,7 +147,7 @@ function oderosw_adapt{N,S}(fn, Jfn, y0::AbstractVector, tspan, btab::TableauRos
     timeout_const = 5 # after step reduction do not increase step for
                       # timeout_const steps
 
-    ## Initialization
+    ## Setup
     dof = length(y0)
     tspan = convert(Vector{Et}, tspan)
     t = tspan[1]
@@ -154,8 +160,10 @@ function oderosw_adapt{N,S}(fn, Jfn, y0::AbstractVector, tspan, btab::TableauRos
     ytrial = similar(y0, Eyf, dof) # trial solution at time t+dt
     yerr   = similar(y0, Eyf, dof) # error of trial solution
     ks = Array(Ty, S)
-    # allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
-    ytmp   = similar(y0, Eyf, dof)
+    allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
+    hprime_store = zeros(Eyf,dof,dof)
+    u = zeros(Eyf,dof)
+    udot = zeros(Eyf,dof)
 
     # output ys
     nsteps_fixed = length(tspan) # these are always output
@@ -187,11 +195,21 @@ function oderosw_adapt{N,S}(fn, Jfn, y0::AbstractVector, tspan, btab::TableauRos
     timeout = 0 # for step-control
     iter = 2 # the index into tspan and ys
     while true
-        ytrial[:] = rosw_step(fn, Jfn, y, dt, btab, 1)
-        yerr[:] = ytrial - rosw_step(fn, Jfn, y, dt, btab, 2)
+        ytrial[:] = rosw_step!(fn, Jfn, y, dt, btab, ks, hprime_store, u, udot, 1)
+        # completion again, see line 927 of
+        # http://www.mcs.anl.gov/petsc/petsc-current/src/ts/impls/rosw/rosw.c.html#TSROSW
+        yerr[:] = 0.0
+        for j=1:S
+            for i=1:dof
+                yerr[i] += (btab.b[2,j]-btab.b[1,j])*ks[j][i]
+            end
+        end
+
+        # ytrial[:] = rosw_step(fn, Jfn, y, dt, btab, 1)
+        # yerr[:] = ytrial - rosw_step(fn, Jfn, y, dt, btab, 2)
+
         err, newdt, timeout = stepsize_hw92!(dt, tdir, y, ytrial, yerr, order, timeout,
                                             dof, abstol, reltol, maxstep, norm)
-
         if err<=1.0 # accept step
             # diagnostics
             steps[1] +=1
@@ -266,7 +284,6 @@ function rosw_step(g, gprime, x0, dt,
     jacobian_stale = true
     hprime_store = zeros(dof,dof)
 
-    cij = (tril(btab.γinv)-diagm(diag(btab.γinv)))/dt
     for i=1:stages
         u = zeros(dof)
         udot = zeros(dof)
@@ -282,7 +299,7 @@ function rosw_step(g, gprime, x0, dt,
             for j=1:i
                 # this is Eq.5-3
                 for d=1:dof
-                    udot[d] += cij[i,j]*ys[j,d]
+                    udot[d] += btab.c[i,j]/dt*ys[j,d]
                 end
             end
             g(u, udot)
@@ -309,6 +326,65 @@ function rosw_step(g, gprime, x0, dt,
     for i=1:dof
         for j=1:stages
             x1[i] += btab.b[bt_ind,j]*ys[j,i]
+        end
+    end
+    return x0 + x1
+end
+
+function rosw_step!(g, gprime, x0, dt,
+                   btab::TableauRosW_T, ks, hprime_store, u, udot, bt_ind=1)
+    # This takes one step for a ode/dae system defined by
+    # g(x,xdot)=0
+    # gprime(x, xdot, α) = dg/dx + α dg/dxdot
+
+    stages = size(btab.a,1)
+    dof = length(x0)
+
+    # stage solutions
+    jacobian_stale = true
+    
+    # calculate kappa
+    for i=1:stages
+        function h(yi) # length(yi)==dof
+            # this function is Eq 5
+            u[:] = x0
+            u[:] += yi
+            for j=1:i-1
+                for d=1:dof
+                    u[d] += btab.a[i,j]*ks[j][d]
+                end
+            end
+            udot[:] = 1./(dt*btab.γii[i]).*yi  # jed: is this index with the stage?
+            for j=1:i
+                # this is Eq.5-3
+                for d=1:dof
+                    udot[d] += btab.c[i,j]/dt*ks[j][d]
+                end
+            end
+            g(u, udot)
+        end
+        function hprime(yi)
+            # here we only update the jacobian once per time step
+            if jacobian_stale
+                hprime_store[:,:] = gprime(u, udot, 1./(dt*btab.γii[i]))  # jed: is this index with the stage?
+            end
+            hprime_store
+        end
+        # this is just a linear solve, usually
+#        ks[i,:] = nlsolve(h, zeros(dof), hprime; opts=one_step_only)
+        ks[i][:] = linsolve(h, hprime, zeros(dof))
+#        ks[i,:] = newtonsolve(h, hprime, zeros(dof), maxsteps=1, warn=false)
+        if i==1
+            # calculate jacobian
+            jacobian_stale = false
+        end
+    end
+
+    # completion:  (done twice for error control)
+    x1 = zeros(eltype(x0), length(x0))
+    for j=1:stages
+        for i=1:dof
+            x1[i] += btab.b[bt_ind,j]*ks[j][i]
         end
     end
     return x0 + x1
