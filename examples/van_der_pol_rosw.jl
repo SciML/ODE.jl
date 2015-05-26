@@ -38,6 +38,15 @@ function Jvdp_impl(y, ydot, α)
     return Jvdp(0,y) - α * eye(2)
 end
 
+# Results 24dfdc9cacfd6
+# elapsed time: 0.025767095 seconds (25194952 bytes allocated)
+# elapsed time: 0.00997568 seconds   (6674864 bytes allocated)
+# Adaptive step: abs error of ode23s vs ref:
+# [0.012513592025336528,0.013225223452835055]
+# Adaptive step: abs error of ode_rosw vs ref:
+# [0.012416936355840624,0.013124961519338618]
+
+
 # implicit inplace equation
 function vdp_impl!(res, y, ydot)
     #  vdp_impl(t, y)
@@ -62,6 +71,13 @@ function Jvdp_impl!(res, y, ydot, α)
     res[2,2] = mu^2*(1-y[1]^2) - α
     return nothing
 end
+
+# elapsed time: 0.02611999 seconds (25194952 bytes allocated)
+# elapsed time: 0.006630583 seconds (4025352 bytes allocated)
+# Adaptive step: abs error of ode23s vs ref:
+# [0.012513592025336528,0.013225223452835055]
+# Adaptive step: abs error of ode_rosw vs ref:
+# [0.012416936355840624,0.013124961519338618]
 
 
 ###
@@ -98,9 +114,9 @@ t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
 gc()
 @time t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
 
-t,yout4 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
+t,yout4 = ode_rosw(vdp_impl!, Jvdp_impl!, y0, tspan)
 gc()
-@time t,yout4 = ode_rosw(vdp_impl, Jvdp_impl, y0, tspan)
+@time t,yout4 = ode_rosw(vdp_impl!, Jvdp_impl!, y0, tspan)
 
 println("Adaptive step: abs error of ode23s vs ref:")
 println(yout3[end]-refsol)

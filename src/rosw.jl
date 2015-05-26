@@ -141,7 +141,7 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
     # TODO: refactor with oderk_adapt
 
     ## Figure types
-    fn_expl = (t,x)->fn(x, x*0)
+    fn_expl = (t,x)->(out=similar(x); fn(out, x, x*0); out)
     Et, Exf, Tx, btab = make_consistent_types(fn, x0, tspan, btab)
     btab = tabletransform(btab)
     # parameters
@@ -164,7 +164,6 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
     k = Array(Tx, S) # stage variables
     allocate!(k, x0, dof)
     ks = zeros(Exf,dof) # work vector for one k
-    h_store = zeros(Exf,dof) # work vector 
     jac_store = zeros(Exf,dof,dof) # Jacobian storage
     u = zeros(Exf,dof)    # work vector 
     udot = zeros(Exf,dof) # work vector 
@@ -200,7 +199,7 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
     iter = 2 # the index into tspan and xs
     while true
         rosw_step!(xtrial, fn, Jfn, x, dt, dof, btab,
-                   k, h_store, jac_store, ks, u, udot, 1)
+                   k, jac_store, ks, u, udot, 1)
         # Completion again for embedded method, see line 927 of
         # http://www.mcs.anl.gov/petsc/petsc-current/src/ts/impls/rosw/rosw.c.html#TSROSW
         xerr[:] = 0.0
@@ -270,29 +269,27 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
     return tspan, xs
 
 end
-function rosw_step!{N,S}(xtrial, g, gprime, x, dt, dof, btab::TableauRosW_T{N,S},
-                         k, h_store, jac_store, ks, u, udot, bt_ind=1)
+function rosw_step!{N,S}(xtrial, g!, gprime!, x, dt, dof, btab::TableauRosW_T{N,S},
+                         k, jac_store, ks, u, udot, bt_ind=1)
     # This takes one step for a ode/dae system defined by
     # g(x,xdot)=0
     # gprime(x, xdot, α) = dg/dx + α dg/dxdot
 
     # first step
-    # ks[:] = 0 assumes ks==0
     s = 1
-    h!(h_store, ks, u, udot, g, x, btab, dt, k, s, dof)
+    h!(k[s], ks, u, udot, g!, x, btab, dt, k, s, dof) # k[s] now holds residual
     # It's sufficient to only update the Jacobian once per time step:
     # (Note that this uses u & udot calculated in h! above.)
-    jac, tmp = hprime!(jac_store, x, gprime, u, udot, btab, dt)
+    jac = hprime!(jac_store, x, gprime!, u, udot, btab, dt)
     
     # calculate k
     for s=1:S-1
         # first step of Newton iteration with guess ks==0
-        k[s][:] = ks - jac\h_store # TODO use A_ldiv_B!
-
-        h!(h_store, ks, u, udot, g, x, btab, dt, k, s+1, dof)
+        k[s][:] = ks - jac\k[s] # in-place A_ldiv_B!(jac, k[s]) 
+        h!(k[s+1], ks, u, udot, g!, x, btab, dt, k, s+1, dof)
     end
     # last step
-    k[S][:] = ks - jac\h_store
+    k[S][:] = ks - jac\k[S]
 
     # completion:
     xtrial[:] = x
@@ -303,12 +300,13 @@ function rosw_step!{N,S}(xtrial, g, gprime, x, dt, dof, btab::TableauRosW_T{N,S}
     end
     return nothing
 end
-function h!(res, ks, u, udot, g, x, btab, dt, k, s, dof)
+function h!(res, ks, u, udot, g!, x, btab, dt, k, s, dof)
     # h(ks)=0 to be solved for ks.
     #
     # Calculates h(ks) and h'(ks) (if s==1).
     # Modifies its first 3 arguments.
     #
+    # res -- result: can use k[s] for this
     # ks -- guess for k[s] (usually==0) AND result g(u,udot)
     # u, udot -- work arrays for first and second argument to g
     # g -- obj function
@@ -317,31 +315,28 @@ function h!(res, ks, u, udot, g, x, btab, dt, k, s, dof)
     # k -- stage vars (jed's yi)
     # s -- current stage to calculate
     # dof
-    #
-    # TODO: could re-use ks for res
 
-    # stage independent and first stage:
-    ss = 1
+    # stage independent
     for d=1:dof
-        u[d] = (ks[d] + x[d]
-                + btab.a[s,ss]*k[ss][d])
-        udot[d] = (1/(dt*btab.γii).*ks[d] # usually ==0 as ks==0
-                   + btab.c[s,ss]/dt*k[ss][d])
+        u[d] = ks[d] + x[d]
+        udot[d] = 1/(dt*btab.γii).*ks[d] # usually ==0 as ks==0
     end
-    # later stages:
-    for ss=2:s-1
+    # stages
+    for ss=1:s-1
         for d=1:dof
             u[d] += btab.a[s,ss]*k[ss][d]
             udot[d] += btab.c[s,ss]/dt*k[ss][d]
         end
     end
-    res[:] = g(u, udot)
+    g!(res, u, udot)
     return nothing
 end
-function hprime!(res, xi, gprime, u, udot, btab, dt)
-    # The Jacobian of h!  Note that u and udot should be calculated by
-    # running h! first.
-    res[:,:] = gprime(u, udot, 1./(dt*btab.γii))
-    tmp = copy(res)
-    return lufact!(res), tmp
+function hprime!(res, xi, gprime!, u, udot, btab, dt)
+    # The Jacobian of h!  Note that u and udot need to be calculated
+    # by running h! first.
+    #
+    # The res will hold part of the LU factorization.  However use the
+    # returned LU-type.
+    gprime!(res, u, udot, 1./(dt*btab.γii))
+    return lufact!(res)
 end
