@@ -38,6 +38,32 @@ function Jvdp_impl(y, ydot, α)
     return Jvdp(0,y) - α * eye(2)
 end
 
+# implicit inplace equation
+function vdp_impl!(res, y, ydot)
+    #  vdp_impl(t, y)
+    #
+    # Implicit van der Pol equation.  (consider using rescaled eq. so
+    # period stays the same for different mu.  Cf. Wanner & Hairer 1991,
+    # p.5)
+    #
+    # Note, that ydot can be used as res here.
+    res[1] = y[2] - ydot[1]
+    res[2] = mu^2*((1-y[1]^2) * y[2] - y[1]) - ydot[2]
+    return nothing
+end
+function Jvdp_impl!(res, y, ydot, α)
+    # d vdp_impl /dy + α d vdp/dy
+    #
+    # Jacobian
+
+    res[1,1] = 0 - α
+    res[1,2] = 1
+    res[2,1] = -mu^2*(y[2]*2*y[1] + 1)
+    res[2,2] = mu^2*(1-y[1]^2) - α
+    return nothing
+end
+
+
 ###
 # reference as t=2
 ##
