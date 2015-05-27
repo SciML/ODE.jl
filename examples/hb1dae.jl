@@ -47,13 +47,20 @@ t,ydassl = dasslSolve(hb1dae, y0, tspan, jacobian=Jhb1dae)
 y = hcat(ydassl...);
 
 ## ROSW
-t,yrosw = ode_rosw(hb1dae!, Jhb1dae!, y0, tspan)
-@time t,yrosw = ode_rosw(hb1dae!, Jhb1dae!, y0, tspan)
+t,yrosw = ode_rosw(hb1dae!, y0, tspan) #, jacobian=Jhb1dae!)
+@time t,yrosw = ode_rosw(hb1dae!, y0, tspan)#, jacobian=Jhb1dae!)
 yr = hcat(yrosw...);
 
 println("Relative difference between DASSL vs ROSW:")
 println(abs(ydassl[end]-yrosw[end])./abs(ydassl[end]))
 
+# with Jacobian
+t,yrosw = ode_rosw(hb1dae!, y0, tspan, jacobian=Jhb1dae!)
+@time t,yrosw = ode_rosw(hb1dae!, y0, tspan, jacobian=Jhb1dae!)
+yr = hcat(yrosw...);
+
+println("Relative difference between DASSL vs ROSW with Jac:")
+println(abs(ydassl[end]-yrosw[end])./abs(ydassl[end]))
 
 # using Winston
 # plot(t, y[1,:], xlog=true)

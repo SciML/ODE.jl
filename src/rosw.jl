@@ -1,12 +1,12 @@
 # Rosenbrock-Wanner methods
 ###########################
 #
-# Main references: Wanner & Hairrere 1996, PETSc http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/TS/TSROSW.html
-@show "NEW"
+# Main references:
+# - Wanner & Hairer 1996
+# - PETSc http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/TS/TSROSW.html
 export ode_rosw, ode_rosw_fixed
 
 # TODO:
-# - finite diff Jacobian
 # - AD Jacobian
 
 # Rosenbrock-W methods are typically specified for autonomous DAE:
@@ -105,19 +105,6 @@ const bt_ros34pw2 = TableauRosW(:ros34pw2, (3,4), Float64,
                                   3.7810903145819369e-01  -9.6042292212423178e-02  5.0000000000000000e-01  2.1793326075422950e-01]
                                   )
 
-# binterpt[0][0]=1.0564298455794094;
-# binterpt[1][0]=2.296429974281067;
-# binterpt[2][0]=-1.307599564525376;
-# binterpt[3][0]=-1.045260255335102;
-# binterpt[0][1]=-1.3864882699759573;
-# binterpt[1][1]=-8.262611700275677;
-# binterpt[2][1]=7.250979895056055;
-# binterpt[3][1]=2.398120075195581;
-# binterpt[0][2]=0.5721822314575016;
-# binterpt[1][2]=4.742931142090097;
-# binterpt[2][2]=-4.398120075195578;
-# binterpt[3][2]=-0.9169932983520199;
-
 ###################
 # Fixed step solver
 ###################
@@ -146,13 +133,14 @@ function oderosw_fixed{N,S}(fn, Jfn, x0::AbstractVector, tspan,
 end
 
 
-ode_rosw(fn, Jfn, x0, tspan;kwargs...) = oderosw_adapt(fn, Jfn, x0, tspan, bt_ros34pw2; kwargs...)
-function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRosW{N,S};
+ode_rosw(fn, x0, tspan;kwargs...) = oderosw_adapt(fn, x0, tspan, bt_ros34pw2; kwargs...)
+function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S};
                             reltol = 1.0e-5, abstol = 1.0e-8,
                             norm=Base.norm,
                             minstep=abs(tspan[end] - tspan[1])/1e18,
                             maxstep=abs(tspan[end] - tspan[1])/2.5,
                             initstep=0.,
+                            jacobian=numerical_jacobian(fn, reltol, abstol)
 #                            points=:all
                             )
     # TODO: refactor with oderk_adapt
@@ -222,7 +210,7 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
     timeout = 0 # for step-control
     iter = 2 # the index into tspan and xs
     while true
-        rosw_step!(xtrial, fn, Jfn, x, dt, dof, btab,
+        rosw_step!(xtrial, fn, jacobian, x, dt, dof, btab,
                    k, jac_store, ks, u, udot)
         # Completion again for embedded method, see line 927 of
         # http://www.mcs.anl.gov/petsc/petsc-current/src/ts/impls/rosw/rosw.c.html#TSROSW
@@ -376,4 +364,30 @@ function hprime!(res, xi, gprime!, u, udot, btab, dt)
     # returned LU-type.
     gprime!(res, u, udot, 1./(dt*btab.γii))
     return lufact!(res)
+end
+
+# Copied & adapted from DASSL:
+# generate a function that computes approximate jacobian using forward
+# finite differences
+function numerical_jacobian(fn!, reltol, abstol)
+    function numjac!(jac, y, dy, a)
+        # TODO use coloring
+        
+        ep      = eps(1e6)   # this is the machine epsilon # TODO: better value?
+        h       = 1/a           # h ~ 1/a
+        wt      = reltol*abs(y).+abstol
+        # delta for approximation of jacobian.  I removed the
+        # sign(h_next*dy0) from the definition of delta because it was
+        # causing trouble when dy0==0 (which happens for ord==1)
+        edelta  = spdiagm(max(abs(y),abs(h*dy),wt)*sqrt(ep))
+
+        tmp = similar(y)
+        f0 = similar(y)
+        fn!(f0, y, dy)
+        for i=1:length(y)
+            fn!(tmp, y+edelta[:,i], a*edelta[:,i]+dy)
+            jac[:,i] = (tmp-f0)/edelta[i,i]
+        end
+        return nothing
+    end
 end
