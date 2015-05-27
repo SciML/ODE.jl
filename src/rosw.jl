@@ -8,6 +8,7 @@ export ode_rosw, ode_rosw_fixed
 
 # TODO:
 # - AD Jacobian
+# - fix fixed step solver
 
 # Rosenbrock-W methods are typically specified for autonomous DAE:
 # Mẋ = f(x)
@@ -91,7 +92,7 @@ function tabletransform{Name,S,T}(rt::TableauRosW{Name,S,T})
 end
 
 
-## tableau for ros34pw2
+## tableau for ros34pw2 http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/TS/TSROSWRA34PW2.html
 const bt_ros34pw2 = TableauRosW(:ros34pw2, (3,4), Float64,
                                 [0  0  0  0
                                  8.7173304301691801e-01  0  0  0
@@ -105,12 +106,28 @@ const bt_ros34pw2 = TableauRosW(:ros34pw2, (3,4), Float64,
                                   3.7810903145819369e-01  -9.6042292212423178e-02  5.0000000000000000e-01  2.1793326075422950e-01]
                                   )
 
+## tableau for RODAS3 http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/TS/TSROSWRODAS3.html
+const bt_ros_rodas3 = TableauRosW(:ros_rodas3, (3,4), Rational{Int},
+                                  [0 0 0 0
+                                   0 0 0 0
+                                   1 0 0 0
+                                   3//4 -1//4 1//2 0],
+                                  [1//2 0 0 0
+                                   1  1//2 0 0
+                                   -1//4 -1//4 1//2 0
+                                   1//12 1//12 -2//3 1//2],
+                                   [5//6 -1//6 -1//6 1//2
+                                    3//4 -1//4 1//2 0]
+                                    )
+
 ###################
 # Fixed step solver
 ###################
-ode_rosw_fixed(fn, Jfn, x0, tspan) = oderosw_fixed(fn, Jfn, x0, tspan, bt_ros34pw2)
-function oderosw_fixed{N,S}(fn, Jfn, x0::AbstractVector, tspan,
-                            btab::TableauRosW{N,S})
+ode_rosw_fixed(fn, x0, tspan; kwargs...) = oderosw_fixed(fn, x0, tspan, bt_ros34pw2, kwargs...)
+function oderosw_fixed{N,S}(fn, x0::AbstractVector, tspan,
+                            btab::TableauRosW{N,S};
+                            jacobian=numerical_jacobian(fn, 1e-6, 1e-6)
+                            )
     # TODO: refactor with oderk_fixed
     Et, Exf, Tx, btab = make_consistent_types(fn, x0, tspan, btab)
     btab = tabletransform(btab)
@@ -122,18 +139,26 @@ function oderosw_fixed{N,S}(fn, Jfn, x0::AbstractVector, tspan,
 
     tspan = convert(Vector{Et}, tspan)
     # work arrays:
-    ks = Array(Tx, S)
+    k = Array(Tx, S) # stage variables
+    allocate!(k, x0, dof)
+    ks = zeros(Exf,dof) # work vector for one k
+    jac_store = zeros(Exf,dof,dof) # Jacobian storage
+    u = zeros(Exf,dof)    # work vector 
+    udot = zeros(Exf,dof) # work vector 
+    
     # allocate!(ks, x0, dof) # no need to allocate as fn is not in-place
     xtmp = similar(x0, Exf, dof)
     for i=1:length(tspan)-1
         dt = tspan[i+1]-tspan[i]
-        xs[i+1] = rosw_step!(fn, Jfn, xs[i], dt, btab, 2)
+        rosw_step!(xs[i+1], fn, jacobian, xs[i], dt, dof, btab,
+                   k, jac_store, ks, u, udot)
     end
     return tspan, xs
 end
 
 
 ode_rosw(fn, x0, tspan;kwargs...) = oderosw_adapt(fn, x0, tspan, bt_ros34pw2; kwargs...)
+ode_rodas3(fn, x0, tspan;kwargs...) = oderosw_adapt(fn, x0, tspan, bt_ros_rodas3; kwargs...)
 function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S};
                             reltol = 1.0e-5, abstol = 1.0e-8,
                             norm=Base.norm,

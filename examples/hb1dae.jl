@@ -51,16 +51,34 @@ t,yrosw = ode_rosw(hb1dae!, y0, tspan) #, jacobian=Jhb1dae!)
 @time t,yrosw = ode_rosw(hb1dae!, y0, tspan)#, jacobian=Jhb1dae!)
 yr = hcat(yrosw...);
 
-println("Relative difference between DASSL vs ROSW:")
+println("Relative difference between DASSL vs ROSW, no Jac:")
+println(abs(ydassl[end]-yrosw[end])./abs(ydassl[end]))
+
+println("Using fixed step ROSW")
+tspan = t
+t,yrosw = ode_rosw_fixed(hb1dae!, y0, tspan)
+@time t,yrosw = ode_rosw_fixed(hb1dae!, y0, tspan)
+println("Relative difference between DASSL vs fixed step, no Jac:")
 println(abs(ydassl[end]-yrosw[end])./abs(ydassl[end]))
 
 # with Jacobian
+tspan = [0, 4e6]
 t,yrosw = ode_rosw(hb1dae!, y0, tspan, jacobian=Jhb1dae!)
 @time t,yrosw = ode_rosw(hb1dae!, y0, tspan, jacobian=Jhb1dae!)
 yr = hcat(yrosw...);
 
 println("Relative difference between DASSL vs ROSW with Jac:")
 println(abs(ydassl[end]-yrosw[end])./abs(ydassl[end]))
+
+
+println("Using ros_rodas3")
+t,yrosw = ODE.oderosw_adapt(hb1dae!, y0, tspan, ODE.bt_ros_rodas3)
+@time t,yrosw = ODE.oderosw_adapt(hb1dae!, y0, tspan, ODE.bt_ros_rodas3)
+println("Relative difference between DASSL vs Robas2, no Jac:")
+println(abs(ydassl[end]-yrosw[end])./abs(ydassl[end]))
+
+
+
 
 # using Winston
 # plot(t, y[1,:], xlog=true)
