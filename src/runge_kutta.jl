@@ -464,7 +464,6 @@ function hermite_interp!(y, tquery,t,dt,y0,y1,f0,f1)
     #
     # f_0 = f(x_0 , y_0) , f_1 = f(x_0 + h, y_1 )
     # this is O(3). TODO for higher order.
-error("")
     theta = (tquery-t)/dt
     for i=1:length(y0)
         y[i] = ((1-theta)*y0[i] + theta*y1[i] + theta*(theta-1) *

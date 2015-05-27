@@ -7,7 +7,9 @@
 export ode_rosw, ode_rosw_fixed
 
 # TODO:
-# - AD Jacobian
+# - Jacobian coloring: https://github.com/mlubin/ReverseDiffSparse.jl
+#      http://wiki.cs.purdue.edu:9835/coloringpage/abstracts/acyclic-SISC.pdf
+# - AD Jacobian: https://github.com/mlubin/ReverseDiffSparse.jl
 # - fix fixed step solver
 
 # Rosenbrock-W methods are typically specified for autonomous DAE:
@@ -172,7 +174,9 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
 
     # FIXME: add interpolation
     if length(tspan)>2
-        error("specified output times not supported yet")
+        warn("specified output times not supported yet")
+        tspan = [tspan[1], tspan[end]]
+        points=:all
     else
         points=:all
     end
@@ -326,7 +330,8 @@ function rosw_step!{N,S}(xtrial, g!, gprime!, x, dt, dof, btab::TableauRosW_T{N,
         # first step of Newton iteration with guess ks==0
         #        k[s][:] = ks - jac\k[s] # in-place A_ldiv_B!(jac, k[s])
         # TODO: add option to do more Newton iterations
-        A_ldiv_B!(jac, k[s])
+        A_ldiv_B!(jac, k[s])  # TODO: see whether this is impacted by https://github.com/JuliaLang/julia/issues/10787
+                              # and https://github.com/JuliaLang/julia/issues/11325
         for d=1:dof
             k[s][d] = ks[d]-k[s][d]
         end
