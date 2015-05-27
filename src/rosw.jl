@@ -5,6 +5,10 @@
 @show "NEW"
 export ode_rosw, ode_rosw_fixed
 
+# TODO:
+# - finite diff Jacobian
+# - AD Jacobian
+
 # Rosenbrock-W methods are typically specified for autonomous DAE:
 # Mẋ = f(x)
 #
@@ -101,6 +105,19 @@ const bt_ros34pw2 = TableauRosW(:ros34pw2, (3,4), Float64,
                                   3.7810903145819369e-01  -9.6042292212423178e-02  5.0000000000000000e-01  2.1793326075422950e-01]
                                   )
 
+# binterpt[0][0]=1.0564298455794094;
+# binterpt[1][0]=2.296429974281067;
+# binterpt[2][0]=-1.307599564525376;
+# binterpt[3][0]=-1.045260255335102;
+# binterpt[0][1]=-1.3864882699759573;
+# binterpt[1][1]=-8.262611700275677;
+# binterpt[2][1]=7.250979895056055;
+# binterpt[3][1]=2.398120075195581;
+# binterpt[0][2]=0.5721822314575016;
+# binterpt[1][2]=4.742931142090097;
+# binterpt[2][2]=-4.398120075195578;
+# binterpt[3][2]=-0.9169932983520199;
+
 ###################
 # Fixed step solver
 ###################
@@ -133,13 +150,19 @@ ode_rosw(fn, Jfn, x0, tspan;kwargs...) = oderosw_adapt(fn, Jfn, x0, tspan, bt_ro
 function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRosW{N,S};
                             reltol = 1.0e-5, abstol = 1.0e-8,
                             norm=Base.norm,
-                            minstep=abs(tspan[end] - tspan[1])/1e9,
+                            minstep=abs(tspan[end] - tspan[1])/1e18,
                             maxstep=abs(tspan[end] - tspan[1])/2.5,
                             initstep=0.,
-                            points=:all
+#                            points=:all
                             )
     # TODO: refactor with oderk_adapt
 
+    # FIXME: add interpolation
+    if length(tspan)>2
+        error("specified output times not supported yet")
+    else
+        points=:all
+    end
     ## Figure types
     fn_expl = (t,x)->(out=similar(x); fn(out, x, x*0); out)
     Et, Exf, Tx, btab = make_consistent_types(fn, x0, tspan, btab)
@@ -183,8 +206,9 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
     elseif points!=:specified
         error("Unrecognized option points==$points")
     end
+
     # Time
-    dt, tdir, k[1] = hinit(fn_expl, x, tstart, tend, order, reltol, abstol) # sets k[1]=f0
+    dt, tdir, f0 = hinit(fn_expl, x, tstart, tend, order, reltol, abstol)
     if initstep!=0
         dt = sign(initstep)==tdir ? initstep : error("initstep has wrong sign.")
     end
@@ -199,7 +223,7 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
     iter = 2 # the index into tspan and xs
     while true
         rosw_step!(xtrial, fn, Jfn, x, dt, dof, btab,
-                   k, jac_store, ks, u, udot, 1)
+                   k, jac_store, ks, u, udot)
         # Completion again for embedded method, see line 927 of
         # http://www.mcs.anl.gov/petsc/petsc-current/src/ts/impls/rosw/rosw.c.html#TSROSW
         xerr[:] = 0.0
@@ -217,17 +241,19 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
             push!(errs, err)
 
             # Output:
-            f0 = k[1]
-            f1 = fn_expl(t+dt, xtrial)
+            # f0 = k[1]
+            # f1 = fn_expl(t+dt, xtrial)
             if points==:specified
                 # interpolate onto given output points
                 while iter-1<nsteps_fixed && (tdir*tspan[iter]<tdir*(t+dt) || laststep) # output at all new times which are < t+dt
+                    error("FIXME: not implemented yet")
                     hermite_interp!(xs[iter], tspan[iter], t, dt, x, xtrial, f0, f1) # TODO: 3rd order only!
                     iter += 1
                 end
             else
                 # first interpolate onto given output points
                 while iter_fixed-1<nsteps_fixed && tdir*t<tdir*tspan_fixed[iter_fixed]<tdir*(t+dt) # output at all new times which are < t+dt
+                    error("FIXME: not implemented yet")
                     xout = hermite_interp(tspan_fixed[iter_fixed], t, dt, x, xtrial, f0, f1)
                     index_or_push!(xs, iter, xout) # TODO: 3rd order only!
                     push!(tspan, tspan_fixed[iter_fixed])
@@ -239,7 +265,7 @@ function oderosw_adapt{N,S}(fn, Jfn, x0::AbstractVector, tspan, btab::TableauRos
                 push!(tspan, t+dt)
                 iter += 1
             end
-            k[1] = f1 # load k[1]==f0 for next step
+            # k[1] = f1 # load k[1]==f0 for next step
 
             # Break if this was the last step:
             laststep && break
@@ -275,23 +301,34 @@ function rosw_step!{N,S}(xtrial, g!, gprime!, x, dt, dof, btab::TableauRosW_T{N,
     # g(x,xdot)=0
     # gprime(x, xdot, α) = dg/dx + α dg/dxdot
 
-    # first step
+    ## Calculate k
+    # first step:
     s = 1
     h!(k[s], ks, u, udot, g!, x, btab, dt, k, s, dof) # k[s] now holds residual
     # It's sufficient to only update the Jacobian once per time step:
     # (Note that this uses u & udot calculated in h! above.)
     jac = hprime!(jac_store, x, gprime!, u, udot, btab, dt)
-    
-    # calculate k
+    # middle steps:
     for s=1:S-1
         # first step of Newton iteration with guess ks==0
-        k[s][:] = ks - jac\k[s] # in-place A_ldiv_B!(jac, k[s]) 
+        #        k[s][:] = ks - jac\k[s] # in-place A_ldiv_B!(jac, k[s])
+        # TODO: add option to do more Newton iterations
+        A_ldiv_B!(jac, k[s])
+        for d=1:dof
+            k[s][d] = ks[d]-k[s][d]
+        end
         h!(k[s+1], ks, u, udot, g!, x, btab, dt, k, s+1, dof)
+        # TODO: add option to evaluate Jakobian again
     end
-    # last step
-    k[S][:] = ks - jac\k[S]
-
-    # completion:
+    # last step:
+    #    k[S][:] = ks - jac\k[S]
+    # TODO: add option to do more Newton iterations
+    A_ldiv_B!(jac, k[S])
+    for d=1:dof
+        k[S][d] = ks[d]-k[S][d]
+    end
+    
+    ## Completion:
     xtrial[:] = x
     for s=1:S
         for d=1:dof
@@ -319,7 +356,7 @@ function h!(res, ks, u, udot, g!, x, btab, dt, k, s, dof)
     # stage independent
     for d=1:dof
         u[d] = ks[d] + x[d]
-        udot[d] = 1/(dt*btab.γii).*ks[d] # usually ==0 as ks==0
+        udot[d] = 1/(dt*btab.γii)*ks[d] # usually ==0 as ks==0
     end
     # stages
     for ss=1:s-1

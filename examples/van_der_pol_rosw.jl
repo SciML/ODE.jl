@@ -1,5 +1,6 @@
 # Van der Pol using DASSL.jl
 using ODE
+using DASSL
 abstol = 1e-6
 reltol = 1e-6
 
@@ -32,7 +33,7 @@ function vdp_impl(y, ydot)
     return vdp(0,y) - ydot
 end
 function Jvdp_impl(y, ydot, α)
-    # d vdp_impl /dy + α d vdp/dy
+    # d vdp_impl /dy + α d vdp_impl/dydot
     #
     # Jacobian
     return Jvdp(0,y) - α * eye(2)
@@ -61,7 +62,7 @@ function vdp_impl!(res, y, ydot)
     return nothing
 end
 function Jvdp_impl!(res, y, ydot, α)
-    # d vdp_impl /dy + α d vdp/dy
+    # d vdp_impl /dy + α d vdp/dydot
     #
     # Jacobian
 
@@ -74,6 +75,7 @@ end
 
 # elapsed time: 0.02611999 seconds (25194952 bytes allocated)
 # elapsed time: 0.006630583 seconds (4025352 bytes allocated)
+# elapsed time: 0.005866466 seconds (2670408 bytes allocated) (newer version)
 # Adaptive step: abs error of ode23s vs ref:
 # [0.012513592025336528,0.013225223452835055]
 # Adaptive step: abs error of ode_rosw vs ref:
@@ -110,11 +112,11 @@ tend = 2.
 # #### adaptive
 tspan = linspace(tstart, tend, 2)
 
-t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
+t,yout3 = ode23s(vdp, y0, [0,0.1]; jacobian=Jvdp)
 gc()
 @time t,yout3 = ode23s(vdp, y0, tspan; jacobian=Jvdp)
 
-t,yout4 = ode_rosw(vdp_impl!, Jvdp_impl!, y0, tspan)
+t,yout4 = ode_rosw(vdp_impl!, Jvdp_impl!, y0, [0, 0.1])
 gc()
 @time t,yout4 = ode_rosw(vdp_impl!, Jvdp_impl!, y0, tspan)
 
@@ -123,14 +125,63 @@ println(yout3[end]-refsol)
 println("Adaptive step: abs error of ode_rosw vs ref:")
 println(yout4[end]-refsol)
 
-# rosw
-# @time yout3, ts, steps, dts, xerrs = rosw_runner_adaptive(
-#                      vdp_impl, Jvdp_impl, [0., 2.], y0;
-#                      reltol=reltol, abstol=abstol, dt0=1e-5, mindt=1e-8)
 
-# check
+####################
+# DAE: reduced Van der Pol
 
-# using Winston
-# plot(ts, yout3[1,:])
 
-# oplot(tspan, yout2[1,:],"r")
+
+# implicit inplace equation
+function dae_vdp_impl!(res, y, ydot)
+    #  dae_vdp_impl(t, y)
+    #
+    # Implicit, reduced van der Pol equation.  mu->\infinity
+
+    res[1] = y[2] - ydot[1]
+    res[2] = y[1] - (y[2]^3/3 - y[2])
+    return nothing
+end
+function Jdae_vdp_impl!(res, y, ydot, α)
+    # d dae_vdp_impl /dy + α d dae_vdp_impl/dydot
+    #
+    # Jacobian
+
+    res[1,1] = 0 - α
+    res[1,2] = 1
+    res[2,1] = 1
+    res[2,2] = -(y[2]^2 - 1)
+    return nothing
+end
+
+t,yout5 = ode_rosw(dae_vdp_impl!, Jdae_vdp_impl!, y0, [0, 0.1])
+gc()
+@time t,yout5 = ode_rosw(dae_vdp_impl!, Jdae_vdp_impl!, y0, tspan)
+
+
+
+# implicit inplace equation
+function dae_vdp(t, y, ydot)
+    #  dae_vdp_impl(t, y)
+    #
+    # Implicit, reduced van der Pol equation.  mu->\infinity
+
+    [y[2] - ydot[1], y[1] - (y[2]^3/3 - y[2])]
+end
+function Jdae_vdp(t, y, ydot, α)
+    # d dae_vdp_impl /dy + α d dae_vdp_impl/dydot
+    #
+    # Jacobian
+    res = zeros(2,2)
+    res[1,1] = 0 - α
+    res[1,2] = 1
+    res[2,1] = 1
+    res[2,2] = -(y[2]^2 - 1)
+    return res
+end
+tspan = [0, 4e6]
+y0 = [1., 0, 0]
+
+t,ydassl = dasslSolve(dae_vdp, y0, tspan)
+
+
+
