@@ -3,31 +3,35 @@ using Base.Test
 
 tol = 1e-2
 
-ode5ms(F, x0, tspan) = ODE.ode_ms(F, x0, tspan, 5)
-
 solvers = [
-    ODE.ode23,
+           ## Non-stiff           
+           # fixed step
+           ODE.ode1,
+           ODE.ode2_midpoint,
+           ODE.ode2_heun,
+           ODE.ode4,
+           ODE.ode4ms,
+           ODE.ode5ms,
+           # adaptive
+#           ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.
+           ODE.ode23,
+           ODE.ode45_dp,
+           ODE.ode45_fe,
+           ODE.ode78,
 
-    ODE.ode4,
-    ODE.ode45_dp,
-    ODE.ode45_fb,
-    ODE.ode45_ck,
-
-    ODE.ode23s,
-
-    ODE.ode4ms,
-    ode5ms,
-    ODE.ode4s_s,
-    ODE.ode4s_kr,
-
-    ODE.ode78_fb]
+           ## Stiff
+           # fixed-step
+           ODE.ode4s_s,
+           ODE.ode4s_kr,
+           # adaptive
+           ODE.ode23s]
 
 for solver in solvers
     println("using $solver")
     # dy
     # -- = 6 ==> y = 6t
     # dt
-    t,y=solver((t,y)->6, 0., [0:.1:1;])
+    t,y=solver((t,y)->6.0, 0., [0:.1:1;])
     @test maximum(abs(y-6t)) < tol
 
     # dy
@@ -35,6 +39,7 @@ for solver in solvers
     # dt
     t,y=solver((t,y)->2t, 0., [0:.001:1;])
     @test maximum(abs(y-t.^2)) < tol
+    
 
     # dy
     # -- = y ==> y = y0*e.^t
@@ -74,5 +79,6 @@ let
               0.9999999791665050] # reference solution at tspan[2]
     @test norm(refsol-y[end], Inf) < 2e-10
 end
+include("interface-tests.jl")
 
 println("All looks OK")
