@@ -223,7 +223,7 @@ end
 function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S};
                           reltol = 1.0e-5, abstol = 1.0e-8,
                           norm=Base.norm,
-                          minstep=abs(tspan[end] - tspan[1])/1e9,
+                          minstep=abs(tspan[end] - tspan[1])/1e18,
                           maxstep=abs(tspan[end] - tspan[1])/2.5,
                           initstep=0.,
                           points=:all
