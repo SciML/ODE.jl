@@ -4,7 +4,7 @@
 # Main references:
 # - Wanner & Hairer 1996
 # - PETSc http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/TS/TSROSW.html
-export ode_rosw, ode_rosw_fixed
+export ode_rosw, ode_rosw_fixed, ode_rodas3
 
 # TODO:
 # - Jacobian coloring: https://github.com/mlubin/ReverseDiffSparse.jl
@@ -409,14 +409,20 @@ function numerical_jacobian(fn!, reltol, abstol)
         # delta for approximation of jacobian.  I removed the
         # sign(h_next*dy0) from the definition of delta because it was
         # causing trouble when dy0==0 (which happens for ord==1)
-        edelta  = spdiagm(max(abs(y),abs(h*dy),wt)*sqrt(ep))
+        edelta  = max(abs(y),abs(h*dy),wt)*sqrt(ep)
 
         tmp = similar(y)
+        tmp1 = similar(y)
+        tmp2 = similar(y)
         f0 = similar(y)
         fn!(f0, y, dy)
         for i=1:length(y)
-            fn!(tmp, y+edelta[:,i], a*edelta[:,i]+dy)
-            jac[:,i] = (tmp-f0)/edelta[i,i]
+            copy!(tmp1, y)
+            copy!(tmp2, dy)
+            tmp1[i] += edelta[i]
+            tmp2[i] += a*edelta[i]
+            fn!(tmp, tmp1, tmp2)
+            jac[:,i] = (tmp-f0)/edelta[i]
         end
         return nothing
     end
