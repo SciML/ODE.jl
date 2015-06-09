@@ -393,7 +393,8 @@ function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
     # If timeout>0 no step size increase is allowed, timeout is
     # decremented in here.
     #
-    # Returns the error, newdt and the number of timeout-steps
+    # Returns the error, newdt and the number of timeout-steps.
+    # Updates xerr in-place with the relative error.
     #
     # TODO:
     # - allow component-wise reltol and abstol?

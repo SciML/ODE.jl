@@ -33,9 +33,9 @@ function Jhb1dae!(res, y, ydot, a)
     return nothing
 end
 function Jhb1dae(t, y, ydot, a)
-    res = zeros(length(y),length(y))
-    Jhb1dae!(res, y, ydot, a)
-    return res
+    jac = zeros(length(y),length(y))
+    Jhb1dae!(jac, y, ydot, a)
+    return jac
 end
 
 

@@ -4,6 +4,8 @@
 # Main references:
 # - Wanner & Hairer 1996
 # - PETSc http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/TS/TSROSW.html
+
+using MatrixColorings
 export ode_rosw, ode_rosw_fixed, ode_rodas3
 
 # TODO:
@@ -23,6 +25,11 @@ export ode_rosw, ode_rosw_fixed, ode_rodas3
 #
 # The method used here uses transformed equations as done in PETSc.
 
+
+rosw_poststep(xtrial, err, t, dt, steps) = (showcompact(t), print(", ") ,
+                                            showcompact(dt), print(", "),
+                                            showcompact(err), print(", "),
+                                            println(steps))
 
 # Tableaus
 ##########
@@ -204,7 +211,12 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
     k = Array(Tx, S) # stage variables
     allocate!(k, x0, dof)
     ks = zeros(Exf,dof) # work vector for one k
-    jac_store = zeros(Exf,dof,dof) # Jacobian storage
+    if isa(jacobian, Tuple)
+        jac_store = jacobian[2]
+        jacobian = jacobian[1]
+    else
+        jac_store = zeros(Exf,dof,dof) # Jacobian storage
+    end
     u = zeros(Exf,dof)    # work vector 
     udot = zeros(Exf,dof) # work vector 
 
@@ -250,7 +262,9 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
             end
         end
         err, newdt, timeout = stepsize_hw92!(dt, tdir, x, xtrial, xerr, order, timeout,
-                                            dof, abstol, reltol, maxstep, norm)
+                                             dof, abstol, reltol, maxstep, norm)
+
+        rosw_poststep(xtrial, err, t, dt, steps)
         if err<=1.0 # accept step
             # diagnostics
             steps[1] +=1
@@ -300,6 +314,7 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
                 laststep = true # next step is the last, if it succeeds
             end
         elseif abs(newdt)<minstep  # minimum step size reached, break
+            println(xerr)
             println("Warning: dt < minstep.  Stopping.")
             break
         else # redo step with smaller dt
@@ -422,7 +437,60 @@ function numerical_jacobian(fn!, reltol, abstol)
             tmp1[i] += edelta[i]
             tmp2[i] += a*edelta[i]
             fn!(tmp, tmp1, tmp2)
-            jac[:,i] = (tmp-f0)/edelta[i]
+            if isa(jac, SparseMatrixCSC)
+                for nz in nzrange(jac,i)
+                    nonzeros(jac)[nz] = tmpy[rowvals(jac)[nz]]
+                end
+            else
+                for j=1:length(y)
+                    jac[j,i] = (tmp[j]-f0[j])/edelta[i]
+                end
+            end
+        end
+        return nothing
+    end
+end
+
+function numerical_jacobian(fn!, reltol, abstol, JPattern1::SparseMatrixCSC, JPattern2::SparseMatrixCSC)
+    # JPattern1: sparsity pattern of dfn/dy
+    # JPattern2: sparsity pattern of dfn/dydot
+    
+    # S1 = color_jac(JPattern1) # seed matrix
+    # S2 = color_jac(JPattern2) # seed matrix
+    # nc1 = size(S1,2) # number of colors
+    # nc2 = size(S2,2) # number of colors
+
+    # TODO: there are probably more clever ways to do this:
+    S = color_jac(JPattern1+JPattern2)
+    nc = size(S,2)
+    function numjac_c!(jac, y, ydot, a)
+        # updates jac in-place
+        ep      = eps(1e6)   # this is the machine epsilon # TODO: better value?
+        h       = 1/a           # h ~ 1/a
+        wt      = reltol*abs(y).+abstol
+        # delta for approximation of jacobian.  I removed the
+        # sign(h_next*dy0) from the definition of delta because it was
+        # causing trouble when dy0==0 (which happens for ord==1)
+        edelta  = max(abs(y),abs(h*ydot),wt)*sqrt(ep)
+
+        dof = length(y)
+        res0 = similar(y)
+        fn!(res0, y, ydot)
+        dy = deepcopy(y) # y+dy
+        dydot = deepcopy(y) # y+dydot
+        res1 = similar(y)   # fn(y+dy, ydot)
+        res2 = similar(y)   # fn(y, ydot+dydot)
+        for c in 1:nc
+            add_delta!(dy, S, c, edelta)  # adds a delta to all indices of color c
+            add_delta!(dydot, S, c, edelta)  # adds a delta to all indices of color c
+            fn!(res1, dy, ydot)
+            fn!(res2, y, dydot)
+            for j=1:dof
+                res1[j] = ( res1[j]-res0[j] + a*(res2[j]-res0[j]) )/edelta[i]
+            end
+            recover_jac!(jac, res1, S, c) # recovers the columns of jac which correspond c
+            remove_delta!(dy, S, c, edelta) # remove delta again
+            remove_delta!(dydot, S, c, edelta) # remove delta again
         end
         return nothing
     end
