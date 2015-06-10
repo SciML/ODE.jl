@@ -213,12 +213,12 @@ function oderosw_adapt{N,S}(fn!, x0::AbstractVector, tspan, btab::TableauRosW{N,
     k = Array(Tx, S) # stage variables
     allocate!(k, x0, dof)
     ks = zeros(Exf,dof) # work vector for one k
-    if isa(jacobian, Tuple) # Jacobian function and sparse storage provided
+    if isa(jacobian, Tuple) # Jacobian function and sparse pattern/storage provided
         jac_store = jacobian[2]
         jacobian = jacobian[1]
     elseif isa(jacobian, SparseMatrixCSC) # Sparse storage provided, make colored Jacobian (TODO)
         jac_store = jacobian
-        jacobian = numerical_jacobian(fn!, reltol, abstol) #, jac_store, jac_store)
+        jacobian = numerical_jacobian(fn!, reltol, abstol, jac_store)
     else # nothing provided, make dense numerical jacobian
         jac_store = zeros(Exf,dof,dof) # Jacobian storage
     end
@@ -352,7 +352,6 @@ function rosw_step!{N,S}(xtrial, g!, gprime!, x, dt, dof, btab::TableauRosW_T{N,
         # TODO: add option to do more Newton iterations
         k[s] = A_ldiv_B!(jac, k[s])  # TODO: see whether this is impacted by https://github.com/JuliaLang/julia/issues/10787
                               # and https://github.com/JuliaLang/julia/issues/11325
-#        k[s][:]  = jac_store\k[s]
         for d=1:dof
             k[s][d] = ks[d]-k[s][d]
         end
@@ -363,7 +362,6 @@ function rosw_step!{N,S}(xtrial, g!, gprime!, x, dt, dof, btab::TableauRosW_T{N,
     #    k[S][:] = ks - jac\k[S]
     # TODO: add option to do more Newton iterations
     k[S] = A_ldiv_B!(jac, k[S])
-#    k[S][:]  = jac_store\k[S]    
     for d=1:dof
         k[S][d] = ks[d]-k[S][d]
     end
@@ -415,7 +413,7 @@ function hprime!(res, xi, gprime!, u, udot, btab, dt)
     # The res will hold part of the LU factorization.  However use the
     # returned LU-type.
     gprime!(res, u, udot, 1./(dt*btab.γii))
-    if true # issparse(res)
+    if issparse(res)
         # For issues with sparse https://github.com/JuliaLang/julia/issues/7488
         # Basically lufact! destroys res and it cannot be used anymore later.
         return lufact(res)
@@ -428,79 +426,83 @@ end
 # generate a function that computes approximate jacobian using forward
 # finite differences
 function numerical_jacobian(fn!, reltol, abstol)
-    function numjac!(jac, y, dy, a)
+    function numjac!(jac, y, ydot, a)
         # Numerical Jacobian, finite differences, no coloring.
-        ep      = eps(1e6)   # this is the machine epsilon # TODO: better value?
+        ep      = eps(1.0)   # this is the machine epsilon # TODO: better value?
         h       = 1/a           # h ~ 1/a
         wt      = reltol*abs(y).+abstol
         # Delta for approximation of Jacobian.  I removed the
-        # sign(h_next*dy0) from the definition of delta because it was
-        # causing trouble when dy0==0 (which happens for ord==1)
-        edelta  = max(abs(y),abs(h*dy),wt)*sqrt(ep)
-
-        tmp = similar(y)
-        tmp1 = similar(y)
-        tmp2 = similar(y)
+        # sign(h_next*ydot0) from the definition of delta because it was
+        # causing trouble when ydot0==0 (which happens for ord==1)
+        edelta  = max(abs(y),abs(h*ydot),wt)*sqrt(ep)
+        
         f0 = similar(y)
-        fn!(f0, y, dy)
+        fn!(f0, y, ydot)
+
+        dy = deepcopy(y)
+        dydot = deepcopy(ydot)
+        f1 = similar(y)
         for i=1:length(y)
-            copy!(tmp1, y)
-            copy!(tmp2, dy)
-            tmp1[i] += edelta[i]
-            tmp2[i] += a*edelta[i]
-            fn!(tmp, tmp1, tmp2)
-            if false #isa(jac, SparseMatrixCSC)
-                for nz in nzrange(jac,i)
-                    nonzeros(jac)[nz] = tmpy[rowvals(jac)[nz]]
-                end
-            else
-                for j=1:length(y)
-                    jac[j,i] = (tmp[j]-f0[j])/edelta[i]
-                end
+            dy[i] += edelta[i]
+            dydot[i] += a*edelta[i]
+            fn!(f1, dy, dydot)
+            for j=1:length(y)
+                jac[j,i] = (f1[j]-f0[j])/edelta[i]
             end
+            # remove delta again
+            dy[i] -= edelta[i]
+            dydot[i] -= a*edelta[i]
         end
         return nothing
     end
 end
 
-function numerical_jacobian(fn!, reltol, abstol, JPattern1::SparseMatrixCSC, JPattern2::SparseMatrixCSC)
-    # JPattern1: sparsity pattern of dfn/dy
-    # JPattern2: sparsity pattern of dfn/dydot
-    
-    # S1 = color_jac(JPattern1) # seed matrix
-    # S2 = color_jac(JPattern2) # seed matrix
-    # nc1 = size(S1,2) # number of colors
-    # nc2 = size(S2,2) # number of colors
+if VERSION < v"0.4.0-dev"
+    # TODO: remove these two for 0.4
+    rowvals(S::SparseMatrixCSC) = S.rowval
+    nzrange(S::SparseMatrixCSC, col::Integer) = S.colptr[col]:(S.colptr[col+1]-1)
+end
+function numerical_jacobian(fn!, reltol, abstol, JPattern::SparseMatrixCSC)
+    # JPattern: sparsity pattern of dfn/dy + dfn/dydot
+    #           Typically this matrix will be used for storage of the
+    #           Jacobian as well.
 
     # TODO: there are probably more clever ways to do this:
-    S = color_jac(JPattern1+JPattern2)
+    S = color_jac(JPattern)
     nc = size(S,2)
     function numjac_c!(jac, y, ydot, a)
         # updates jac in-place
-        ep      = eps(1e6)   # this is the machine epsilon # TODO: better value?
+        ep      = eps(1.0)   # this is the machine epsilon # TODO: better value?
         h       = 1/a           # h ~ 1/a
         wt      = reltol*abs(y).+abstol
 
         edelta  = max(abs(y),abs(h*ydot),wt)*sqrt(ep)
+        a_edelta = a*edelta
 
-        dof = length(y)
-        res0 = similar(y)
-        fn!(res0, y, ydot)
+        f0 = similar(y)
+        fn!(f0, y, ydot)
+
         dy = deepcopy(y) # y+dy
-        dydot = deepcopy(y) # y+dydot
-        res1 = similar(y)   # fn(y+dy, ydot)
-        res2 = similar(y)   # fn(y, ydot+dydot)
+        dydot = deepcopy(ydot) # y+dydot
+        f1 = similar(y)   # fn(y+dy, ydot)
         for c in 1:nc
             add_delta!(dy, S, c, edelta)  # adds a delta to all indices of color c
-            add_delta!(dydot, S, c, edelta)  # adds a delta to all indices of color c
-            fn!(res1, dy, ydot)
-            fn!(res2, y, dydot)
-            for j=1:dof
-                res1[j] = ( res1[j]-res0[j] + a*(res2[j]-res0[j]) )/edelta[j]
+            add_delta!(dydot, S, c, a_edelta)  # adds a delta to all indices of color c
+            fn!(f1, dy, dydot)
+            for j=1:length(y)
+                f1[j] = f1[j]-f0[j]
             end
-            recover_jac!(jac, res1, S, c) # recovers the columns of jac which correspond c
+            recover_jac!(jac, f1, S, c) # recovers the columns of jac which correspond c
             remove_delta!(dy, S, c, edelta) # remove delta again
-            remove_delta!(dydot, S, c, edelta) # remove delta again
+            remove_delta!(dydot, S, c, a_edelta) # remove delta again
+        end
+        # do the division by edelta
+        nz = nonzeros(jac)
+        for j =1:size(jac,2)
+            ed = edelta[j]
+            for i in nzrange(jac,j)
+                nz[i] /= ed
+            end
         end
         return nothing
     end

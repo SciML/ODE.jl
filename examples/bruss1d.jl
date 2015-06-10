@@ -169,34 +169,37 @@ ic[1:2:2N] = u0(x)
 ic[2:2:2N] = v0(x)
 tspan = T[0.0, 10.0] # integration interval
 tspan0 = T[0.0, 0.001] # integration interval
+tspan1 = T[0.0, 0.3] # integration interval
 
 #t,ydassl = dasslSolve(fn, ic, tspan, jacobian=jac)
 
 ## ode23s
-# tout, yout = ode23s(fn_ex, ic, tspan0, jacobian=jac_ex)
-# @time tout, yout = ode23s(fn_ex, ic, tspan, jacobian=jac_ex)
-# @show norm(abs(yout[end][refsolinds]-refsol)./refsol, Inf)
+tout, yout = ode23s(fn_ex, ic, tspan0, jacobian=jac_ex)
+@time tout, yout = ode23s(fn_ex, ic, tspan, jacobian=jac_ex)
+@show norm(abs(yout[end][refsolinds]-refsol)./refsol, Inf)
 
 # ## DASSL
-# t,ydassl = dasslSolve(fn, ic, tspan0, jacobian=jac)
-# @time t,ydassl = dasslSolve(fn, ic, tspan, jacobian=jac)
-# @show norm(abs(ydassl[end][refsolinds]-refsol)./refsol, Inf)
+t,ydassl = dasslSolve(fn, ic, tspan0, jacobian=jac)
+@time t,ydassl = dasslSolve(fn, ic, tspan, jacobian=jac)
+@show norm(abs(ydassl[end][refsolinds]-refsol)./refsol, Inf)
 
 ## ROSW
+# for some reason the abstol and reltol need to be way lower to reach
+# the same precision.  Presumably an error in the step control.
+abstol, reltol = 1e-2, 1e-3
+# No jac
+tout, yout = ode_rosw(fn!, ic, tspan0)
+@time tout, yout = ode_rosw(fn!, ic, tspan, abstol=abstol, reltol=reltol);
+@show norm(abs(yout[end][refsolinds]-refsol)./refsol, Inf)
 
-# # No jac works but is slower and gives much higher precision than
-# # other methods.
-# tout, yout = ode_rosw(fn!, ic, tspan0)
-# @time tout, yout = ode_rosw(fn!, ic, tspan)
-# @show norm(abs(yout[end][refsolinds]-refsol)./refsol, Inf)
-
-# Analytic Jacobian
+# Analytic Jacobian, same as previous
 tout, yout = ode_rosw(fn!, ic, tspan0, jacobian=(jac!, jac!()))
-@time tout, yout = ode_rosw(fn!, ic, tspan, jacobian=(jac!, jac!()))
+@time tout, yout = ode_rosw(fn!, ic, tspan, jacobian=(jac!, jac!()), abstol=abstol, reltol=reltol);
 @show norm(abs(yout[end][refsolinds]-refsol)./refsol, Inf)
 
 # Numerical colored Jacobian
 tout, yout = ode_rosw(fn!, ic, tspan0, jacobian=jac!())
-@time tout, yout = ode_rosw(fn!, ic, tspan, jacobian=jac!())
+@time tout, yout = ode_rosw(fn!, ic, tspan, jacobian=jac!(), abstol=abstol, reltol=reltol);
 @show norm(abs(yout[end][refsolinds]-refsol)./refsol, Inf)
 
+nothing
