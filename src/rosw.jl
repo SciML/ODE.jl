@@ -26,10 +26,12 @@ export ode_rosw, ode_rosw_fixed, ode_rodas3
 # The method used here uses transformed equations as done in PETSc.
 
 
-rosw_poststep(xtrial, err, t, dt, steps) = (showcompact(t), print(", ") ,
-                                            showcompact(dt), print(", "),
-                                            showcompact(err), print(", "),
-                                            println(steps))
+# rosw_poststep(xtrial, err, t, dt, steps) = (showcompact(t), print(", ") ,
+#                                             showcompact(dt), print(", "),
+#                                             showcompact(err), print(", "),
+#                                             println(steps))
+
+rosw_poststep(xtrial, err, t, dt, steps) = nothing
 
 # Tableaus
 ##########
@@ -132,13 +134,13 @@ const bt_ros_rodas3 = TableauRosW(:ros_rodas3, (3,4), Rational{Int},
 ###################
 # Fixed step solver
 ###################
-ode_rosw_fixed(fn, x0, tspan; kwargs...) = oderosw_fixed(fn, x0, tspan, bt_ros34pw2, kwargs...)
-function oderosw_fixed{N,S}(fn, x0::AbstractVector, tspan,
+ode_rosw_fixed(fn!, x0, tspan; kwargs...) = oderosw_fixed(fn!, x0, tspan, bt_ros34pw2, kwargs...)
+function oderosw_fixed{N,S}(fn!, x0::AbstractVector, tspan,
                             btab::TableauRosW{N,S};
-                            jacobian=numerical_jacobian(fn, 1e-6, 1e-6)
+                            jacobian=numerical_jacobian(fn!, 1e-6, 1e-6)
                             )
     # TODO: refactor with oderk_fixed
-    Et, Exf, Tx, btab = make_consistent_types(fn, x0, tspan, btab)
+    Et, Exf, Tx, btab = make_consistent_types(fn!, x0, tspan, btab)
     btab = tabletransform(btab)
     dof = length(x0)
 
@@ -155,26 +157,26 @@ function oderosw_fixed{N,S}(fn, x0::AbstractVector, tspan,
     u = zeros(Exf,dof)    # work vector 
     udot = zeros(Exf,dof) # work vector 
     
-    # allocate!(ks, x0, dof) # no need to allocate as fn is not in-place
+    # allocate!(ks, x0, dof) # no need to allocate as fn! is not in-place
     xtmp = similar(x0, Exf, dof)
     for i=1:length(tspan)-1
         dt = tspan[i+1]-tspan[i]
-        rosw_step!(xs[i+1], fn, jacobian, xs[i], dt, dof, btab,
+        rosw_step!(xs[i+1], fn!, jacobian, xs[i], dt, dof, btab,
                    k, jac_store, ks, u, udot)
     end
     return tspan, xs
 end
 
 
-ode_rosw(fn, x0, tspan;kwargs...) = oderosw_adapt(fn, x0, tspan, bt_ros34pw2; kwargs...)
-ode_rodas3(fn, x0, tspan;kwargs...) = oderosw_adapt(fn, x0, tspan, bt_ros_rodas3; kwargs...)
-function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S};
+ode_rosw(fn!, x0, tspan;kwargs...) = oderosw_adapt(fn!, x0, tspan, bt_ros34pw2; kwargs...)
+ode_rodas3(fn!, x0, tspan;kwargs...) = oderosw_adapt(fn!, x0, tspan, bt_ros_rodas3; kwargs...)
+function oderosw_adapt{N,S}(fn!, x0::AbstractVector, tspan, btab::TableauRosW{N,S};
                             reltol = 1.0e-5, abstol = 1.0e-8,
                             norm=Base.norm,
                             minstep=abs(tspan[end] - tspan[1])/1e18,
                             maxstep=abs(tspan[end] - tspan[1])/2.5,
                             initstep=0.,
-                            jacobian=numerical_jacobian(fn, reltol, abstol)
+                            jacobian=numerical_jacobian(fn!, reltol, abstol)
 #                            points=:all
                             )
     # TODO: refactor with oderk_adapt
@@ -188,8 +190,8 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
         points=:all
     end
     ## Figure types
-    fn_expl = (t,x)->(out=similar(x); fn(out, x, x*0); out)
-    Et, Exf, Tx, btab = make_consistent_types(fn, x0, tspan, btab)
+    fn_expl = (t,x)->(out=similar(x); fn!(out, x, x*0); out)
+    Et, Exf, Tx, btab = make_consistent_types(fn!, x0, tspan, btab)
     btab = tabletransform(btab)
     # parameters
     order = minimum(btab.order)
@@ -211,10 +213,13 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
     k = Array(Tx, S) # stage variables
     allocate!(k, x0, dof)
     ks = zeros(Exf,dof) # work vector for one k
-    if isa(jacobian, Tuple)
+    if isa(jacobian, Tuple) # Jacobian function and sparse storage provided
         jac_store = jacobian[2]
         jacobian = jacobian[1]
-    else
+    elseif isa(jacobian, SparseMatrixCSC) # Sparse storage provided, make colored Jacobian (TODO)
+        jac_store = jacobian
+        jacobian = numerical_jacobian(fn!, reltol, abstol) #, jac_store, jac_store)
+    else # nothing provided, make dense numerical jacobian
         jac_store = zeros(Exf,dof,dof) # Jacobian storage
     end
     u = zeros(Exf,dof)    # work vector 
@@ -247,11 +252,11 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
     steps = [0,0]  # [accepted, rejected]
 
     ## Integration loop
-    laststep = false
+    islaststep = abs(t+dt-tend)<=eps(tend) ? true : false
     timeout = 0 # for step-control
     iter = 2 # the index into tspan and xs
     while true
-        rosw_step!(xtrial, fn, jacobian, x, dt, dof, btab,
+        rosw_step!(xtrial, fn!, jacobian, x, dt, dof, btab,
                    k, jac_store, ks, u, udot)
         # Completion again for embedded method, see line 927 of
         # http://www.mcs.anl.gov/petsc/petsc-current/src/ts/impls/rosw/rosw.c.html#TSROSW
@@ -276,13 +281,13 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
             # f1 = fn_expl(t+dt, xtrial)
             if points==:specified
                 # interpolate onto given output points
-                while iter-1<nsteps_fixed && (tdir*tspan[iter]<tdir*(t+dt) || laststep) # output at all new times which are < t+dt
+                while iter-1<nsteps_fixed && (tdir*tspan[iter]<tdir*(t+dt) || islaststep) # output at all new times which are < t+dt
                     error("FIXME: not implemented yet")
                     hermite_interp!(xs[iter], tspan[iter], t, dt, x, xtrial, f0, f1) # TODO: 3rd order only!
                     iter += 1
                 end
             else
-                # first interpolate onto given output points
+                # First interpolate onto given output points
                 while iter_fixed-1<nsteps_fixed && tdir*t<tdir*tspan_fixed[iter_fixed]<tdir*(t+dt) # output at all new times which are < t+dt
                     error("FIXME: not implemented yet")
                     xout = hermite_interp(tspan_fixed[iter_fixed], t, dt, x, xtrial, f0, f1)
@@ -299,7 +304,7 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
             # k[1] = f1 # load k[1]==f0 for next step
 
             # Break if this was the last step:
-            laststep && break
+            islaststep && break
 
             # Swap bindings of x and xtrial, avoids one copy
             x, xtrial = xtrial, x
@@ -311,14 +316,14 @@ function oderosw_adapt{N,S}(fn, x0::AbstractVector, tspan, btab::TableauRosW{N,S
             # Hit end point exactly if next step within 1% of end:
             if tdir*(t+dt*1.01) >= tdir*tend
                 dt = tend-t
-                laststep = true # next step is the last, if it succeeds
+                islaststep = true # next step is the last, if it succeeds
             end
         elseif abs(newdt)<minstep  # minimum step size reached, break
-            println(xerr)
+            println("max err=$(maximum(xerr)), mean err=$(mean(xerr))")
             println("Warning: dt < minstep.  Stopping.")
             break
         else # redo step with smaller dt
-            laststep = false
+            islaststep = false
             steps[2] +=1
             dt = newdt
             timeout = timeout_const
@@ -345,8 +350,9 @@ function rosw_step!{N,S}(xtrial, g!, gprime!, x, dt, dof, btab::TableauRosW_T{N,
         # first step of Newton iteration with guess ks==0
         #        k[s][:] = ks - jac\k[s] # in-place A_ldiv_B!(jac, k[s])
         # TODO: add option to do more Newton iterations
-        A_ldiv_B!(jac, k[s])  # TODO: see whether this is impacted by https://github.com/JuliaLang/julia/issues/10787
+        k[s] = A_ldiv_B!(jac, k[s])  # TODO: see whether this is impacted by https://github.com/JuliaLang/julia/issues/10787
                               # and https://github.com/JuliaLang/julia/issues/11325
+#        k[s][:]  = jac_store\k[s]
         for d=1:dof
             k[s][d] = ks[d]-k[s][d]
         end
@@ -356,7 +362,8 @@ function rosw_step!{N,S}(xtrial, g!, gprime!, x, dt, dof, btab::TableauRosW_T{N,
     # last step:
     #    k[S][:] = ks - jac\k[S]
     # TODO: add option to do more Newton iterations
-    A_ldiv_B!(jac, k[S])
+    k[S] = A_ldiv_B!(jac, k[S])
+#    k[S][:]  = jac_store\k[S]    
     for d=1:dof
         k[S][d] = ks[d]-k[S][d]
     end
@@ -408,7 +415,13 @@ function hprime!(res, xi, gprime!, u, udot, btab, dt)
     # The res will hold part of the LU factorization.  However use the
     # returned LU-type.
     gprime!(res, u, udot, 1./(dt*btab.γii))
-    return lufact!(res)
+    if true # issparse(res)
+        # For issues with sparse https://github.com/JuliaLang/julia/issues/7488
+        # Basically lufact! destroys res and it cannot be used anymore later.
+        return lufact(res)
+    else
+        return lufact!(res)
+    end
 end
 
 # Copied & adapted from DASSL:
@@ -416,12 +429,11 @@ end
 # finite differences
 function numerical_jacobian(fn!, reltol, abstol)
     function numjac!(jac, y, dy, a)
-        # TODO use coloring
-        
+        # Numerical Jacobian, finite differences, no coloring.
         ep      = eps(1e6)   # this is the machine epsilon # TODO: better value?
         h       = 1/a           # h ~ 1/a
         wt      = reltol*abs(y).+abstol
-        # delta for approximation of jacobian.  I removed the
+        # Delta for approximation of Jacobian.  I removed the
         # sign(h_next*dy0) from the definition of delta because it was
         # causing trouble when dy0==0 (which happens for ord==1)
         edelta  = max(abs(y),abs(h*dy),wt)*sqrt(ep)
@@ -437,7 +449,7 @@ function numerical_jacobian(fn!, reltol, abstol)
             tmp1[i] += edelta[i]
             tmp2[i] += a*edelta[i]
             fn!(tmp, tmp1, tmp2)
-            if isa(jac, SparseMatrixCSC)
+            if false #isa(jac, SparseMatrixCSC)
                 for nz in nzrange(jac,i)
                     nonzeros(jac)[nz] = tmpy[rowvals(jac)[nz]]
                 end
@@ -468,9 +480,7 @@ function numerical_jacobian(fn!, reltol, abstol, JPattern1::SparseMatrixCSC, JPa
         ep      = eps(1e6)   # this is the machine epsilon # TODO: better value?
         h       = 1/a           # h ~ 1/a
         wt      = reltol*abs(y).+abstol
-        # delta for approximation of jacobian.  I removed the
-        # sign(h_next*dy0) from the definition of delta because it was
-        # causing trouble when dy0==0 (which happens for ord==1)
+
         edelta  = max(abs(y),abs(h*ydot),wt)*sqrt(ep)
 
         dof = length(y)
@@ -486,7 +496,7 @@ function numerical_jacobian(fn!, reltol, abstol, JPattern1::SparseMatrixCSC, JPa
             fn!(res1, dy, ydot)
             fn!(res2, y, dydot)
             for j=1:dof
-                res1[j] = ( res1[j]-res0[j] + a*(res2[j]-res0[j]) )/edelta[i]
+                res1[j] = ( res1[j]-res0[j] + a*(res2[j]-res0[j]) )/edelta[j]
             end
             recover_jac!(jac, res1, S, c) # recovers the columns of jac which correspond c
             remove_delta!(dy, S, c, edelta) # remove delta again
