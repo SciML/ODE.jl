@@ -62,6 +62,7 @@ Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert met
 # estimator for initial step based on book
 # "Solving Ordinary Differential Equations I" by Hairer et al., p.169
 function hinit(F, x0, t0, tend, p, reltol, abstol)
+    # Returns first step, direction of integration and F evaluated at t0
     tdir = sign(tend-t0)
     tdir==0 && error("Zero time span")
     tau = max(reltol*norm(x0, Inf), abstol)
@@ -84,7 +85,7 @@ function hinit(F, x0, t0, tend, p, reltol, abstol)
         pow = -(2. + log10(max(d1, d2)))/(p + 1.)
         h1 = 10.^pow
     end
-    return tdir*min(100*h0, h1), tdir, f0
+    return tdir*min(100*h0, h1, tdir*(tend-t0)), tdir, f0
 end
 
 # isoutofdomain takes the state and returns true if state is outside

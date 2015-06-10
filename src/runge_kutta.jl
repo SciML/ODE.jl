@@ -286,7 +286,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     steps = [0,0]  # [accepted, rejected]
 
     ## Integration loop
-    laststep = false
+    islaststep = abs(t+dt-tend)<=eps(tend) ? true : false
     timeout = 0 # for step-control
     iter = 2 # the index into tspan and ys
     while true
@@ -307,7 +307,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
             f1 = isFSAL(btab) ? ks[S] : fn(t+dt, ytrial)
             if points==:specified
                 # interpolate onto given output points
-                while iter-1<nsteps_fixed && (tdir*tspan[iter]<tdir*(t+dt) || laststep) # output at all new times which are < t+dt
+                while iter-1<nsteps_fixed && (tdir*tspan[iter]<tdir*(t+dt) || islaststep) # output at all new times which are < t+dt
                     hermite_interp!(ys[iter], tspan[iter], t, dt, y, ytrial, f0, f1) # TODO: 3rd order only!
                     iter += 1
                 end
@@ -328,7 +328,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
             ks[1] = f1 # load ks[1]==f0 for next step
 
             # Break if this was the last step:
-            laststep && break
+            islaststep && break
 
             # Swap bindings of y and ytrial, avoids one copy
             y, ytrial = ytrial, y
@@ -340,13 +340,13 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
             # Hit end point exactly if next step within 1% of end:
             if tdir*(t+dt*1.01) >= tdir*tend
                 dt = tend-t
-                laststep = true # next step is the last, if it succeeds
+                islaststep = true # next step is the last, if it succeeds
             end
         elseif abs(newdt)<minstep  # minimum step size reached, break
             println("Warning: dt < minstep.  Stopping.")
             break
         else # redo step with smaller dt
-            laststep = false
+            islaststep = false
             steps[2] +=1
             dt = newdt
             timeout = timeout_const
