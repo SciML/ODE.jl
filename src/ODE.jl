@@ -7,7 +7,7 @@ using Compat
 
 ## minimal function export list
 # adaptive non-stiff:
-export ode45, ode78
+export ode23, ode45, ode78
 # non-adaptive non-stiff:
 export ode4, ode4ms
 # adaptive stiff:
