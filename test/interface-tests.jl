@@ -3,6 +3,9 @@
 ################################################################################
 # This is to test a scalar-like state variable
 # (due to @acroy: https://gist.github.com/acroy/28be4f2384d01f38e577)
+
+import Base: +, -, *, /, .+, .-, .*, ./
+
 const delta0 = 0.
 const V0 = 1.
 const g0 = 0.
@@ -12,10 +15,10 @@ immutable CompSol
   rho::Matrix{Complex128}
   x::Float64
   p::Float64
- 
+
   CompSol(r,x,p) = new(copy(r),x,p)
 end
- 
+
 # ... which has to support the following operations
 # to work with odeX
 Base.norm(y::CompSol, p::Float64) = maximum([Base.norm(y.rho, p) abs(y.x) abs(y.p)])
