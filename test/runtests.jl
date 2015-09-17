@@ -4,7 +4,7 @@ using Base.Test
 tol = 1e-2
 
 solvers = [
-           ## Non-stiff           
+           ## Non-stiff
            # fixed step
            ODE.ode1,
            ODE.ode2_midpoint,
@@ -39,7 +39,7 @@ for solver in solvers
     # dt
     t,y=solver((t,y)->2t, 0., [0:.001:1;])
     @test maximum(abs(y-t.^2)) < tol
-    
+
 
     # dy
     # -- = y ==> y = y0*e.^t
@@ -49,7 +49,7 @@ for solver in solvers
 
     t,y=solver((t,y)->y, 1., [1:-.001:0;])
     @test maximum(abs(y-e.^(t-1))) < tol
- 
+
     # dv       dw
     # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
     # dt       dt
