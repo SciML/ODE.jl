@@ -6,6 +6,9 @@
 # Tableaus for explicit Runge-Kutta methods
 ###########################################
 
+import Base: start, next, done
+
+
 immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
     order::(@compat(Tuple{Vararg{Int}})) # the order of the methods
     a::Matrix{T}
@@ -20,20 +23,30 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert istril(a)
         @assert S==length(c)==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.  
+        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.
         new(order,a,b,c)
     end
 end
+
+
 function TableauRKExplicit{T}(name::Symbol, order::(@compat(Tuple{Vararg{Int}})),
                    a::Matrix{T}, b::Matrix{T}, c::Vector{T})
     TableauRKExplicit{name,length(c),T}(order, a, b, c)
 end
+
+
 function TableauRKExplicit(name::Symbol, order::(@compat(Tuple{Vararg{Int}})), T::Type,
                    a::Matrix, b::Matrix, c::Vector)
     TableauRKExplicit{name,length(c),T}(order, convert(Matrix{T},a),
                                         convert(Matrix{T},b), convert(Vector{T},c) )
 end
+
+
 conv_field{T,N}(D,a::Array{T,N}) = convert(Array{D,N}, a)
+
+
+S(tab::TableauRKExplicit) = length(tab.c)
+
 function Base.convert{Tnew<:Real,Name,S,T}(::Type{Tnew}, tab::TableauRKExplicit{Name,S,T})
     # Converts the tableau coefficients to the new type Tnew
     newflds = ()
@@ -100,7 +113,7 @@ const bt_rk23 = TableauRKExplicit(:bogacki_shampine,(2,3), Rational{Int64},
                                    2/9       1/3     4/9     0],
                                   [7/24 1/4 1/3 1/8
                                    2/9 1/3 4/9 0],
-                                  [0, 1//2, 3//4, 1] 
+                                  [0, 1//2, 3//4, 1]
                          )
 
 # Fehlberg https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method
@@ -173,7 +186,7 @@ function oderk_fixed{N,S}(fn, y0::AbstractVector, tspan,
     # TODO: instead of AbstractVector use a Holy-trait
 
     # Needed interface:
-    # On components: 
+    # On components:
     # On y0 container: length, deepcopy, similar, setindex!
     # On time container: getindex, convert. length
 
@@ -233,7 +246,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     #  - note that the type of the components might change!
     # On y0 container: length, similar, setindex!
     # On time container: getindex, convert, length
-    
+
     # For y0 which support indexing.  Currently y0<:AbstractVector but
     # that could be relaxed with a Holy-trait.
     !isadaptive(btab_) && error("Can only use this solver with an adaptive RK Butcher table")
@@ -477,4 +490,136 @@ function hermite_interp(tquery,t,dt,y0,y1,f0,f1)
     y = similar(y0)
     hermite_interp!(y,tquery,t,dt,y0,y1,f0,f1)
     return y
+end
+
+####################
+# Iterator methods #
+####################
+
+type TempArrays
+    y; ks
+end
+
+type Step
+    t; y; dy; dt
+end
+
+type State
+    tmp :: TempArrays
+    prev_steps :: Vector{Step}
+    last_tout
+    first_step
+end
+
+immutable Problem
+    F
+    btab
+    y0
+    t0
+    dt0
+    tspan
+    points
+end
+
+function newProblem(fn, y0, t0, dt0; tspan = [t0,Inf], method = bt_feuler, points = :all)
+    return Problem(fn, method, y0, t0, dt0, tspan, points)
+end
+
+function start(problem :: Problem)
+    S = length(problem.btab.c)
+    t0 = problem.t0
+    y0 = problem.y0
+    dy0 = problem.F(t0,y0)
+    dt0 = problem.dt0
+    tmp = TempArrays(problem.y0, Array(typeof(y0), S))
+    step0 = Step(t0,y0,dy0,dt0)
+    # initialize with two identical steps
+    prev_steps = [step0, deepcopy(step0)]
+    return State(tmp, prev_steps, t0, true)
+end
+
+function calc_next_k_2!(tmp :: TempArrays, i, step :: Step, prob :: Problem)
+    # Calculates the next ks and puts it into ks[s]
+    # - ks and ytmp are modified inside this function.
+
+    # Needed interface:
+    # On components: +, *
+    # On y0 container: setindex!, getindex, fn
+
+    dof = length(step.y)
+    t, dt, a, c = step.t, step.dt, prob.btab.a, prob.btab.c
+
+    tmp.y[:] = step.y
+    for j=1:i-1
+        # tmp.y += dt * btab.a[i,j] *  ks[j]
+        for d=1:dof
+            tmp.y[d] += dt * tmp.ks[j][d] * a[i,j]
+        end
+    end
+    tmp.ks[i] = prob.F(t + c[i]*dt, tmp.y)
+
+    nothing
+end
+
+function next(prob :: Problem, state :: State)
+
+    s0, s1 = state.prev_steps
+    t0, t1 = s0.t, s1.t
+
+    if state.first_step
+        state.first_step = false
+        return ((s0.t,s0.y),state)
+    end
+
+    # the next output time that we aim at
+    t_goal = prob.tspan[findfirst(t->(t>state.last_tout), prob.tspan)]
+
+    # the t0 == t1 part ensures that we make at least one step
+    while t1 < t_goal
+
+        # s1 is the starting point for the new step, while the new
+        # step is saved in s0
+
+        s0.y[:] = s1.y
+        s0.t    = s1.t
+
+        # perform a step and save it to s0
+        dof = length(s1.y)
+        for s=1:S(prob.btab)
+            calc_next_k_2!(state.tmp, s, s1, prob)
+            for d=1:dof
+                s0.y[d] += s1.dt * prob.btab.b[s]*state.tmp.ks[s][d]
+            end
+        end
+        s0.t += s1.dt
+        s0.dy = prob.F(s0.t,s0.y)
+
+        # swap s0 and s1
+        state.prev_steps[:] = [s1,s0]
+
+        # reassign the steps
+        s0, s1 = state.prev_steps
+        t0, t1 = s0.t, s1.t
+
+        # we made a successfull step and points == :all
+        if prob.points == :all
+            t_goal = min(t_goal,t1)
+            break
+        end
+    end
+
+    # at this point we have t_goal∈[t0,t1] so we can apply the
+    # interpolation
+
+    hermite_interp!(state.tmp.y,t_goal,t0,t1-t0,s0.y,s1.y,s0.dy,s1.dy)
+
+    # update the last output time
+    state.last_tout = t_goal
+
+    return ((s1.t,s1.y),state)
+
+end
+
+function done(prob :: Problem, state :: State)
+    state.prev_steps[2].t >= prob.tspan[end]
 end
