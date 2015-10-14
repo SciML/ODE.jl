@@ -60,6 +60,10 @@ for solver in solvers
     @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
 end
 
+# Test negative starting times ODE.ode23s
+@assert length(ODE.ode23s((t,y)->[-y[2]; y[1]], [1., 2.], [-5., 0])[1]) > 1
+
+
 # rober testcase from http://www.unige.ch/~hairer/testset/testset.html
 let
     println("ROBER test case")
