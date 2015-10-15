@@ -250,8 +250,8 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
 
     # initialization
     t = tspan[1]
-    tfinal = tspan[end]
 
+    tfinal = tspan[end]
 
     h = initstep
     if h == 0.
@@ -261,7 +261,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         tdir = sign(tfinal - t)
         F0 = F(t,y0)
     end
-    h = tdir*min(h, maxstep)
+    h = tdir * min(abs(h), maxstep)
 
     y = y0
     tout = Array(typeof(t), 1)
@@ -272,7 +272,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
 
     J = jac(t,y)    # get Jacobian of F wrt y
 
-    while abs(t) < abs(tfinal) && minstep < abs(h)
+    while abs(t - tfinal) > 0 && minstep < abs(h)
         if abs(t-tfinal) < abs(h)
             h = tfinal - t
         end
@@ -299,7 +299,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         F2 = F(t + h, ynew)
         k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
 
-        err = (h/6)*norm(k1 - 2*k2 + k3) # error estimate
+        err = (abs(h)/6)*norm(k1 - 2*k2 + k3) # error estimate
         delta = max(reltol*max(norm(y),norm(ynew)), abstol) # allowable error
 
         # check if new solution is acceptable
