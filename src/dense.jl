@@ -3,7 +3,7 @@
 # ODE.newDenseProblem(..., method = ODE.bt_rk23, ...)
 
 type Step
-    t; y; dy; dt
+    t; y; dy
 end
 
 
@@ -11,41 +11,36 @@ type DenseState
     s0; s1
     last_tout
     first_step
-    rkstate
+    solver_state
     # used for storing the interpolation result
     ytmp
 end
 
 
 immutable DenseProblem
-    rkprob
+    F
+    y0
+    t0
+    solver
     points :: Symbol
     tspan
 end
 
 
-function DenseProblem(args...; tspan = [Inf], points = :all, method = bt_feuler, opt_args...)
-    rkprob = method(args...; opt_args..., tstop = tspan[end])
-    return DenseProblem(rkprob, points, tspan)
-end
-
-
-# create an instance of the zero-th step for RKProblem
-function Step(problem :: AbstractProblem)
-    t0 = problem.t0
-    y0 = problem.y0
-    dy0 = problem.F(t0,y0)
-    dt0 = problem.dt0
-    return Step(t0,y0,dy0,dt0)
+function dense(F, y0, t0, solver; tspan = [Inf], points = :all, kargs...)
+    return DenseProblem(F, y0, t0, solver, points, tspan)
 end
 
 
 function start(prob :: DenseProblem)
-    step0 = Step(prob.rkprob)
-    step1 = Step(prob.rkprob)
-    rkstate = start(prob.rkprob)
-    ytmp = deepcopy(prob.rkprob.y0)
-    return DenseState(step0, step1, prob.rkprob.t0, true, rkstate, ytmp)
+    t0 = prob.t0
+    y0 = prob.y0
+    dy0 = prob.F(t0,y0)
+    step0 = Step(t0,y0,dy0)
+    step1 = Step(t0,y0,dy0)
+    solver_state = start(prob.solver)
+    ytmp = deepcopy(prob.y0)
+    return DenseState(step0, step1, prob.t0, true, solver_state, ytmp)
 end
 
 
@@ -68,12 +63,12 @@ function next(prob :: DenseProblem, state :: DenseState)
         # s1 is the starting point for the new step, while the new
         # step is saved in s0
 
-        if done(prob.rkprob, state.rkstate)
+        if done(prob.solver, state.solver_state)
             # TODO: this shouldn't happen
             error("The iterator was exhausted before the dense output compltede.")
         else
             # at this point s0 holds the new step, "s2" if you will
-            ((s0.t,s0.y[:]), state.rkstate) = next(prob.rkprob, state.rkstate)
+            ((s0.t,s0.y[:]), state.solver_state) = next(prob.solver, state.solver_state)
         end
 
         # swap s0 and s1
@@ -93,8 +88,7 @@ function next(prob :: DenseProblem, state :: DenseState)
     # at this point we have t_goal∈[t0,t1] so we can apply the
     # interpolation
 
-    F = prob.rkprob.F
-    s0.dy[:], s1.dy[:] = F(t0,s0.y), F(t1,s1.y)
+    s0.dy[:], s1.dy[:] = prob.F(t0,s0.y), prob.F(t1,s1.y)
 
     hermite_interp!(state.ytmp,t_goal,s0,s1)
 
@@ -107,7 +101,7 @@ end
 
 
 function done(prob :: DenseProblem, state :: DenseState)
-    return done(prob.rkprob, state.rkstate) || state.s1.t >= prob.tspan[end]
+    return done(prob.solver, state.solver_state) || state.s1.t >= prob.tspan[end]
 end
 
 

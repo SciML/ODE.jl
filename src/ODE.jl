@@ -146,7 +146,7 @@ end
 ## NON-STIFF SOLVERS
 ###############################################################################
 
-include("runge_kutta.jl")
+include("iterators.jl")
 
 # ODE_MS Fixed-step, fixed-order multi-step numerical method
 #   with Adams-Bashforth-Moulton coefficients
