@@ -205,36 +205,6 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     return tspan, ys
 end
 
-function rk_embedded_step!{N,S}(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab::TableauRKExplicit{N,S})
-    # Does one embedded R-K step updating ytrial, yerr and ks.
-    #
-    # Assumes that ks[:,1] is already calculated!
-    #
-    # Modifies ytrial, yerr, ks, and ytmp
-
-    # Needed interface:
-    # On components: arithmetic, zero
-    # On y0 container: fill!, setindex!, getindex
-
-    fill!(ytrial, zero(eltype(ytrial)) )
-    fill!(yerr, zero(eltype(ytrial)) )
-    for d=1:dof
-        ytrial[d] += btab.b[1,1]*ks[1][d]
-        yerr[d]   += btab.b[2,1]*ks[1][d]
-    end
-    for s=2:S
-        calc_next_k!(ks, ytmp, y, s, fn, t, dt, dof, btab)
-        for d=1:dof
-            ytrial[d] += btab.b[1,s]*ks[s][d]
-            yerr[d]   += btab.b[2,s]*ks[s][d]
-        end
-    end
-    for d=1:dof
-        yerr[d]   = dt * (ytrial[d]-yerr[d])
-        ytrial[d] = y[d] + dt * ytrial[d]
-    end
-end
-
 function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
                        timeout, dof, abstol, reltol, maxstep, norm)
     # Estimates the error and a new step size following Hairer &

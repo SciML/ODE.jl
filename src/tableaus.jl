@@ -24,13 +24,13 @@ end
 
 
 function TableauRKExplicit{T}(name::Symbol, order::(@compat(Tuple{Vararg{Int}})),
-                   a::Matrix{T}, b::Matrix{T}, c::Vector{T})
+                              a::Matrix{T}, b::Matrix{T}, c::Vector{T})
     TableauRKExplicit{name,length(c),T}(order, a, b, c)
 end
 
 
 function TableauRKExplicit(name::Symbol, order::(@compat(Tuple{Vararg{Int}})), T::Type,
-                   a::Matrix, b::Matrix, c::Vector)
+                           a::Matrix, b::Matrix, c::Vector)
     TableauRKExplicit{name,length(c),T}(order, convert(Matrix{T},a),
                                         convert(Matrix{T},b), convert(Vector{T},c) )
 end

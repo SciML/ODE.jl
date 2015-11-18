@@ -1,10 +1,11 @@
-function Step(problem :: RKProblem)
-    t0 = problem.t0
-    y0 = problem.y0
-    dy0 = problem.F(t0,y0)
-    dt0 = problem.dt0
-    return Step(t0,y0,dy0,dt0)
+# iterator for the dense output, can be wrapped around any other
+# iterator supporting tspan by using the method keyword, for example
+# ODE.newDenseProblem(..., method = ODE.bt_rk23, ...)
+
+type Step
+    t; y; dy; dt
 end
+
 
 type DenseState
     s0; s1
@@ -15,17 +16,29 @@ type DenseState
     ytmp
 end
 
+
 immutable DenseProblem
-    rkprob :: RKProblem
+    rkprob
     points :: Symbol
     tspan
 end
 
 
-function newDenseProblem(args...; tspan = [Inf], points = :all, opt_args...)
-    rkprob = newRKProblem(args...; opt_args..., tstop = tspan[end])
+function DenseProblem(args...; tspan = [Inf], points = :all, method = bt_feuler, opt_args...)
+    rkprob = method(args...; opt_args..., tstop = tspan[end])
     return DenseProblem(rkprob, points, tspan)
 end
+
+
+# create an instance of the zero-th step for RKProblem
+function Step(problem :: AbstractProblem)
+    t0 = problem.t0
+    y0 = problem.y0
+    dy0 = problem.F(t0,y0)
+    dt0 = problem.dt0
+    return Step(t0,y0,dy0,dt0)
+end
+
 
 function start(prob :: DenseProblem)
     step0 = Step(prob.rkprob)
@@ -34,6 +47,7 @@ function start(prob :: DenseProblem)
     ytmp = deepcopy(prob.rkprob.y0)
     return DenseState(step0, step1, prob.rkprob.t0, true, rkstate, ytmp)
 end
+
 
 function next(prob :: DenseProblem, state :: DenseState)
 
@@ -55,10 +69,11 @@ function next(prob :: DenseProblem, state :: DenseState)
         # step is saved in s0
 
         if done(prob.rkprob, state.rkstate)
+            # TODO: this shouldn't happen
             error("The iterator was exhausted before the dense output compltede.")
         else
             # at this point s0 holds the new step, "s2" if you will
-            ((s0.t,s0.y[:]),state.rkstate) = next(prob.rkprob, state.rkstate)
+            ((s0.t,s0.y[:]), state.rkstate) = next(prob.rkprob, state.rkstate)
         end
 
         # swap s0 and s1
@@ -90,6 +105,27 @@ function next(prob :: DenseProblem, state :: DenseState)
 
 end
 
+
 function done(prob :: DenseProblem, state :: DenseState)
     return done(prob.rkprob, state.rkstate) || state.s1.t >= prob.tspan[end]
+end
+
+
+function hermite_interp!(y,t,step0::Step,step1::Step)
+    # For dense output see Hairer & Wanner p.190 using Hermite
+    # interpolation. Updates y in-place.
+    #
+    # f_0 = f(x_0 , y_0) , f_1 = f(x_0 + h, y_1 )
+    # this is O(3). TODO for higher order.
+
+    y0,  y1  = step0.y, step1.y
+    dy0, dy1 = step0.dy, step1.dy
+
+    dt       = step1.t-step0.t
+    theta    = (t-step0.t)/dt
+    for i=1:length(y0)
+        y[i] = ((1-theta)*y0[i] + theta*y1[i] + theta*(theta-1) *
+                ((1-2*theta)*(y1[i]-y0[i]) + (theta-1)*dt*dy0[i] + theta*dt*dy1[i]) )
+    end
+    nothing
 end
