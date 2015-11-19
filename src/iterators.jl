@@ -9,6 +9,7 @@ function solver(F, y0, t0;
                 tstop = Inf,
                 tspan = [tstop],
                 method = bt_feuler,
+                stopevent = (t,y)->false,
                 kargs...)
 
     if tstop >= t0
@@ -18,15 +19,18 @@ function solver(F, y0, t0;
         return dense_sol
     else
         # reverse time integration
-        F_reverse(t,y)=-F(2*t0-t,y)
+        F_reverse(t,y) = -F(2*t0-t,y)
         reverse_output(t,y)=(2*t0-t,y)
-        sol =  solver(F_reverse,y0,t0;
-                      tstop = 2*t0 -tstop,
-                      tspan = 2*t0.-tspan,
-                      kargs...)
-        dense_sol = dense(F, y0, t0, sol; tspan = tspan, kargs...)
+        sol = method(F_reverse,y0,t0;
+                     tstop = 2*t0 -tstop,
+                     tspan = 2*t0.-tspan,
+                     kargs...)
+        dense_sol = dense(F_reverse, y0, t0, sol;
+                          tspan = 2*t0-tspan,
+                          stopevent = (t,y)->stopevent(2*t0-t,y),
+                          kargs...)
 
-        return imap(x->reverse_output(x...),sol)
+        return imap(x->reverse_output(x...),dense_sol)
     end
 
 end

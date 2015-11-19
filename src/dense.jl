@@ -25,11 +25,12 @@ immutable DenseProblem
     points :: Symbol
     tspan
     stopevent
+    roottol
 end
 
 
-function dense(F, y0, t0, solver; tspan = [Inf], points = :all, stopevent = ()->false, kargs...)
-    return DenseProblem(F, y0, t0, solver, points, tspan, stopevent)
+function dense(F, y0, t0, solver; tspan = [Inf], points = :all, stopevent = (t,y)->false, roottol = 1e-5, kargs...)
+    return DenseProblem(F, y0, t0, solver, points, tspan, stopevent, roottol)
 end
 
 
@@ -80,7 +81,7 @@ function next(prob :: DenseProblem, state :: DenseState)
         t0, t1 = s0.t, s1.t
 
         # we made a successfull step and points == :all
-        if prob.points == :all
+        if prob.points == :all || prob.stopevent(t1,s1.y)
             t_goal = min(t_goal,t1)
             break
         end
@@ -92,7 +93,18 @@ function next(prob :: DenseProblem, state :: DenseState)
 
     s0.dy[:], s1.dy[:] = prob.F(t0,s0.y), prob.F(t1,s1.y)
 
-    hermite_interp!(state.ytmp,t_goal,s0,s1)
+    if prob.stopevent(t1,s1.y)
+        function stopfun(t)
+            hermite_interp!(state.ytmp,t,s0,s1)
+            res = typeof(t0)(prob.stopevent(t,state.ytmp))
+            return 2*res-1      # -1 if false, +1 if true
+        end
+        t_goal = findroot(stopfun, [s0.t,s1.t], prob.roottol)
+        # state.ytmp is already overwwriten to the correct result as a
+        # side-effect of calling stopfun
+    else
+        hermite_interp!(state.ytmp,t_goal,s0,s1)
+    end
 
     # update the last output time
     state.last_tout = t_goal
@@ -103,7 +115,12 @@ end
 
 
 function done(prob :: DenseProblem, state :: DenseState)
-    return done(prob.solver, state.solver_state) || state.s1.t >= prob.tspan[end]
+
+    return (
+            done(prob.solver, state.solver_state) ||
+            state.s1.t >= prob.tspan[end] ||
+            prob.stopevent(state.s1.t,state.s1.y)
+            )
 end
 
 
@@ -124,4 +141,30 @@ function hermite_interp!(y,t,step0::Step,step1::Step)
                 ((1-2*theta)*(y1[i]-y0[i]) + (theta-1)*dt*dy0[i] + theta*dt*dy1[i]) )
     end
     nothing
+end
+
+
+function findroot(f,rng,eps;args...)
+    xl,xr = rng
+    fl = f(xl;args...)
+    fr = f(xr;args...)
+
+    if fl*fr > 0 || xl > xr
+        error("Inconsistent bracket")
+    end
+
+    while xr-xl > eps
+        xm = (xl+xr)/2
+        fm = f(xm;args...)
+
+        if fm*fr > 0
+            xr = xm
+            fr = fm
+        else
+            xl = xm
+            fl = fm
+        end
+    end
+
+    return (xr+xl)/2
 end
