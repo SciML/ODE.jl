@@ -24,11 +24,12 @@ immutable DenseProblem
     solver
     points :: Symbol
     tspan
+    stopevent
 end
 
 
-function dense(F, y0, t0, solver; tspan = [Inf], points = :all, kargs...)
-    return DenseProblem(F, y0, t0, solver, points, tspan)
+function dense(F, y0, t0, solver; tspan = [Inf], points = :all, stopevent = ()->false, kargs...)
+    return DenseProblem(F, y0, t0, solver, points, tspan, stopevent)
 end
 
 
@@ -36,8 +37,8 @@ function start(prob :: DenseProblem)
     t0 = prob.t0
     y0 = prob.y0
     dy0 = prob.F(t0,y0)
-    step0 = Step(t0,y0,dy0)
-    step1 = Step(t0,y0,dy0)
+    step0 = Step(t0,deepcopy(y0),deepcopy(dy0))
+    step1 = Step(t0,deepcopy(y0),deepcopy(dy0))
     solver_state = start(prob.solver)
     ytmp = deepcopy(prob.y0)
     return DenseState(step0, step1, prob.t0, true, solver_state, ytmp)
@@ -83,6 +84,7 @@ function next(prob :: DenseProblem, state :: DenseState)
             t_goal = min(t_goal,t1)
             break
         end
+
     end
 
     # at this point we have t_goal∈[t0,t1] so we can apply the

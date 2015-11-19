@@ -1,6 +1,8 @@
 # This file contains the implementation of explicit Runkge-Kutta
 # solver from (Hairer & Wanner 1992 p.134, p.165-169).
 
+using Iterators
+
 # include the Butcher tableaus.
 include("tableaus.jl")
 
@@ -21,8 +23,8 @@ end
 
 
 immutable Problem{MethodType}
-    F
     method
+    F
     y0
     t0
     dt0
@@ -34,28 +36,26 @@ immutable Problem{MethodType}
 end
 
 
-function solver(F, y0, t0;
-                tstop = Inf,
-                method = bt_feuler,
-                reltol = 1e-5,
-                abstol = 1e-5,
-                minstep = 1e-10,
-                maxstep = 1/minstep,
-                dt0 = hinit(F, y0, t0, tstop, method, reltol, abstol),
-                tspan = [tstop],
-                kargs...)
+# overload the call method for TableauRKExplicit, it returns the
+# iterator (fixed or variable step according to the tableau)
+function call(tab::TableauRKExplicit,
+              F, y0, t0;
+              tstop  = Inf,
+              reltol = 1e-5,
+              abstol = 1e-5,
+              minstep = 1e-10,
+              maxstep = 1/minstep,
+              dt0 = hinit(F, y0, t0, tstop, tab, reltol, abstol),
+              kargs...
+              )
 
-    if isadaptive(method)
+    if isadaptive(tab)
         methodtype = :adaptive
     else
         methodtype = :fixed
     end
 
-    solver = Problem{methodtype}(F, method, y0, t0, dt0, tstop, reltol, abstol, minstep, maxstep)
-    dense_solver = dense(F, y0, t0, solver; tspan = tspan, kargs...)
-
-    return dense_solver
-
+    return Problem{methodtype}(tab, F, y0, t0, dt0, tstop, reltol, abstol, minstep, maxstep)
 end
 
 
@@ -66,7 +66,7 @@ function start(problem :: Problem)
     tmp.ks[1] = problem.F(t0,y0) # we assume that ks[1] is already initialized
 
     timeout = 0 # for step control
-    return State(t0,dt0,y0,tmp,timeout)
+    return State(t0,dt0,deepcopy(y0),tmp,timeout)
 end
 
 
@@ -74,9 +74,11 @@ function done(prob :: Problem, state :: State)
     return state.t >= prob.tstop || state.dt < prob.minstep
 end
 
+
 #####################
 # Fixed step method #
 #####################
+
 
 function next(prob :: Problem{:fixed}, state :: State)
     dof = length(state.y)
@@ -90,9 +92,11 @@ function next(prob :: Problem{:fixed}, state :: State)
     return ((state.t,state.y), state)
 end
 
+
 ########################
 # Adaptive step method #
 ########################
+
 
 function next(prob :: Problem{:adaptive}, state :: State)
 
@@ -247,6 +251,7 @@ end
 
 function hinit(F, y0, t0, tstop, method, reltol, abstol)
     # Returns first step size
+    tdir = sign(tstop - t0)
     order = minimum(method.order)
     tau = max(reltol*norm(y0, Inf), abstol)
     d0 = norm(y0, Inf)/tau
@@ -258,8 +263,8 @@ function hinit(F, y0, t0, tstop, method, reltol, abstol)
         h0 = 0.01*(d0/d1)
     end
     # perform Euler step
-    y1 = y0 + h0*f0
-    f1 = F(t0 + h0, y1)
+    y1 = y0 + tdir*h0*f0
+    f1 = F(t0 + tdir*h0, y1)
     # estimate second derivative
     d2 = norm(f1 - f0, Inf)/(tau*h0)
     if max(d1, d2) <= 1e-15
@@ -268,7 +273,7 @@ function hinit(F, y0, t0, tstop, method, reltol, abstol)
         pow = -(2 + log10(max(d1, d2)))/(order+1)
         h1 = 10^pow
     end
-    return min(100*h0, h1, tstop-t0)
+    return min(100*h0, h1, tdir*abs(tstop-t0))
 end
 
 
