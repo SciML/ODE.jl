@@ -29,6 +29,12 @@ immutable DenseProblem
 end
 
 
+# normally we return the working array, which changes at each step and
+# expect the user to copy it if necessary.  In order for collect to
+# return the expected result we need to copy the output at each step.
+collect{T}(t::Type{T}, prob::DenseProblem) = collect(t, imap(x->deepcopy(x),prob))
+
+
 function dense(F, y0, t0, solver; tspan = [Inf], points = :all, stopevent = (t,y)->false, roottol = 1e-5, kargs...)
     return DenseProblem(F, y0, t0, solver, points, tspan, stopevent, roottol)
 end
@@ -66,8 +72,7 @@ function next(prob :: DenseProblem, state :: DenseState)
         # step is saved in s0
 
         if done(prob.solver, state.solver_state)
-            # TODO: this shouldn't happen
-            error("The iterator was exhausted before the dense output compltede.")
+            warn("The iterator was exhausted before the dense output completed.")
         else
             # at this point s0 holds the new step, "s2" if you will
             ((s0.t,s0.y[:]), state.solver_state) = next(prob.solver, state.solver_state)
@@ -144,10 +149,9 @@ function hermite_interp!(y,t,step0::Step,step1::Step)
 end
 
 
-function findroot(f,rng,eps;args...)
-    xl,xr = rng
-    fl = f(xl;args...)
-    fr = f(xr;args...)
+function findroot(f,rng,eps)
+    xl, xr = rng
+    fl, fr = f(xl), f(xr)
 
     if fl*fr > 0 || xl > xr
         error("Inconsistent bracket")
@@ -155,7 +159,7 @@ function findroot(f,rng,eps;args...)
 
     while xr-xl > eps
         xm = (xl+xr)/2
-        fm = f(xm;args...)
+        fm = f(xm)
 
         if fm*fr > 0
             xr = xm

@@ -1,11 +1,11 @@
-import Base: start, next, done, call
+import Base: start, next, done, call, collect
 
 include("dense.jl")
 include("rk.jl")
 
 # this wraps any iterator (method) returning pairs (t,y) in a dense
 # output and also covers the reverse time integration
-function solver(F, y0, t0;
+function solver(F, y0::AbstractArray, t0;
                 tstop = Inf,
                 tspan = [tstop],
                 method = bt_feuler,
@@ -34,3 +34,6 @@ function solver(F, y0, t0;
     end
 
 end
+
+
+solver(F,y0,t0;kargs...)=solver((t,y)->[F(t,y[1])],[y0],t0;kargs...)
