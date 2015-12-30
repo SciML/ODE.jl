@@ -45,3 +45,11 @@ There are also fixed step Runge-Kutta and Rosenbrock solvers available.
 # Need something long-term reliable right now?
 
 See [the Sundials.jl package](https://github.com/julialang/sundials.jl), which provides wrappers for the excellent Sundials ODE solver library.
+
+# References
+
+Several classic texts on ODE/DAEs, partly used in the design of ODE.jl, are freely available:
+
+- [Hairer, Wanner & Nørsett, 1993](http://link.springer.com/book/10.1007/978-3-540-78862-1)
+- [Wanner & Hairer, 1996](http://link.springer.com/book/10.1007/978-3-642-05221-7)
+- [Hairer,  Wanner & Lubich, 2002](http://link.springer.com/book/10.1007/978-3-662-05018-7)
