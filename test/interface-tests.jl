@@ -49,15 +49,15 @@ ODE.isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
 # define RHSs of differential equations
 # delta, V and g are parameters
 function rhs(t, y, delta, V, g)
-  H = [[-delta/2 V]; [V delta/2]]
- 
-  rho_dot = -im*H*y.rho + im*y.rho*H
-  x_dot = y.p
-  p_dot = -y.x
- 
+    H = [[-delta/2 V]; [V delta/2]]
+
+    rho_dot = -im*H*y.rho + im*y.rho*H
+    x_dot = y.p
+    p_dot = -y.x
+
   return CompSol( rho_dot, x_dot, p_dot)
 end
- 
+
 # inital conditons
 rho0 = zeros(2,2);
 rho0[1,1]=1.;

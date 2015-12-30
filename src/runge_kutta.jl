@@ -233,7 +233,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     #  - note that the type of the components might change!
     # On y0 container: length, similar, setindex!
     # On time container: getindex, convert, length
-    
+
     # For y0 which support indexing.  Currently y0<:AbstractVector but
     # that could be relaxed with a Holy-trait.
     !isadaptive(btab_) && error("Can only use this solver with an adaptive RK Butcher table")
