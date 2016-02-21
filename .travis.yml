@@ -3,8 +3,11 @@ os:
     - osx
     - linux
 julia:
+    - 0.3
     - release
     - nightly
+git:
+    depth: 999999
 notifications:
     email: false
 script:
