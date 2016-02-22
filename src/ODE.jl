@@ -1,3 +1,4 @@
+isdefined(Base, :__precompile__) && __precompile__()
 # Ordinary Differential Equation Solvers
 
 module ODE
