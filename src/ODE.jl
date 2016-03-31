@@ -67,7 +67,7 @@ function hinit(F, x0, t0, tend, p, reltol, abstol)
     tdir = sign(tend-t0)
     tdir==0 && error("Zero time span")
     tau = max(reltol.*abs(x0), abstol)
-    d0 = norm(x0,./tau Inf)
+    d0 = norm(x0./tau, Inf)
     f0 = F(t0, x0)
     d1 = norm(f0./tau, Inf)
     if d0 < 1e-5 || d1 < 1e-5
