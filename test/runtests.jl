@@ -81,7 +81,7 @@ let
     refsol = [0.2083340149701255e-07,
               0.8333360770334713e-13,
               0.9999999791665050] # reference solution at tspan[2]
-    @test norm(refsol-y[end], Inf) < 2e-10
+    @test norm(refsol-y[end], Inf) < 3e-10
 end
 include("interface-tests.jl")
 

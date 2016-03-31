@@ -250,6 +250,13 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     t = tspan[1]
     tstart = tspan[1]
     tend = tspan[end]
+    
+    if length(reltol) == 1
+        reltol = reltol*ones(y0);
+    end
+    if length(abstol) == 1
+        abstol = abstol*ones(y0);
+    end
 
     # work arrays:
     y      = similar(y0, Eyf, dof)      # y at time t
@@ -412,7 +419,7 @@ function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
     for d=1:dof
         # if outside of domain (usually NaN) then make step size smaller by maximum
         isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
-        xerr[d] = xerr[d]/(abstol + max(norm(x0[d]), norm(xtrial[d]))*reltol) # Eq 4.10
+        xerr[d] = xerr[d]/(abstol[d] + max(abs(x0[d]), abs(xtrial[d]))*reltol[d]) # Eq 4.10
     end
     err = norm(xerr, 2) # Eq. 4.11
     newdt = min(maxstep, tdir*dt*max(facmin, fac*(1/err)^(1/(order+1)))) # Eq 4.13 modified

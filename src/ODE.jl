@@ -66,10 +66,10 @@ function hinit(F, x0, t0, tend, p, reltol, abstol)
     # Returns first step, direction of integration and F evaluated at t0
     tdir = sign(tend-t0)
     tdir==0 && error("Zero time span")
-    tau = max(reltol*norm(x0, Inf), abstol)
-    d0 = norm(x0, Inf)/tau
+    tau = max(reltol.*abs(x0), abstol)
+    d0 = norm(x0./tau, Inf)
     f0 = F(t0, x0)
-    d1 = norm(f0, Inf)/tau
+    d1 = norm(f0./tau, Inf)
     if d0 < 1e-5 || d1 < 1e-5
         h0 = 1e-6
     else
@@ -79,7 +79,7 @@ function hinit(F, x0, t0, tend, p, reltol, abstol)
     x1 = x0 + tdir*h0*f0
     f1 = F(t0 + tdir*h0, x1)
     # estimate second derivative
-    d2 = norm(f1 - f0, Inf)/(tau*h0)
+    d2 = norm((f1 - f0)./tau, Inf)/h0
     if max(d1, d2) <= 1e-15
         h1 = max(1e-6, 1e-3*h0)
     else
@@ -247,8 +247,15 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     # constants
     const d = 1/(2 + sqrt(2))
     const e32 = 6 + sqrt(2)
-
-
+    
+    @assert length(reltol) == 1 "Relative tolerance must be a scalar"
+    @assert length(abstol) == 1 || length(abstol) == length(y0) "Dimension of Absolute tolerance does not match the dimension of the problem"
+    
+    # Broadcast the abstol to a vector
+    if length(abstol) == 1 && length(y0) != 1
+        abstol = abstol*ones(y0);
+    end
+    
     # initialization
     t = tspan[1]
 
@@ -300,11 +307,14 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         F2 = F(t + h, ynew)
         k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
 
-        err = (abs(h)/6)*norm(k1 - 2*k2 + k3) # error estimate
-        delta = max(reltol*max(norm(y),norm(ynew)), abstol) # allowable error
-
+        
+        # Component-wise error check similar to MATLAB ode23s
+        
+        threshold = abstol/reltol
+        err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(max(abs(y),abs(ynew)),threshold),Inf) # error estimate
+    
         # check if new solution is acceptable
-        if  err <= delta
+        if  err <= reltol
 
             if points==:specified || points==:all
                 # only points in tspan are requested
@@ -334,7 +344,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         end
 
         # update of the step size
-        h = tdir*min( maxstep, abs(h)*0.8*(delta/err)^(1/3) )
+        h = tdir*min( maxstep, abs(h)*0.8*(reltol/err)^(1/3) )
     end
 
     return tout, yout
