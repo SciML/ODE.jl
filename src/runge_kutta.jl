@@ -251,12 +251,18 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     tstart = tspan[1]
     tend = tspan[end]
     
-    if length(reltol) == 1
+    # Component-wise reltol and abstol as per Solving Ordinary Differential Equations I by Hairer and Wanner
+    @assert length(abstol) == 1 || length(abstol) == length(y0) "Dimension of Absolute tolerance does not match the dimension of the problem"
+    @assert length(reltol) == 1 || length(reltol) == length(y0) "Dimension of Relative tolerance does not match the dimension of the problem"
+    
+    # Broadcast the tolerances if scalars are provided
+    if length(reltol) == 1 && length(y0) != 1
         reltol = reltol*ones(y0);
     end
-    if length(abstol) == 1
+    if length(abstol) == 1 && length(y0) != 1
         abstol = abstol*ones(y0);
     end
+    
 
     # work arrays:
     y      = similar(y0, Eyf, dof)      # y at time t

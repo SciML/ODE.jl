@@ -67,7 +67,7 @@ function hinit(F, x0, t0, tend, p, reltol, abstol)
     tdir = sign(tend-t0)
     tdir==0 && error("Zero time span")
     tau = max(reltol.*abs(x0), abstol)
-    d0 = norm(x0./tau, Inf)
+    d0 = norm(x0,./tau Inf)
     f0 = F(t0, x0)
     d1 = norm(f0./tau, Inf)
     if d0 < 1e-5 || d1 < 1e-5
@@ -247,7 +247,14 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     # constants
     const d = 1/(2 + sqrt(2))
     const e32 = 6 + sqrt(2)
+
+
+    # initialization
+    t = tspan[1]
     
+    # Component-wise Tolerance check similar to MATLAB ode23s
+    # Support for component-wise absolute tolerance only.
+    # Relative tolerance should be a scalar.
     @assert length(reltol) == 1 "Relative tolerance must be a scalar"
     @assert length(abstol) == 1 || length(abstol) == length(y0) "Dimension of Absolute tolerance does not match the dimension of the problem"
     
@@ -255,9 +262,6 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     if length(abstol) == 1 && length(y0) != 1
         abstol = abstol*ones(y0);
     end
-    
-    # initialization
-    t = tspan[1]
 
     tfinal = tspan[end]
 
@@ -307,12 +311,9 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         F2 = F(t + h, ynew)
         k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
 
-        
-        # Component-wise error check similar to MATLAB ode23s
-        
-        threshold = abstol/reltol
+        threshold = abstol/reltol # error threshold
         err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(max(abs(y),abs(ynew)),threshold),Inf) # error estimate
-    
+
         # check if new solution is acceptable
         if  err <= reltol
 
