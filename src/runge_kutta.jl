@@ -253,16 +253,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     
     # Component-wise reltol and abstol as per Solving Ordinary Differential Equations I by Hairer and Wanner
     @assert length(abstol) == 1 || length(abstol) == length(y0) "Dimension of Absolute tolerance does not match the dimension of the problem"
-    @assert length(reltol) == 1 || length(reltol) == length(y0) "Dimension of Relative tolerance does not match the dimension of the problem"
-    
-    # Broadcast the tolerances if scalars are provided
-    if length(reltol) == 1 && length(y0) != 1
-        reltol = reltol*ones(y0);
-    end
-    if length(abstol) == 1 && length(y0) != 1
-        abstol = abstol*ones(y0);
-    end
-    
+    @assert length(reltol) == 1 || length(reltol) == length(y0) "Dimension of Relative tolerance does not match the dimension of the problem"    
 
     # work arrays:
     y      = similar(y0, Eyf, dof)      # y at time t
@@ -289,7 +280,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
         error("Unrecognized option points==$points")
     end
     # Time
-    dt, tdir, ks[1] = hinit(fn, y, tstart, tend, order, reltol, abstol) # sets ks[1]=f0
+    dt, tdir, ks[1] = hinit(fn, y, tstart, tend, order, reltol, abstol, norm) # sets ks[1]=f0
     if initstep!=0
         dt = sign(initstep)==tdir ? initstep : error("initstep has wrong sign.")
     end
@@ -422,10 +413,22 @@ function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
     facmin = 1./facmax  # maximal step size decrease. ?
 
     # in-place calculate xerr./tol
-    for d=1:dof
-        # if outside of domain (usually NaN) then make step size smaller by maximum
-        isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
-        xerr[d] = xerr[d]/(abstol[d] + max(abs(x0[d]), abs(xtrial[d]))*reltol[d]) # Eq 4.10
+    
+    # If reltol and abstol are vectors
+    # perform component-wise computations
+    if length(abstol) != 1 && length(reltol) != 1
+        for d=1:dof
+        	# if outside of domain (usually NaN) then make step size smaller by maximum
+        	isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
+        	xerr[d] = xerr[d]/(abstol[d] + max(abs(x0[d]), abs(xtrial[d]))*reltol[d]) # Eq 4.10
+    	end
+    else
+    # else restore old behaviour
+    	for d=1:dof
+        	# if outside of domain (usually NaN) then make step size smaller by maximum
+        	isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
+        	xerr[d] = xerr[d]/(abstol + max(abs(x0[d]), abs(xtrial[d]))*reltol) # Eq 4.10
+    	end
     end
     err = norm(xerr, 2) # Eq. 4.11
     newdt = min(maxstep, tdir*dt*max(facmin, fac*(1/err)^(1/(order+1)))) # Eq 4.13 modified
