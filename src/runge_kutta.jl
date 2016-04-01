@@ -413,23 +413,9 @@ function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
     facmin = 1./facmax  # maximal step size decrease. ?
 
     # in-place calculate xerr./tol
+    # Get the scaled error and if outside of domain (usually NaN) then make step size smaller by maximum
+    getScaledError!(x0,xtrial,xerr,reltol,abstol,norm,dof) && return 10., dt*facmin, timout_after_nan
     
-    # If reltol and abstol are vectors
-    # restore old behaviour
-    if length(abstol) == 1 && length(reltol) == 1
-        for d=1:dof
-        	# if outside of domain (usually NaN) then make step size smaller by maximum
-        	isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
-        	xerr[d] = xerr[d]/(abstol + max(abs(x0[d]), abs(xtrial[d]))*reltol) # Eq 4.10
-    	end
-    else
-    # else perform component-wise computations
-    	for d=1:dof
-        	# if outside of domain (usually NaN) then make step size smaller by maximum
-        	isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
-        	xerr[d] = xerr[d]/(abstol[d] + max(abs(x0[d]), abs(xtrial[d]))*reltol[d]) # Eq 4.10
-    	end
-    end
     err = norm(xerr, 2) # Eq. 4.11
     newdt = min(maxstep, tdir*dt*max(facmin, fac*(1/err)^(1/(order+1)))) # Eq 4.13 modified
     if timeout>0

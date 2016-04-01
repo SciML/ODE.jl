@@ -220,6 +220,40 @@ function fdjacobian(F, x, t)
     return dFdx
 end
 
+## Function to get the Scaled error given the error estimate
+# The following 3 functions are for the stiff solver
+# If both reltol and abstol are scalars then restore previous behaviour 
+function getScaledError(y,ynew,errEstimate,h,reltol::Number,abstol::Number,norm)
+	return (abs(h)/6)*norm(errEstimate)/max(reltol*max(norm(y),norm(ynew)), abstol) # scaled error estimate
+end
+# If atleast one of them is a vector then perform component-wise computations
+function getScaledError(y,ynew,errEstimate,h,reltol::Number,abstol::Vector,norm)
+	return (abs(h)/6)*norm((errEstimate)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate
+end
+function getScaledError(y,ynew,errEstimate,h,reltol::Vector,abstol,norm)
+	return (abs(h)/6)*norm((errEstimate)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate 
+end
+# The following 2 functions are for the non-stiff solvers since it requires dof check
+# As per the old code, the error estimate is rewritten with the scaled error
+# Estimates the error and a new step size following Hairer &
+# Wanner 1992, p167 (with some modifications)
+function getScaledError!(y,ynew,errEstimate,reltol::Number,abstol::Number,norm,dof)
+	for d=1:dof
+    	# if outside of domain (usually NaN) then make step size smaller by maximum
+    	isoutofdomain(ynew[d]) && return true
+    	errEstimate[d] = errEstimate[d]/(abstol + max(abs(y[d]), abs(ynew[d]))*reltol) # Eq 4.10
+    end
+	return false
+end
+function getScaledError!(y,ynew,errEstimate,reltol::Vector,abstol::Vector,norm,dof)
+	for d=1:dof
+    	# if outside of domain (usually NaN) then break and return
+    	isoutofdomain(ynew[d]) && return true
+    	errEstimate[d] = errEstimate[d]/(abstol[d] + max(abs(y[d]), abs(ynew[d]))*reltol[d]) # Eq 4.10
+	end
+	return false
+end
+
 # ODE23S  Solve stiff systems based on a modified Rosenbrock triple
 # (also used by MATLAB's ODE23s); see Sec. 4.1 in
 #
@@ -306,12 +340,14 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
 
 		# If reltol and abstol are vectors
 		# restore old behvaiour
-		if length(abstol) == 1 && length(reltol) == 1
-			err = (abs(h)/6)*norm(k1 - 2*k2 + k3)/max(reltol*max(norm(y),norm(ynew)), abstol) # scaled error estimate
-		else
 		# else perform component-wise computations for error
-			err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate 
-	    end
+		errEstimate = k1 - 2*k2 + k3;
+		err = getScaledError(y,ynew,errEstimate,h,reltol,abstol,norm)
+		#if length(abstol) == 1 && length(reltol) == 1
+		#	err = (abs(h)/6)*norm(k1 - 2*k2 + k3)/max(reltol*max(norm(y),norm(ynew)), abstol) # scaled error estimate
+		#else
+		#	err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate 
+	    #end
 
         # check if new solution is acceptable
         if  err <= 1
