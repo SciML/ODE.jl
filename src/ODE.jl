@@ -305,12 +305,12 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
 
 		# If reltol and abstol are vectors
-		# perform component-wise computations for error
-		if length(abstol) != 1 && length(reltol) != 1
-			err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate
-		else
-		# else restore old behvaiour
+		# restore old behvaiour
+		if length(abstol) == 1 && length(reltol) == 1
 			err = (abs(h)/6)*norm(k1 - 2*k2 + k3)/max(reltol*max(norm(y),norm(ynew)), abstol) # scaled error estimate
+		else
+		# else perform component-wise computations for error
+			err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate 
 	    end
 
         # check if new solution is acceptable

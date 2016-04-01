@@ -415,19 +415,19 @@ function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
     # in-place calculate xerr./tol
     
     # If reltol and abstol are vectors
-    # perform component-wise computations
-    if length(abstol) != 1 && length(reltol) != 1
+    # restore old behaviour
+    if length(abstol) == 1 && length(reltol) == 1
         for d=1:dof
         	# if outside of domain (usually NaN) then make step size smaller by maximum
         	isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
-        	xerr[d] = xerr[d]/(abstol[d] + max(abs(x0[d]), abs(xtrial[d]))*reltol[d]) # Eq 4.10
+        	xerr[d] = xerr[d]/(abstol + max(abs(x0[d]), abs(xtrial[d]))*reltol) # Eq 4.10
     	end
     else
-    # else restore old behaviour
+    # else perform component-wise computations
     	for d=1:dof
         	# if outside of domain (usually NaN) then make step size smaller by maximum
         	isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
-        	xerr[d] = xerr[d]/(abstol + max(abs(x0[d]), abs(xtrial[d]))*reltol) # Eq 4.10
+        	xerr[d] = xerr[d]/(abstol[d] + max(abs(x0[d]), abs(xtrial[d]))*reltol[d]) # Eq 4.10
     	end
     end
     err = norm(xerr, 2) # Eq. 4.11
