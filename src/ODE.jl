@@ -311,7 +311,7 @@ function ode23s(F, y0, tspan; reltol::Number = 1.0e-5, abstol = 1.0e-8,
         k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
 
         threshold = abstol/reltol # error threshold
-        err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(max(abs(y),abs(ynew)),threshold),Inf) # scaled error estimate
+		err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(max(abs(y),abs(ynew)),threshold)) # scaled error estimate
 
         # check if new solution is acceptable
         if  err <= reltol
