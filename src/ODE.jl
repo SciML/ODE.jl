@@ -227,7 +227,7 @@ end
 #
 # supports keywords: points = :all | :specified (using dense output)
 #                    jacobian = G(t,y)::Function | nothing (FD)
-function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
+function ode23s(F, y0, tspan; reltol::Number = 1.0e-5, abstol = 1.0e-8,
                                                 jacobian=nothing,
                                                 points=:all,
                                                 norm=Base.norm,
@@ -255,7 +255,6 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     # Component-wise Tolerance check similar to MATLAB ode23s
     # Support for component-wise absolute tolerance only.
     # Relative tolerance should be a scalar.
-    @assert length(reltol) == 1 "Relative tolerance must be a scalar"
     @assert length(abstol) == 1 || length(abstol) == length(y0) "Dimension of Absolute tolerance does not match the dimension of the problem"
     
     # Broadcast the abstol to a vector
@@ -312,7 +311,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
 
         threshold = abstol/reltol # error threshold
-        err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(max(abs(y),abs(ynew)),threshold),Inf) # error estimate
+        err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(max(abs(y),abs(ynew)),threshold),Inf) # scaled error estimate
 
         # check if new solution is acceptable
         if  err <= reltol
