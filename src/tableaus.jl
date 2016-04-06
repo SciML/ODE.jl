@@ -1,3 +1,42 @@
+###############################################################################
+## Coefficient Tableaus
+###############################################################################
+
+# Butcher Tableaus, or more generally coefficient tables
+# see Hairer & Wanner 1992, p. 134, 166
+
+abstract Tableau{Name, S, T<:Real}
+# Name is the name of the tableau/method (a symbol)
+# S is the number of stages (an int)
+# T is the type of the coefficients
+#
+# TODO: have a type parameter which specifies adaptive vs non-adaptive
+#
+# For all types of tableaus it assumes fields:
+# order::(Int...) # order of the method(s)
+#
+# For Runge-Kutta methods it assumes fields:
+# a::Matrix{T}  # SxS matrix
+# b::Matrix{T}  # 1 or 2 x S matrix (fixed step/ adaptive)
+# c::Vector{T}  # S
+#
+# For a tableau:
+#  c1  | a_11   ....   a_1s
+#  .   | a_21 .          .
+#  .   | a_31     .      .
+#  .   | ....         .  .
+#  c_s | a_s1  ....... a_ss
+# -----+--------------------
+#      | b_1     ...   b_s   this is the one used for stepping
+#      | b'_1    ...   b'_s  this is the one used for error-checking
+
+Base.eltype{N,S,T}(b::Tableau{N,S,T}) = T
+order(b::Tableau) = b.order
+# Subtypes need to define a convert method to convert to a different
+# eltype with signature:
+Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert method for concrete Tableau types")
+
+
 ###########################################
 # Tableaus for explicit Runge-Kutta methods
 ###########################################
@@ -157,3 +196,53 @@ const bt_feh78 = TableauRKExplicit(:feh78, (7,8), Rational{Int64},
                                0 0 0 0 0 34//105 9//35 9//35 9//280 9//280 0     41//840 41//840],
                                [0,    2//27, 1//9, 1//6 , 5//12, 1//2 , 5//6 , 1//6 , 2//3 , 1//3 , 1 , 0, 1]
                             )
+
+
+function make_consistent_types(fn, y0, tspan, btab::Tableau)
+    # There are a few types involved in a call to a ODE solver which
+    # somehow need to be consistent:
+    #
+    # Et = eltype(tspan)
+    # Ey = eltype(y0)
+    # Ef = eltype(Tf)
+    #
+    # There are also the types of the containers, but they are not
+    # needed as `similar` is used to make containers.
+    # Tt = typeof(tspan)
+    # Ty = typeof(y0)              # note, this can be a scalar
+    # Tf = typeof(F(tspan(1),y0))  # note, this can be a scalar
+    #
+    # Returns
+    # - Et: eltype of time, needs to be a real "continuous" type, at
+    #       the moment a AbstractFloat
+    # - Eyf: suitable eltype of y and f(t,y)
+    #   --> both of these are set to typeof(y0[1]/(tspan[end]-tspan[1]))
+    # - Ty: container type of y0
+    # - btab: tableau with entries converted to Et
+
+    # Needed interface:
+    # On components: /, -
+    # On container: eltype, promote_type
+    # On time container: eltype
+
+    Ty = typeof(y0)
+    Eyf = typeof(y0[1]/(tspan[end]-tspan[1]))
+
+    Et = eltype(tspan)
+    @assert Et<:Real
+    if !(Et<:AbstractFloat)
+        Et = promote_type(Et, Float64)
+    end
+
+    # if all are Floats, make them the same
+    if Et<:AbstractFloat &&  Eyf<:AbstractFloat
+        Et = promote_type(Et, Eyf)
+        Eyf = Et
+    end
+
+    !isleaftype(Et) && warn("The eltype(tspan) is not a concrete type!  Change type of tspan for better performance.")
+    !isleaftype(Eyf) && warn("The eltype(y0/tspan[1]) is not a concrete type!  Change type of y0 and/or tspan for better performance.")
+
+    btab_ = convert(Et, btab)
+    return Et, Eyf, Ty, btab_
+end

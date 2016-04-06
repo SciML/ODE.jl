@@ -2,13 +2,13 @@
 # iterator supporting tspan by using the method keyword, for example
 # ODE.newDenseProblem(..., method = ODE.bt_rk23, ...)
 
-type Step
-    t; y; dy
-end
+# type Step
+#     t; y; dy
+# end
 
 
 type DenseState
-    s0; s1
+    s0 :: Step; s1 :: Step
     last_tout
     first_step
     solver_state
@@ -18,13 +18,10 @@ end
 
 
 immutable DenseProblem
-    F
-    y0
-    t0
-    solver
+    solver :: Solution
     points :: Symbol
     tspan
-    stopevent
+    stopevent :: Function
     roottol
 end
 
@@ -35,20 +32,26 @@ end
 collect{T}(t::Type{T}, prob::DenseProblem) = collect(t, imap(x->deepcopy(x),prob))
 
 
-function dense(F, y0, t0, solver; tspan = [Inf], points = :all, stopevent = (t,y)->false, roottol = 1e-5, kargs...)
-    return DenseProblem(F, y0, t0, solver, points, tspan, stopevent, roottol)
+function dense(solver :: Solution;
+               tspan = [Inf],
+               points = :all,
+               stopevent = (t,y)->false,
+               roottol = 1e-5,
+               kargs...)
+    return DenseProblem(solver, points, tspan, stopevent, roottol)
 end
 
 
 function start(prob :: DenseProblem)
-    t0 = prob.t0
-    y0 = prob.y0
-    dy0 = prob.F(t0,y0)
+    t0  = prob.solver.ode.t0
+    y0  = prob.solver.ode.y0
+    dy0 = deepcopy(y0)
+    prob.solver.ode.F!(t0,y0,dy0)
     step0 = Step(t0,deepcopy(y0),deepcopy(dy0))
     step1 = Step(t0,deepcopy(y0),deepcopy(dy0))
     solver_state = start(prob.solver)
-    ytmp = deepcopy(prob.y0)
-    return DenseState(step0, step1, prob.t0, true, solver_state, ytmp)
+    ytmp = deepcopy(y0)
+    return DenseState(step0, step1, t0, true, solver_state, ytmp)
 end
 
 
@@ -96,7 +99,8 @@ function next(prob :: DenseProblem, state :: DenseState)
     # at this point we have t_goal∈[t0,t1] so we can apply the
     # interpolation
 
-    s0.dy[:], s1.dy[:] = prob.F(t0,s0.y), prob.F(t1,s1.y)
+    prob.solver.ode.F!(t0,s0.y,s0.dy)
+    prob.solver.ode.F!(t1,s1.y,s1.dy)
 
     if prob.stopevent(t1,s1.y)
         function stopfun(t)

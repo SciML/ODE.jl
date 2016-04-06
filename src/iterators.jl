@@ -1,6 +1,3 @@
-import Base: start, next, done, call, collect
-
-include("dense.jl")
 include("rk.jl")
 
 # this wraps any iterator (method) returning pairs (t,y) in a dense
