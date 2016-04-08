@@ -17,13 +17,25 @@ type DenseState
 end
 
 
+# TODO: would it be possible to make the DenseProblem a
+# Solver{DenseProblem} instead?
 immutable DenseProblem
+    # TODO: solver has options in it, maybe we should move the points,
+    # tspan, stopevent, roottol to options instead of having them
+    # hanging around here?
     solver :: Solution
     points :: Symbol
     tspan
     stopevent :: Function
     roottol
 end
+
+# TODO: perhaps something like this?
+# solve(ode, stepper :: DenseStepper, options :: Options) = Solver(ode,stepper,options)
+# function solve(ode, stepper, options :: Options)
+#     solver = Solver(ode, stepper, options)
+#     Solver(ode,DenseStepper(solver),options)
+# end
 
 
 # normally we return the working array, which changes at each step and

@@ -1,3 +1,5 @@
+isoutofdomain = isnan
+
 function hinit{T}(F, y0, t0::T, reltol, abstol; tstop = Inf, order = 1)
     # Returns first step size
     tdir = sign(tstop-t0)

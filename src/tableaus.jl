@@ -78,7 +78,7 @@ end
 conv_field{T,N}(D,a::Array{T,N}) = convert(Array{D,N}, a)
 
 
-S(tab::TableauRKExplicit) = length(tab.c)
+lengthks(tab::TableauRKExplicit) = length(tab.c)
 
 function Base.convert{Tnew<:Real,Name,S,T}(::Type{Tnew}, tab::TableauRKExplicit{Name,S,T})
     # Converts the tableau coefficients to the new type Tnew

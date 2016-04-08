@@ -84,7 +84,7 @@ immutable Options{T}
                                         # here, possibly overwrite it
                                         # in the call to solve()
                      norm     = Base.norm,
-                     kargs...)
+        kargs...)
         new(initstep,tstop,reltol,abstol,minstep,maxstep,norm)
     end
 
@@ -123,9 +123,11 @@ solve(ode, stepper; kargs...) = solve(ode, stepper, Options(kargs...))
 # filter the wrong combinations of ode and stepper
 solve{T,S}(ode :: T, stepper :: S, options :: Options) = error("The $S doesn't support $T")
 
-# convert the ExplicitODE to the default in place version
-solve(ode :: ExplicitODE, stepper, options :: Options) = solve(convert(ExplicitODEInPlace,ode), stepper, options)
+# TODO: this might not be necessary, in the long run we should make
+# ExplicitODE the in-place one and use specific constructors
 
+# always convert ExplicitODE to ExplicitODEInPlace
+solve(ode :: ExplicitODE, stepper, options :: Options) = solve(convert(ExplicitODEInPlace,ode), stepper, options)
 
 
 # some leftovers from the previous implementation

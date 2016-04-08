@@ -8,11 +8,11 @@
 
 # Internal
 
-immutable RosenbrockStepper{T<:Number} <: AbstractStepper
+immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
     d :: T
     e32 :: T
 
-    function RosenbrockStepper()
+    function ModifiedRosenbrockStepper()
         d   = T(1/(2 + sqrt(2)))
         e32 = T(6 + sqrt(2))
         new(d,e32)
@@ -20,34 +20,16 @@ immutable RosenbrockStepper{T<:Number} <: AbstractStepper
 end
 
 # default to floating point precision
-RosenbrockStepper() = RosenbrockStepper{Float64}()
+ModifiedRosenbrockStepper() = ModifiedRosenbrockStepper{Float64}()
 
 
 # TODO: is this correct?
-order(RosenbrockStepper) = 2
+order(ModifiedRosenbrockStepper) = 2
 
 
 # define the set of ODE problems with which this stepper can work
-solve(ode :: ExplicitODEInPlace, stepper :: RosenbrockStepper, options :: Options) =
-    Solution{RosenbrockStepper}(ode,stepper,options)
-
-
-# higher level interface
-# TODO: how to set the default initstep?
-function ode23s{T}(F, y0, t0 :: T;
-                   jacobian = (t,y)->fdjacobian(F, y, t),
-                   # we can make a better guess for the initstep if we have access to ExplicitODE
-                   # initstep = hinit(F, y0, t0, reltol, abstol, order = order(RosenbrockStepper))
-                   kargs...
-                   )
-
-    ode = ExplicitODE(t0,y0,F,jacobian)
-
-    stepper = RosenbrockStepper{T}(;kargs...
-                                   # ,initstep = initstep
-                                   )
-    return solve(ode,stepper)
-end
+solve(ode :: ExplicitODEInPlace, stepper :: ModifiedRosenbrockStepper, options :: Options) =
+    Solution{ModifiedRosenbrockStepper}(ode,stepper,options)
 
 
 # lower level interface (iterator)
@@ -73,7 +55,7 @@ function show(io::IO, state :: RosenbrockState)
 end
 
 
-function start(s :: Solution{RosenbrockStepper})
+function start(s :: Solution{ModifiedRosenbrockStepper})
     t  = s.ode.t0
     dt = s.options.initstep
     y  = s.ode.y0
@@ -95,13 +77,13 @@ function start(s :: Solution{RosenbrockStepper})
 end
 
 
-function done(s     :: Solution{RosenbrockStepper},
+function done(s     :: Solution{ModifiedRosenbrockStepper},
               state :: RosenbrockState)
     return state.dt <= s.options.minstep
 end
 
 
-function next(s     :: Solution{RosenbrockStepper},
+function next(s     :: Solution{ModifiedRosenbrockStepper},
               state :: RosenbrockState)
 
     stepper = s.stepper

@@ -1,5 +1,3 @@
-include("rk.jl")
-
 # this wraps any iterator (method) returning pairs (t,y) in a dense
 # output and also covers the reverse time integration
 function solver(F, y0::AbstractArray, t0;
