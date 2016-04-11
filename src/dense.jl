@@ -1,10 +1,15 @@
-# iterator for the dense output, can be wrapped around any other
-# iterator supporting tspan by using the method keyword, for example
-# ODE.newDenseProblem(..., method = ODE.bt_rk23, ...)
+# A higher level stepper, defined as a wrapper around another stepper.
 
-# type Step
-#     t; y; dy
-# end
+immutable DenseStepper <: AbstractStepper
+    solver :: Solution
+end
+
+
+solve(ode     :: ExplicitODEInPlace,
+      stepper :: DenseStepper,
+      options :: Options) = Solution(ode,stepper,options)
+
+dense(stepper :: AbstractStepper) = solve(stepper.ode, stepper, stepper.options)
 
 
 type DenseState
@@ -17,57 +22,24 @@ type DenseState
 end
 
 
-# TODO: would it be possible to make the DenseProblem a
-# Solver{DenseProblem} instead?
-immutable DenseProblem
-    # TODO: solver has options in it, maybe we should move the points,
-    # tspan, stopevent, roottol to options instead of having them
-    # hanging around here?
-    solver :: Solution
-    points :: Symbol
-    tspan
-    stopevent :: Function
-    roottol
-end
-
-# TODO: perhaps something like this?
-# solve(ode, stepper :: DenseStepper, options :: Options) = Solver(ode,stepper,options)
-# function solve(ode, stepper, options :: Options)
-#     solver = Solver(ode, stepper, options)
-#     Solver(ode,DenseStepper(solver),options)
-# end
-
-
-# normally we return the working array, which changes at each step and
-# expect the user to copy it if necessary.  In order for collect to
-# return the expected result we need to copy the output at each step.
-collect{T}(t::Type{T}, prob::DenseProblem) = collect(t, imap(x->deepcopy(x),prob))
-
-
-function dense(solver :: Solution;
-               tspan = [Inf],
-               points = :all,
-               stopevent = (t,y)->false,
-               roottol = 1e-5,
-               kargs...)
-    return DenseProblem(solver, points, tspan, stopevent, roottol)
-end
-
-
-function start(prob :: DenseProblem)
-    t0  = prob.solver.ode.t0
-    y0  = prob.solver.ode.y0
+function start(s :: Solution{DenseStepper})
+    # extract the real solver
+    solver = s.stepper.solver
+    t0  = solver.ode.t0
+    y0  = solver.ode.y0
     dy0 = deepcopy(y0)
-    prob.solver.ode.F!(t0,y0,dy0)
+    solver.ode.F!(t0,y0,dy0)
     step0 = Step(t0,deepcopy(y0),deepcopy(dy0))
     step1 = Step(t0,deepcopy(y0),deepcopy(dy0))
-    solver_state = start(prob.solver)
+    solver_state = start(solver)
     ytmp = deepcopy(y0)
     return DenseState(step0, step1, t0, true, solver_state, ytmp)
 end
 
 
-function next(prob :: DenseProblem, state :: DenseState)
+function next(s :: Solution{DenseStepper}, state :: DenseState)
+
+    solver = s.stepper.solver
 
     s0, s1 = state.s0, state.s1
     t0, t1 = s0.t, s1.t
@@ -78,7 +50,7 @@ function next(prob :: DenseProblem, state :: DenseState)
     end
 
     # the next output time that we aim at
-    t_goal = prob.tspan[findfirst(t->(t>state.last_tout), prob.tspan)]
+    t_goal = s.options.tspan[findfirst(t->(t>state.last_tout), s.options.tspan)]
 
     # the t0 == t1 part ensures that we make at least one step
     while t1 < t_goal
@@ -86,11 +58,11 @@ function next(prob :: DenseProblem, state :: DenseState)
         # s1 is the starting point for the new step, while the new
         # step is saved in s0
 
-        if done(prob.solver, state.solver_state)
+        if done(solver, state.solver_state)
             warn("The iterator was exhausted before the dense output completed.")
         else
             # at this point s0 holds the new step, "s2" if you will
-            ((s0.t,s0.y[:]), state.solver_state) = next(prob.solver, state.solver_state)
+            ((s0.t,s0.y[:]), state.solver_state) = next(solver, state.solver_state)
         end
 
         # swap s0 and s1
@@ -101,7 +73,7 @@ function next(prob :: DenseProblem, state :: DenseState)
         t0, t1 = s0.t, s1.t
 
         # we made a successfull step and points == :all
-        if prob.points == :all || prob.stopevent(t1,s1.y)
+        if s.options.points == :all || s.options.stopevent(t1,s1.y)
             t_goal = min(t_goal,t1)
             break
         end
@@ -111,16 +83,16 @@ function next(prob :: DenseProblem, state :: DenseState)
     # at this point we have t_goal∈[t0,t1] so we can apply the
     # interpolation
 
-    prob.solver.ode.F!(t0,s0.y,s0.dy)
-    prob.solver.ode.F!(t1,s1.y,s1.dy)
+    solver.ode.F!(t0,s0.y,s0.dy)
+    solver.ode.F!(t1,s1.y,s1.dy)
 
-    if prob.stopevent(t1,s1.y)
+    if s.options.stopevent(t1,s1.y)
         function stopfun(t)
             hermite_interp!(state.ytmp,t,s0,s1)
-            res = typeof(t0)(prob.stopevent(t,state.ytmp))
+            res = Int(s.options.stopevent(t,state.ytmp))
             return 2*res-1      # -1 if false, +1 if true
         end
-        t_goal = findroot(stopfun, [s0.t,s1.t], prob.roottol)
+        t_goal = findroot(stopfun, [s0.t,s1.t], s.options.roottol)
         # state.ytmp is already overwwriten to the correct result as a
         # side-effect of calling stopfun
     else
@@ -135,12 +107,12 @@ function next(prob :: DenseProblem, state :: DenseState)
 end
 
 
-function done(prob :: DenseProblem, state :: DenseState)
+function done(s :: Solution{DenseStepper}, state :: DenseState)
 
     return (
-            done(prob.solver, state.solver_state) ||
-            state.s1.t >= prob.tspan[end] ||
-            prob.stopevent(state.s1.t,state.s1.y)
+            done(s.stepper.solver, state.solver_state) ||
+            state.s1.t >= s.options.tspan[end] ||
+            s.options.stopevent(state.s1.t,state.s1.y)
             )
 end
 

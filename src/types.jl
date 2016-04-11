@@ -66,6 +66,7 @@ end
 
 # general purpose options
 immutable Options{T}
+    # stepper options
     initstep :: T
     tstop    :: T
     reltol   :: T
@@ -73,6 +74,12 @@ immutable Options{T}
     minstep  :: T
     maxstep  :: T
     norm     :: Function
+
+    # dense output options
+    tspan    :: Vector{T}
+    points   :: Symbol
+    stopevent :: Function
+    roottol  :: T
 
     function Options(;
                      tstop    = T(Inf),
@@ -84,8 +91,12 @@ immutable Options{T}
                                         # here, possibly overwrite it
                                         # in the call to solve()
                      norm     = Base.norm,
-        kargs...)
-        new(initstep,tstop,reltol,abstol,minstep,maxstep,norm)
+                     tspan = [tstop],
+                     points = :all,
+                     stopevent = (t,y)->false,
+                     roottol = eps(T)^(1/3),
+                     kargs...)
+        new(initstep,tstop,reltol,abstol,minstep,maxstep,norm,tspan,points,stopevent,roottol)
     end
 
 end
@@ -101,6 +112,10 @@ function show{T}(io::IO, opts :: Options{T})
     println("maxstep  = $(opts.maxstep)")
     println("initstep = $(opts.initstep)")
     println("norm     = $(opts.norm)")
+    println("tspan    = $(opts.tspan)")
+    println("points   = $(opts.points)")
+    println("stopevent= $(opts.stopevent)")
+    println("roottol  = $(opts.roottol)")
 end
 
 
@@ -128,6 +143,17 @@ solve{T,S}(ode :: T, stepper :: S, options :: Options) = error("The $S doesn't s
 
 # always convert ExplicitODE to ExplicitODEInPlace
 solve(ode :: ExplicitODE, stepper, options :: Options) = solve(convert(ExplicitODEInPlace,ode), stepper, options)
+
+
+# normally we return the working array, which changes at each step and
+# expect the user to copy it if necessary.  In order for collect to
+# return the expected result we need to copy the output at each step.
+function collect{T}(t::Type{T}, s::Solution)
+    if s.options.tstop == Inf || s.options.tspan[end] == Inf
+        error("Trying to collect an infinite list")
+    end
+    collect(t, imap(x->deepcopy(x),s))
+end
 
 
 # some leftovers from the previous implementation
