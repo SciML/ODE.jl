@@ -10,6 +10,7 @@ end
 
 function explicit_ineff(t0,y0,F;jac = (t,y)->fdjacobian(F,t,y))
     function F!(t,y,dy)
+        # this is why we can't handle a scalar type any more
         dy[:] = F(t,y)
     end
     function jac!(t,y,J)
@@ -49,6 +50,7 @@ immutable Options{T}
     minstep  :: T
     maxstep  :: T
     norm     :: Function
+    maxiters :: T
 
     # dense output options
     tspan    :: Vector{T}
@@ -58,15 +60,16 @@ immutable Options{T}
 
     function Options(;
                      tstop    = T(Inf),
-                     reltol   = eps(T)^(1/3),
-                     abstol   = reltol,
+                     tspan = [tstop],
+                     reltol   = eps(T)^(1/3)/10,
+                     abstol   = eps(T)^(1/2)/10,
                      minstep  = 10*eps(T),
                      maxstep  = 1/minstep,
                      # TODO: we need a better guess here, possibly
                      # overwrite it in the call to solve()
-                     initstep = max(min(reltol,abstol),minstep),
+                     initstep = max(min(reltol,abstol,maxstep),minstep),
                      norm     = Base.norm,
-                     tspan = [tstop],
+                     maxiters = T(Inf),
                      points = :all,
                      stopevent = (t,y)->false,
                      roottol = eps(T)^(1/3),
@@ -74,7 +77,7 @@ immutable Options{T}
         if all(points .!= [:specified,:all])
             error("Option points = $points is not supported, use :specified or :all")
         end
-        new(initstep,tstop,reltol,abstol,minstep,maxstep,norm,sort(tspan),points,stopevent,roottol)
+        new(initstep,tstop,reltol,abstol,minstep,maxstep,norm,maxiters,sort(tspan),points,stopevent,roottol)
     end
 
 end

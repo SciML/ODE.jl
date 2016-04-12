@@ -19,6 +19,7 @@ type DenseState
     solver_state
     # used for storing the interpolation result
     ytmp
+    solver_done
 end
 
 
@@ -33,7 +34,7 @@ function start(s :: Solution{DenseStepper})
     step1 = Step(t0,deepcopy(y0),deepcopy(dy0))
     solver_state = start(solver)
     ytmp = deepcopy(y0)
-    return DenseState(step0, step1, t0, true, solver_state, ytmp)
+    return DenseState(step0, step1, t0, true, solver_state, ytmp, false)
 end
 
 
@@ -60,7 +61,9 @@ function next(s :: Solution{DenseStepper}, state :: DenseState)
 
         if done(solver, state.solver_state)
             warn("The iterator was exhausted before the dense output completed.")
-            break
+            # prevents calling done(..) twice
+            state.solver_done = true
+            return ((s0.t,s0.y[:]),state)
         else
             # at this point s0 holds the new step, "s2" if you will
             ((s0.t,s0.y[:]), state.solver_state) = next(solver, state.solver_state)
@@ -111,8 +114,8 @@ end
 function done(s :: Solution{DenseStepper}, state :: DenseState)
 
     return (
-            done(s.stepper.solver, state.solver_state) ||
-            state.s1.t >= s.options.tspan[end]         ||
+            state.solver_done ||
+            state.s1.t >= s.options.tspan[end] ||
             s.options.stopevent(state.s1.t,state.s1.y)
             )
 end

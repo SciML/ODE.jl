@@ -19,9 +19,6 @@ immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
     end
 end
 
-# default to floating point precision
-ModifiedRosenbrockStepper() = ModifiedRosenbrockStepper{Float64}()
-
 
 # TODO: is this correct?
 order(ModifiedRosenbrockStepper) = 2
@@ -42,6 +39,7 @@ type RosenbrockState{T,S} <: AbstractState
     dt :: T
     F1 :: S; F2 :: S
     J # :: ?
+    iters :: Int
 end
 
 
@@ -68,7 +66,8 @@ function start(s :: Solution{ModifiedRosenbrockStepper})
                             dt,
                             zero(y), # F1
                             zero(y), # F2
-                            J)       # J
+                            J,       # J
+                            0)       # iters
     # initialize the derivative and the Jacobian
     s.ode.F!(t,y,step.dy)
     s.ode.jac!(t,y,state.J)
@@ -82,7 +81,10 @@ function done(s     :: Solution{ModifiedRosenbrockStepper},
     if state.step.t >= s.options.tstop
         return true
     elseif state.dt < s.options.minstep
-        warn("minstep reached")
+        warn("minstep reached.")
+        return true
+    elseif state.iters >= s.options.maxiters
+        warn("Maximum number of iterations ($(Int(s.options.maxiters))) reached, consider setting a larger maxiter.")
         return true
     end
     return false
@@ -107,8 +109,16 @@ function next(s     :: Solution{ModifiedRosenbrockStepper},
 
     while true
 
+        state.iters += 1
+        if state.iters > s.options.maxiters
+            return ((step.t,step.y), state)
+        end
+
+        # trim the step size to match the bounds of integration
+        dt = min(s.options.tstop-t,dt)
+
         # TODO: this should go to a specialized function for type stabilty sake
-        # maybe make W a part of ExplicitODE?
+        # maybe make W a part of ExplicitODE?  Same for tder below?
         if size(J,1) == 1
             W = one(J) - dt*d*J
         else
@@ -120,30 +130,29 @@ function next(s     :: Solution{ModifiedRosenbrockStepper},
             W = lufact( eye(J) - dt*d*J )
         end
 
-        # TODO: same for tder?
-        # approximate time-derivative of F
+        # Approximate time-derivative of F, we are using F1 as a
+        # temporary array
         ode.F!(t+dt/100,y,F1)
         tder = 100*d*(F1-F0)
 
         # modified Rosenbrock formula
         # TODO: allocate some temporary space for these variables
-        k1 = W \ (dy + tder)
+        k1 = W \ (F0 + tder)
         ode.F!(t+dt/2, y+dt*k1/2, F1)
         k2 = W \ (F1 - k1) + k1
         ynew = y + dt*k2
         ode.F!(t+dt,   ynew,      F2)
-        k3 = W \ (F2 - e32*(k2 - F1) - 2*(k1 - dy) + tder )
+        k3 = W \ (F2 - e32*(k2 - F1) - 2*(k1 - F0) + tder )
 
         delta = max(opts.reltol*max(opts.norm(y),
                                     opts.norm(ynew)),
                     opts.abstol) # allowable error
 
-
         err = (dt/6)*opts.norm(k1 - 2*k2 + k3)/delta # error estimate
 
         # upon a failed step decrease the step size
         dtnew = min(opts.maxstep,
-                    dt*0.8*max(1,err^(-1/3)) )
+                    dt*0.8*err^(-1/3) )
 
         # check if the new solution is acceptable
         if err <= 1
@@ -156,6 +165,9 @@ function next(s     :: Solution{ModifiedRosenbrockStepper},
             ode.jac!(step.t,step.y,J)
 
             return ((step.t,step.y), state)
+        else
+            # continue with the decreased time step
+            dt = dtnew
         end
 
     end

@@ -13,7 +13,7 @@ solvers = [
            # ODE.ode4ms,
            # ODE.ode5ms,
            # adaptive
-#           ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.
+           ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.
            ODE.ode23,
            ODE.ode45_dp,
            ODE.ode45_fe,
@@ -26,39 +26,40 @@ solvers = [
            # adaptive
            ODE.ode23s]
 
-# for solver in solvers
-#     println("using $solver")
-#     # dy
-#     # -- = 6 ==> y = 6t
-#     # dt
-#     t,y=solver((t,y)->6.0, 0., [0:.1:1;])
-#     @test maximum(abs(y-6t)) < tol
+for solver in solvers
+    println("using $solver")
+    # dy
+    # -- = 6 ==> y = 6t
+    # dt
+    # we need to fix initstep for the fixed-step methods
+    t,y=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1)
+    @test maximum(abs(y-6t)) < tol
 
-#     # dy
-#     # -- = 2t ==> y = t.^2
-#     # dt
-#     t,y=solver((t,y)->2t, 0., [0:.001:1;])
-#     @test maximum(abs(y-t.^2)) < tol
+    # dy
+    # -- = 2t ==> y = t.^2
+    # dt
+    t,y=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001)
+    @test maximum(abs(y-t.^2)) < tol
 
 
-#     # dy
-#     # -- = y ==> y = y0*e.^t
-#     # dt
-#     t,y=solver((t,y)->y, 1., [0:.001:1;])
-#     @test maximum(abs(y-e.^t)) < tol
+    # dy
+    # -- = y ==> y = y0*e.^t
+    # dt
+    t,y=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001)
+    @test maximum(abs(y-e.^t)) < tol
 
-#     t,y=solver((t,y)->y, 1., [1:-.001:0;])
-#     @test maximum(abs(y-e.^(t-1))) < tol
+    t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001)
+    @test maximum(abs(y-e.^(t-1))) < tol
 
-#     # dv       dw
-#     # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
-#     # dt       dt
-#     #
-#     # y = [v, w]
-#     t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;])
-#     ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
-#     @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
-# end
+    # dv       dw
+    # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
+    # dt       dt
+    #
+    # y = [v, w]
+    t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001)
+    ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
+    @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
+end
 
 # Test negative starting times ODE.ode23s
 @assert length(ODE.ode23s((t,y)->[-y[2]; y[1]], [1., 2.], [-5., 0])[1]) > 1
@@ -81,8 +82,6 @@ let
     refsol = [0.2083340149701255e-07,
               0.8333360770334713e-13,
               0.9999999791665050] # reference solution at tspan[2]
-    println(t)
-    println(y)
     @test norm(refsol-y[end], Inf) < 2e-10
 end
 include("interface-tests.jl")

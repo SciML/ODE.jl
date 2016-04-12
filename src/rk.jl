@@ -145,7 +145,6 @@ function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauSta
             rk_trial_step!(tmp, sol.ode, step, sol.stepper.tableau, dt, timeout, sol.options)
 
         if abs(newdt) < sol.options.minstep  # minimum step size reached, break
-            println("Warning: dt < minstep.  Stopping.")
             # passing the newdt to state will result in done()
             state.dt = newdt
             break
