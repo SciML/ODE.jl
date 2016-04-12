@@ -1,46 +1,21 @@
 abstract AbstractODE
 
-type ExplicitODE <: AbstractODE
-    t0; y0                      # initial data
-    F :: Function               # solve y'=F(t,y)
-    jac :: Function             # optional jacobian of F
-end
 
-type ExplicitODEInPlace <: AbstractODE
+type ExplicitODE <: AbstractODE
     t0; y0
     F! :: Function
     jac! :: Function
 end
 
 
-# plug in the numerical jacobian if none is provided
-ExplicitODE(t,y,F)=ExplicitODE(t,y,F,(t,y)->fdjacobian(F,t,y))
-
-
-function convert(::Type{ExplicitODEInPlace}, ode :: ExplicitODE)
+function explicit_ineff(t0,y0,F;jac = (t,y)->fdjacobian(F,t,y))
     function F!(t,y,dy)
-        dy[:] = ode.F(t,y)
+        dy[:] = F(t,y)
     end
     function jac!(t,y,J)
-        J[:] = ode.jac(t,y)
+        J[:] = jac(t,y)
     end
-    return ExplicitODEInPlace(ode.t0,ode.y0,F!,jac!)
-end
-
-
-function convert(::Type{ExplicitODE}, ode :: ExplicitODEInPlace)
-    function F(t,y)
-        dy = deepcopy(y)
-        ode.F!(t,y,dy)
-        return dy
-    end
-    function jac(t,y)
-        n  = length(y)
-        J  = Array(eltype(dy),n,n)
-        ode.jac!(t,y,J)
-        return J
-    end
-    return ExplicitODE(ode.t0,ode.y0,F,jac)
+    return ExplicitODE(t0,y0,F!,jac!)
 end
 
 
@@ -49,7 +24,7 @@ abstract AbstractState
 
 
 # this might suffice for some solvers
-type Step{T,S} <: AbstractState
+type Step{T,S}
     t  :: T
     y  :: S
     dy :: S
@@ -87,16 +62,19 @@ immutable Options{T}
                      abstol   = reltol,
                      minstep  = 10*eps(T),
                      maxstep  = 1/minstep,
-                     initstep = reltol, # TODO: we need a better guess
-                                        # here, possibly overwrite it
-                                        # in the call to solve()
+                     # TODO: we need a better guess here, possibly
+                     # overwrite it in the call to solve()
+                     initstep = max(min(reltol,abstol),minstep),
                      norm     = Base.norm,
                      tspan = [tstop],
                      points = :all,
                      stopevent = (t,y)->false,
                      roottol = eps(T)^(1/3),
                      kargs...)
-        new(initstep,tstop,reltol,abstol,minstep,maxstep,norm,tspan,points,stopevent,roottol)
+        if all(points .!= [:specified,:all])
+            error("Option points = $points is not supported, use :specified or :all")
+        end
+        new(initstep,tstop,reltol,abstol,minstep,maxstep,norm,sort(tspan),points,stopevent,roottol)
     end
 
 end
@@ -119,10 +97,6 @@ function show{T}(io::IO, opts :: Options{T})
 end
 
 
-# default to floating point precision
-Options(args...) = Options{Float64}(args...)
-
-
 # solution is a collection of an equation, an integration method
 # (stepper) and its options
 type Solution{T<:AbstractStepper}
@@ -138,19 +112,13 @@ solve(ode, stepper; kargs...) = solve(ode, stepper, Options(kargs...))
 # filter the wrong combinations of ode and stepper
 solve{T,S}(ode :: T, stepper :: S, options :: Options) = error("The $S doesn't support $T")
 
-# TODO: this might not be necessary, in the long run we should make
-# ExplicitODE the in-place one and use specific constructors
-
-# always convert ExplicitODE to ExplicitODEInPlace
-solve(ode :: ExplicitODE, stepper, options :: Options) = solve(convert(ExplicitODEInPlace,ode), stepper, options)
-
 
 # normally we return the working array, which changes at each step and
 # expect the user to copy it if necessary.  In order for collect to
 # return the expected result we need to copy the output at each step.
 function collect{T}(t::Type{T}, s::Solution)
-    if s.options.tstop == Inf || s.options.tspan[end] == Inf
-        error("Trying to collect an infinite list")
+    if any(s.options.tspan .== Inf)
+        error("Attempting to collect an infinite list, use tstop or tspan with finite numbers only")
     end
     collect(t, imap(x->deepcopy(x),s))
 end
@@ -169,7 +137,7 @@ function fdjacobian(F, t, x::Number)
     return dFdx
 end
 
-function fdjacobian(F, t, x)
+function fdjacobian(F, t, x::Vector)
     ftx = F(t, x)
     lx = max(length(x),1)
     dFdx = zeros(eltype(x), lx, lx)

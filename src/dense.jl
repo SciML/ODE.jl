@@ -5,11 +5,11 @@ immutable DenseStepper <: AbstractStepper
 end
 
 
-solve(ode     :: ExplicitODEInPlace,
+solve(ode     :: ExplicitODE,
       stepper :: DenseStepper,
       options :: Options) = Solution(ode,stepper,options)
 
-dense(stepper :: AbstractStepper) = solve(stepper.ode, stepper, stepper.options)
+dense(sol :: Solution) = solve(sol.ode, DenseStepper(sol), sol.options)
 
 
 type DenseState
@@ -60,6 +60,7 @@ function next(s :: Solution{DenseStepper}, state :: DenseState)
 
         if done(solver, state.solver_state)
             warn("The iterator was exhausted before the dense output completed.")
+            break
         else
             # at this point s0 holds the new step, "s2" if you will
             ((s0.t,s0.y[:]), state.solver_state) = next(solver, state.solver_state)
@@ -111,7 +112,7 @@ function done(s :: Solution{DenseStepper}, state :: DenseState)
 
     return (
             done(s.stepper.solver, state.solver_state) ||
-            state.s1.t >= s.options.tspan[end] ||
+            state.s1.t >= s.options.tspan[end]         ||
             s.options.stopevent(state.s1.t,state.s1.y)
             )
 end

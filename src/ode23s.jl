@@ -28,7 +28,7 @@ order(ModifiedRosenbrockStepper) = 2
 
 
 # define the set of ODE problems with which this stepper can work
-solve(ode :: ExplicitODEInPlace, stepper :: ModifiedRosenbrockStepper, options :: Options) =
+solve(ode :: ExplicitODE, stepper :: ModifiedRosenbrockStepper, options :: Options) =
     Solution{ModifiedRosenbrockStepper}(ode,stepper,options)
 
 
@@ -79,7 +79,13 @@ end
 
 function done(s     :: Solution{ModifiedRosenbrockStepper},
               state :: RosenbrockState)
-    return state.dt <= s.options.minstep
+    if state.step.t >= s.options.tstop
+        return true
+    elseif state.dt < s.options.minstep
+        warn("minstep reached")
+        return true
+    end
+    return false
 end
 
 

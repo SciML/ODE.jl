@@ -34,6 +34,6 @@ include("rk.jl")
 # include("multistep.jl")
 
 include("iterators.jl")
-# include("interfaces.jl")
+include("interfaces.jl")
 
 end # module ODE

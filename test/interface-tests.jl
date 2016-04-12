@@ -11,7 +11,7 @@ const V0 = 1.
 const g0 = 0.
 
 # define custom type ...
-immutable CompSol
+immutable CompSol <: Number
   rho::Matrix{Complex128}
   x::Float64
   p::Float64
@@ -27,11 +27,14 @@ Base.norm(y::CompSol) = norm(y::CompSol, 2.0)
 +(y1::CompSol, y2::CompSol) = CompSol(y1.rho+y2.rho, y1.x+y2.x, y1.p+y2.p)
 -(y1::CompSol, y2::CompSol) = CompSol(y1.rho-y2.rho, y1.x-y2.x, y1.p-y2.p)
 *(y1::CompSol, s::Real) = CompSol(y1.rho*s, y1.x*s, y1.p*s)
+*(s::Bool, y1::CompSol) = false
 *(s::Real, y1::CompSol) = y1*s
 /(y1::CompSol, s::Real) = CompSol(y1.rho/s, y1.x/s, y1.p/s)
 
 ### new for PR #68
 Base.abs(y::CompSol) = norm(y, 2.) # TODO not needed anymore once https://github.com/JuliaLang/julia/pull/11043 is in current stable julia
+Base.abs2(y::CompSol) = norm(y, 2.)
+
 Base.zero(::Type{CompSol}) = CompSol(complex(zeros(2,2)), 0., 0.)
 ODE.isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
 
@@ -45,19 +48,19 @@ ODE.isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
 
 
 ################################################################################
- 
+
 # define RHSs of differential equations
 # delta, V and g are parameters
 function rhs(t, y, delta, V, g)
   H = [[-delta/2 V]; [V delta/2]]
- 
+
   rho_dot = -im*H*y.rho + im*y.rho*H
   x_dot = y.p
   p_dot = -y.x
- 
+
   return CompSol( rho_dot, x_dot, p_dot)
 end
- 
+
 # inital conditons
 rho0 = zeros(2,2);
 rho0[1,1]=1.;

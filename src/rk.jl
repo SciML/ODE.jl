@@ -5,42 +5,32 @@ include("tableaus.jl")
 
 # intermediate level interface
 
-
-immutable TableauStepper{StepType,MethodType} <: AbstractStepper
-    tableau :: Tableau # Butcher tableau
+immutable TableauStepper{Step,T} <: AbstractStepper
+    tableau :: Tableau
+    function TableauStepper(tab)
+        if Step == :fixed && isadaptive(tab)
+            error("Cannot construct a fixed step method from an adaptive step tableau")
+        elseif Step == :adaptive && !isadaptive(tab)
+            error("Cannot construct an adaptive step method from an fixed step tableau")
+        end
+        new(convert(T,tab))
+    end
 end
 
 
-function TableauStepper(tableau :: Tableau)
-    if isadaptive(tableau)
-        steptype = :adaptive
-    else
-        steptype = :fixed
-    end
-
-    if isexplicit(tableau)
-        methodtype = :explicit
-    else
-        methodtype = :implicit
-    end
-
-    # convert the method table to T here
-    return TableauStepper{steptype,methodtype}(tableau)
-end
+typealias TableauStepperFixed{T}    TableauStepper{:fixed,   T}
+typealias TableauStepperAdaptive{T} TableauStepper{:adaptive,T}
 
 
 order(stepper :: TableauStepper) = minimum(order(stepper.tableau))
 
 
 # TODO: possibly handle the initial stepsize and the tableau conversion here?
-solve{T}(ode :: ExplicitODEInPlace, stepper :: TableauStepper{T,:explicit}, options :: Options) =
-    Solution{TableauStepper{T,:explicit}}(ode,stepper,options)
+solve{S,T}(ode :: ExplicitODE, stepper :: TableauStepper{S,T}, options :: Options{T}) =
+    Solution{TableauStepper{S,T}}(ode,stepper,options)
 
 
 # lower level interface
-
-abstract AbstractTableauState
-
 
 # explicit RK stepper
 
@@ -52,14 +42,14 @@ type RKTempArrays{T}
 end
 
 
-type TableauExplicitState{T,S} <: AbstractTableauState
+type TableauState{T,S}
     step :: Step{T,S}
     dt   :: T
     tmp  :: RKTempArrays{S}
     timeout :: Int
 end
 
-function show(io :: IO, state :: TableauExplicitState)
+function show(io :: IO, state :: TableauState)
     show(state.step)
     println("dt      = $(state.dt)")
     println("timeout = $(state.timeout)")
@@ -67,7 +57,7 @@ function show(io :: IO, state :: TableauExplicitState)
 end
 
 
-function start{T}(s :: Solution{TableauStepper{T,:explicit}})
+function start{S,T}(s :: Solution{TableauStepper{S,T}})
     t0, dt0, y0 = s.ode.t0, s.options.initstep, s.ode.y0
 
     # TODO: we should do the Butcher table conversion somewhere
@@ -87,12 +77,18 @@ function start{T}(s :: Solution{TableauStepper{T,:explicit}})
     step = Step(t0,deepcopy(y0),deepcopy(tmp.ks[1]))
 
     timeout = 0 # for step control
-    return TableauExplicitState(step,dt0,tmp,timeout)
+    return TableauState(step,dt0,tmp,timeout)
 end
 
 
-function done{T,S}(s :: Solution{TableauStepper{T,S}}, state :: AbstractTableauState)
-    return state.step.t >= s.options.tstop || state.dt < s.options.minstep
+function done{S,T}(s :: Solution{TableauStepper{S,T}}, state :: TableauState)
+    if state.step.t >= s.options.tstop
+        return true
+    elseif state.dt < s.options.minstep
+        warn("minstep reached")
+        return true
+    end
+    return false
 end
 
 
@@ -101,7 +97,7 @@ end
 #####################
 
 
-function next(s :: Solution{TableauStepper{:fixed,:explicit}}, state :: TableauExplicitState)
+function next{T}(s :: Solution{TableauStepperFixed{T}}, state :: TableauState)
     step = state.step
     tmp = state.tmp
 
@@ -124,7 +120,7 @@ end
 ########################
 
 
-function next(sol :: Solution{TableauStepper{:adaptive,:explicit}}, state :: TableauExplicitState)
+function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauState)
 
     const timeout_const = 5
 
@@ -190,7 +186,7 @@ end
 
 
 function rk_trial_step!(tmp       :: RKTempArrays,
-                        ode       :: ExplicitODEInPlace,
+                        ode       :: ExplicitODE,
                         last_step :: Step,
                         tableau   :: TableauRKExplicit,
                         dt,
@@ -208,7 +204,7 @@ end
 
 
 function rk_embedded_step!(tmp       :: RKTempArrays,
-                           ode       :: ExplicitODEInPlace,
+                           ode       :: ExplicitODE,
                            tableau   :: Tableau,
                            last_step :: Step,
                            dt)
@@ -222,8 +218,8 @@ function rk_embedded_step!(tmp       :: RKTempArrays,
     dof    = length(y)
     b      = tableau.b
 
-    tmp.ynew[:] = 0
-    tmp.yerr[:] = 0
+    tmp.ynew[:] = zero(y)
+    tmp.yerr[:] = zero(y)
 
     for s=1:lengthks(tableau)
         # we skip the first step beacause we assume that tmp.ks[1] is
@@ -231,12 +227,16 @@ function rk_embedded_step!(tmp       :: RKTempArrays,
         if s > 1
             calc_next_k!(tmp, s, ode, tableau, last_step, dt)
         end
-        tmp.ynew[:] += b[1,s]*tmp.ks[s]
-        tmp.yerr[:] += b[2,s]*tmp.ks[s]
+        for d=1:dof
+            tmp.ynew[d] += b[1,s]*tmp.ks[s][d]
+            tmp.yerr[d] += b[2,s]*tmp.ks[s][d]
+        end
     end
 
-    tmp.yerr[:] = dt*(tmp.ynew-tmp.yerr)
-    tmp.ynew[:] = y + dt*tmp.ynew
+    for d=1:dof
+        tmp.yerr[d] = dt*(tmp.ynew[d]-tmp.yerr[d])
+        tmp.ynew[d] = y[d] + dt*tmp.ynew[d]
+    end
 
 end
 
@@ -280,7 +280,7 @@ function stepsize_hw92!(tmp,
         tmp.yerr[d] = tmp.yerr[d]/sci # Eq 4.10
     end
 
-    err = norm(tmp.yerr, 2) # Eq. 4.11
+    err = norm(tmp.yerr) # Eq. 4.11
     newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1/(ord+1)))) # Eq 4.13 modified
 
     if timeout > 0
@@ -296,7 +296,7 @@ end
 # this is the only part of state that can be changed here
 function calc_next_k!(tmp       :: RKTempArrays,
                       i         :: Int,
-                      ode       :: ExplicitODEInPlace,
+                      ode       :: ExplicitODE,
                       tableau   :: Tableau,
                       last_step :: Step,
                       dt)
