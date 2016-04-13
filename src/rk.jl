@@ -99,18 +99,22 @@ end
 
 function next{T}(s :: Solution{TableauStepperFixed{T}}, state :: TableauState)
     step = state.step
-    tmp = state.tmp
+    tmp  = state.tmp
 
-    dof = length(step.y)
-    b = s.stepper.tableau.b
+    dof  = length(step.y)
+    b    = s.stepper.tableau.b
+    dt   = min(state.dt,s.options.tstop-step.t)
 
-    for k=1:lengthks(s.stepper.tableau)
-        calc_next_k!(state.tmp, k, s.ode, s.stepper.tableau, step, state.dt)
+    tmp.ynew[:] = step.y
+
+    for k=1:length(b)
+        calc_next_k!(state.tmp, k, s.ode, s.stepper.tableau, step, dt)
         for d=1:dof
-            step.y[d] += state.dt * b[k]*tmp.ks[k][d]
+            tmp.ynew[d] += dt * b[k]*tmp.ks[k][d]
         end
     end
-    step.t += state.dt
+    step.t += dt
+    step.y[:] = tmp.ynew
     return ((step.t,step.y), state)
 end
 
@@ -136,6 +140,9 @@ function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauSta
     # leads to a small enough error or the stepsize reaches
     # prob.minstep
 
+    # trim the inital stepsize to avoid overshooting
+    dt      = min(dt, sol.options.tstop-state.step.t)
+
     while true
 
         # Do one step (assumes ks[1]==f0).  After calling tmp.ynew
@@ -143,6 +150,9 @@ function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauSta
         # TODO: return ynew instead of passing it as tmp.ynew?
         err, newdt, timeout =
             rk_trial_step!(tmp, sol.ode, step, sol.stepper.tableau, dt, timeout, sol.options)
+
+        # trim again in case newdt > dt
+        newdt = min(newdt, sol.options.tstop-state.step.t)
 
         if abs(newdt) < sol.options.minstep  # minimum step size reached, break
             # passing the newdt to state will result in done()
@@ -307,8 +317,7 @@ function calc_next_k!(tmp       :: RKTempArrays,
         for d=1:dof
             tmp.y[d] += dt * tmp.ks[j][d] * a[i,j]
         end
+        # tmp.y[:] += dt*tmp.ks[j]*a[i,j]
     end
     ode.F!(t + c[i]*dt, tmp.y, tmp.ks[i])
-
-    nothing
 end
