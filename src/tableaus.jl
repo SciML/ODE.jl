@@ -56,7 +56,7 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert istril(a)
         @assert S==length(c)==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.
+        @assert norm(sum(a,2)-c'',Inf)<T(1e-10) # consistency.
         new(order,a,b,c)
     end
 end

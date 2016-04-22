@@ -19,14 +19,15 @@ const steppers =
 
 for (name,stepper,params) in steppers
     @eval begin
-        function ($name){T<:Number}(F, y0 :: AbstractVector, t0 :: T;
+        function ($name){T<:Number,S<:AbstractVector}(
+                                    F, y0 :: S, t0 :: T;
                                     jacobian = (t,y)->fdjacobian(F, t, y),
                                     stopevent = (t,y)->false,
-                                    tstop = Inf,
+                                    tstop = T(Inf),
                                     tspan = [tstop],
                                     # we need these options explicitly for the hinit
-                                    reltol = eps(T)^(1/3)/10,
-                                    abstol = eps(T)^(1/2)/10,
+                                    reltol = eps(T)^T(1//3)/10,
+                                    abstol = eps(T)^T(1//2)/10,
                                     initstep = hinit(F, y0, t0, reltol, abstol; tstop=tstop, order=order($stepper)),
                                     kargs...)
 
@@ -63,7 +64,7 @@ for (name,stepper,params) in steppers
                 return ([t0],[y0])
             end
 
-            solution = collect(dense(solve(ode,step,opts)))
+            solution = collect(Tuple{T,S},dense(solve(ode,step,opts)))
             n = length(solution)
 
             # return solution
@@ -90,6 +91,7 @@ for (name,stepper,params) in steppers
                     kargs...)
 
         function ($name)(F, y0 :: Number, t0; kargs...)
+            # TODO: this is slow!
             tn, yn = ($name)((t,y)->[F(t,y[1])], [y0], t0; kargs...)
             yn2  = Array(typeof(y0),length(yn))
             yn2[:] = map(first,yn)

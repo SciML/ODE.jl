@@ -250,12 +250,12 @@ function rk_embedded_step!(tmp       :: RKTempArrays,
 end
 
 
-function stepsize_hw92!(tmp,
-                        last_step :: Step,
-                        tableau :: TableauRKExplicit,
-                        dt,
-                        timeout,
-                        options :: Options)
+function stepsize_hw92!{T}(tmp,
+                           last_step :: Step,
+                           tableau :: TableauRKExplicit,
+                           dt :: T,
+                           timeout,
+                           options :: Options)
     # Estimates the error and a new step size following Hairer &
     # Wanner 1992, p167 (with some modifications)
     #
@@ -270,8 +270,8 @@ function stepsize_hw92!(tmp,
 
     ord = minimum(order(tableau))
     timout_after_nan = 5
-    fac = [0.8, 0.9, 0.25^(1/(ord+1)), 0.38^(1/(ord+1))][1]
-    facmax = 5.0 # maximal step size increase. 1.5-5
+    fac = [T(8//10), T(9//10), T(1//4)^(1//(ord+1)), T(38//100)^(1//(ord+1))][1]
+    facmax = T(5) # maximal step size increase. 1.5-5
     facmin = 1./facmax  # maximal step size decrease. ?
     dof = length(last_step.y)
 
@@ -280,7 +280,7 @@ function stepsize_hw92!(tmp,
 
         # if outside of domain (usually NaN) then make step size smaller by maximum
         if isoutofdomain(tmp.y[d])
-            return 10., dt*facmin, timout_after_nan
+            return T(10), dt*facmin, timout_after_nan
         end
 
         y0 = last_step.y[d] # TODO: is this supposed to be the last successful step?
@@ -290,7 +290,7 @@ function stepsize_hw92!(tmp,
     end
 
     err = norm(tmp.yerr) # Eq. 4.11
-    newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1/(ord+1)))) # Eq 4.13 modified
+    newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1//(ord+1)))) # Eq 4.13 modified
 
     if timeout > 0
         newdt = min(newdt, dt)

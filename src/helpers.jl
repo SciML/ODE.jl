@@ -1,9 +1,8 @@
 isoutofdomain = isnan
 
 #TODO make it a function on ExplicitODE and Options
-function hinit{T}(F, y0, t0::T, reltol, abstol; tstop = Inf, order = 1)
+function hinit{T}(F, y0, t0::T, reltol, abstol; tstop = T(Inf), order = 1)
     # Returns first step size
-    tdir = sign(tstop-t0)
     tau = max(reltol*norm(y0, Inf), abstol)
     d0 = norm(y0, Inf)/tau
     f0 = F(t0, y0)
@@ -16,9 +15,9 @@ function hinit{T}(F, y0, t0::T, reltol, abstol; tstop = Inf, order = 1)
     # perform Euler step
     y1 = similar(y0)
     for d = 1:length(y1)
-        y1[d] = y0[d]+tdir*h0*f0[d]
+        y1[d] = y0[d]+h0*f0[d]
     end
-    f1 = F(t0 + tdir*h0, y1)
+    f1 = F(t0 + h0, y1)
     # estimate second derivative
     d2 = norm(f1 - f0, Inf)/(tau*h0)
     if max(d1, d2) <= 10*eps(T)
