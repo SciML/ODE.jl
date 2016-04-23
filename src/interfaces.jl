@@ -16,6 +16,10 @@ const steppers =
 
 # TODO: there is a lot of useless conversions going on here
 
+# m3: is meta-programming really needed here?  Why not do it like it
+# was done before?  For instance in runge_kutta.jl we got:
+#   ode23(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_rk23; kwargs...)
+
 
 for (name,stepper,params) in steppers
     @eval begin
@@ -46,6 +50,7 @@ for (name,stepper,params) in steppers
                                   initstep = initstep,
                                   kargs...)
             elseif all(tspan .<= t0)
+# m3: again, seems like a band-aid
                 # reverse time integration
                 F_reverse(t,y) = -F(2*t0-t,y)
                 # TODO: is that how the jacobian changes?
@@ -90,6 +95,7 @@ for (name,stepper,params) in steppers
                     points = :specified,
                     kargs...)
 
+# m3: could this go into the low-level API?
         function ($name)(F, y0 :: Number, t0; kargs...)
             # TODO: this is slow!
             tn, yn = ($name)((t,y)->[F(t,y[1])], [y0], t0; kargs...)

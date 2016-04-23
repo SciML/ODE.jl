@@ -5,8 +5,10 @@ include("tableaus.jl")
 
 # intermediate level interface
 
+# m3: this seems a bit an odd name.  Tableaus are useful not just for
+# RK.  So either move this to tableaus.jl or rename it.
 immutable TableauStepper{Step,T} <: AbstractStepper
-    tableau :: Tableau
+    tableau :: Tableau # m3: this is an abstract type.  Is that ok?
     function TableauStepper(tab)
         if Step == :fixed && isadaptive(tab)
             error("Cannot construct a fixed step method from an adaptive step tableau")
@@ -34,7 +36,9 @@ solve{S,T}(ode :: ExplicitODE, stepper :: TableauStepper{S,T}, options :: Option
 
 # explicit RK stepper
 
-type RKTempArrays{T}
+# m3: rename tmp->work (This is what these arrays are called in classic codes,
+
+type RKTempArrays{T} # m3: RKWorkArrays
     y    :: T
     ynew :: T
     yerr :: T
@@ -66,7 +70,7 @@ function start{S,T}(s :: Solution{TableauStepper{S,T}})
                        zero(y0), # ynew
                        zero(y0), # yerr
                        Array(typeof(y0), lk)) # ks
-
+# m3: above to zeros(typeof(y0), lk) and remove below loop
     for i = 1:lk
         tmp.ks[i] = zero(y0)
     end
@@ -105,9 +109,11 @@ function next{T}(s :: Solution{TableauStepperFixed{T}}, state :: TableauState)
     b    = s.stepper.tableau.b
     dt   = min(state.dt,s.options.tstop-step.t)
 
+    # m3: why is it necessary to copy here and then copy back below?
     tmp.ynew[:] = step.y
 
     for k=1:length(b)
+        # m3: here write in tmp not state.tmp:
         calc_next_k!(state.tmp, k, s.ode, s.stepper.tableau, step, dt)
         for d=1:dof
             tmp.ynew[d] += dt * b[k]*tmp.ks[k][d]
@@ -151,6 +157,16 @@ function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauSta
         err, newdt, timeout =
             rk_trial_step!(tmp, sol.ode, step, sol.stepper.tableau, dt, timeout, sol.options)
 
+        # m3: I liked my setup better with:
+        # rk_embedded_step!(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab)
+        # # Check error and find a new step size:
+        # err, newdt, timeout = stepsize_hw92!(dt, tdir, y, ytrial, yerr, order, timeout,
+        #                                     dof, abstol, reltol, maxstep, norm)
+        #
+        # It that way it's clearer what's done, plus the
+        # rk_trial_step! function is only used once.
+
+
         # trim again in case newdt > dt
         newdt = min(newdt, sol.options.tstop-state.step.t)
 
@@ -193,7 +209,7 @@ end
 # Lower level algorithms #
 ##########################
 
-
+# m3: docs (or better remove)
 function rk_trial_step!(tmp       :: RKTempArrays,
                         ode       :: ExplicitODE,
                         last_step :: Step,
@@ -217,6 +233,7 @@ function rk_embedded_step!(tmp       :: RKTempArrays,
                            tableau   :: Tableau,
                            last_step :: Step,
                            dt)
+# m3: update docs
     # Does one embedded R-K step updating ytrial, yerr and ks.
     #
     # Assumes that ks[:,1] is already calculated!
@@ -227,6 +244,8 @@ function rk_embedded_step!(tmp       :: RKTempArrays,
     dof    = length(y)
     b      = tableau.b
 
+    # m3: not good: this first creates an array, then copies it.  Use
+    # fill!(A, zero(y[1]))
     tmp.ynew[:] = zero(y)
     tmp.yerr[:] = zero(y)
 
@@ -267,6 +286,8 @@ function stepsize_hw92!{T}(tmp,
     # TODO:
     # - allow component-wise reltol and abstol?
     # - allow other norms
+
+# m3: shouldn't this use options.norm?
 
     ord = minimum(order(tableau))
     timout_after_nan = 5

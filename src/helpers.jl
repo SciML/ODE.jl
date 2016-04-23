@@ -1,4 +1,9 @@
+# m3: This should be a generic function so methods can be added if
+#     other types have something else than NaN for out-of-domain.
+#     Although, better make it an option.
 isoutofdomain = isnan
+
+# m3: to be consistent: h->dt
 
 #TODO make it a function on ExplicitODE and Options
 function hinit{T}(F, y0, t0::T, reltol, abstol; tstop = T(Inf), order = 1)

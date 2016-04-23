@@ -1,4 +1,5 @@
-# using ODE
+include("../src/ODE.jl")
+using ODE
 using Base.Test
 
 tol = 1e-2
@@ -9,8 +10,8 @@ solvers = [
            ODE.ode1,
            ODE.ode2_midpoint,
            ODE.ode2_heun,
-           # ODE.ode4,
-           # ODE.ode4ms,
+           ODE.ode4,
+           # Ode.ode4ms,
            # ODE.ode5ms,
            # adaptive
            ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.

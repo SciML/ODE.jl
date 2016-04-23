@@ -41,6 +41,7 @@ Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert met
 # Tableaus for explicit Runge-Kutta methods
 ###########################################
 
+# m3: these tableaus should go into rk.jl as they belong to R-K methods
 
 immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
     order::(@compat(Tuple{Vararg{Int}})) # the order of the methods
@@ -198,6 +199,13 @@ const bt_feh78 = TableauRKExplicit(:feh78, (7,8), Rational{Int64},
                             )
 
 
+# m3:
+# - this function is not used anymore!  Is there a reason for this?
+# - this should probably stay in this file.
+# - update type-variables to
+#     ET, EY, EF, CT, CY
+#     - I think it is fine to assume that typeof(y0)==typeof(F(t0,y0))
+#       i.e. dy has same type as y.
 function make_consistent_types(fn, y0, tspan, btab::Tableau)
     # There are a few types involved in a call to a ODE solver which
     # somehow need to be consistent:

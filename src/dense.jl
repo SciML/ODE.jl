@@ -1,17 +1,19 @@
 # A higher level stepper, defined as a wrapper around another stepper.
+# m3: is this still true?  The wrapper in `next` seems very substantial?
 
 immutable DenseStepper <: AbstractStepper
-    solver :: Solution
+    solver :: Solution # m3: a `solver` is a `Solution`?  Seems a bit strange.
 end
 
-
+# m3: this seems a bit odd: just return a `Solution` type which is
+# actually not solved yet.
 solve(ode     :: ExplicitODE,
       stepper :: DenseStepper,
       options :: Options) = Solution(ode,stepper,options)
 
 dense(sol :: Solution) = solve(sol.ode, DenseStepper(sol), sol.options)
 
-
+# m3: does this not need type-parameters?
 type DenseState
     s0 :: Step; s1 :: Step
     last_tout
@@ -37,8 +39,27 @@ function start(s :: Solution{DenseStepper})
     return DenseState(step0, step1, t0, true, solver_state, ytmp, false)
 end
 
-
+# m3: I think it would be nice to factor out the dense-output and
+# root-finding into its own function.  That way it could be used also
+# independently of the dense-output iterator.  Also, it would make
+# this next function more compact.
 function next(s :: Solution{DenseStepper}, state :: DenseState)
+
+
+    # m3: I'm not 100% sure what happens here.  I would implement it like so:
+    # Initialize in `start`: calculate next t1, y1 and also hold onto IC in t0,y0,
+    # set state.last_t=1
+    #
+    # in next have this loop
+    # for t in tspan[state.last_t:end]
+    #     if t>t1
+    #        make new t1, y1, move old t1, y1 into t0, y0
+    #     end
+    #     make dense output at t
+    #     find events
+    #     state.last_t += 1
+    #     return ((t, y), state)
+    # end
 
     solver = s.stepper.solver
 
@@ -140,7 +161,7 @@ function hermite_interp!(y,t,step0::Step,step1::Step)
     nothing
 end
 
-
+# m3: docs, move to helpers.jl
 function findroot(f,rng,eps)
     xl, xr = rng
     fl, fr = f(xl), f(xr)
