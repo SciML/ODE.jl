@@ -26,20 +26,27 @@ order(ModifiedRosenbrockStepper) = 2
 
 # define the set of ODE problems with which this stepper can work
 solve(ode :: ExplicitODE, stepper :: ModifiedRosenbrockStepper, options :: Options) =
-    Solution{ModifiedRosenbrockStepper}(ode,stepper,options)
+    Solver{ModifiedRosenbrockStepper}(ode,stepper,options)
 
 
 # lower level interface (iterator)
 
+"""
+The state for the Rosenbrock stepper
 
-# TODO: should we re-use Step or should we just put t,y,dy explicitly
-# there?
+- step:  Last successful step
+- F1,F2: Work arrays for storing the intermediate values of y'
+- J:     Jacobian
+- iters: Number of successful steps made
+
+"""
 type RosenbrockState{T,S} <: AbstractState
-    step :: Step{T,S}
-    dt :: T
-    F1 :: S; F2 :: S
+    step ::Step{T,S}
+    dt   ::T
+    F1   ::S
+    F2   ::S
     J # :: ?
-    iters :: Int
+    iters::Int
 end
 
 
@@ -53,7 +60,7 @@ function show(io::IO, state :: RosenbrockState)
 end
 
 
-function start(s :: Solution{ModifiedRosenbrockStepper})
+function start(s :: Solver{ModifiedRosenbrockStepper})
     t  = s.ode.t0
     dt = s.options.initstep
     y  = s.ode.y0
@@ -76,22 +83,7 @@ function start(s :: Solution{ModifiedRosenbrockStepper})
 end
 
 
-function done(s     :: Solution{ModifiedRosenbrockStepper},
-              state :: RosenbrockState)
-    if state.step.t >= s.options.tstop
-        return true
-    elseif state.dt < s.options.minstep
-        warn("minstep reached.")
-        return true
-    elseif state.iters >= s.options.maxiters
-        warn("Maximum number of iterations ($(Int(s.options.maxiters))) reached, consider setting a larger maxiter.")
-        return true
-    end
-    return false
-end
-
-
-function next(s     :: Solution{ModifiedRosenbrockStepper},
+function next(s     :: Solver{ModifiedRosenbrockStepper},
               state :: RosenbrockState)
 
     stepper = s.stepper

@@ -5,11 +5,19 @@ include("tableaus.jl")
 
 # intermediate level interface
 
-# m3: this seems a bit an odd name.  Tableaus are useful not just for
-# RK.  So either move this to tableaus.jl or rename it.
-immutable TableauStepper{Step,T} <: AbstractStepper
-    tableau :: Tableau # m3: this is an abstract type.  Is that ok?
-    function TableauStepper(tab)
+"""
+
+A general Runge-Kutta stepper (it cen represent either, a fixed step
+or an adaptive step algorithm).
+
+"""
+immutable RKStepper{Step,T} <: AbstractStepper
+    # m3: this is an abstract type.  Is that ok?
+
+    # pwl: I think this is fine, otherwise we would have to add even
+    # more type parameters to RKStepper
+    tableau::Tableau
+    function RKStepper(tab)
         if Step == :fixed && isadaptive(tab)
             error("Cannot construct a fixed step method from an adaptive step tableau")
         elseif Step == :adaptive && !isadaptive(tab)
@@ -20,79 +28,78 @@ immutable TableauStepper{Step,T} <: AbstractStepper
 end
 
 
-typealias TableauStepperFixed{T}    TableauStepper{:fixed,   T}
-typealias TableauStepperAdaptive{T} TableauStepper{:adaptive,T}
+typealias RKStepperFixed{T}    RKStepper{:fixed,   T}
+typealias RKStepperAdaptive{T} RKStepper{:adaptive,T}
 
 
-order(stepper :: TableauStepper) = minimum(order(stepper.tableau))
+order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
 
 # TODO: possibly handle the initial stepsize and the tableau conversion here?
-solve{S,T}(ode :: ExplicitODE, stepper :: TableauStepper{S,T}, options :: Options{T}) =
-    Solution{TableauStepper{S,T}}(ode,stepper,options)
+solve{S,T}(ode::ExplicitODE, stepper::RKStepper{S,T}, options::Options{T}) =
+    Solver{RKStepper{S,T}}(ode,stepper,options)
 
 
 # lower level interface
 
 # explicit RK stepper
 
-# m3: rename tmp->work (This is what these arrays are called in classic codes,
+"""
 
-type RKTempArrays{T} # m3: RKWorkArrays
-    y    :: T
-    ynew :: T
-    yerr :: T
-    ks   :: Vector{T}
+Pre allocated arrays to store temporary data.  Used only by
+Runge-Kutta stepper.
+
+"""
+type RKWorkArrays{T}
+    y   ::T
+    ynew::T
+    yerr::T
+    ks  ::Vector{T}
 end
 
 
-type TableauState{T,S}
-    step :: Step{T,S}
-    dt   :: T
-    tmp  :: RKTempArrays{S}
-    timeout :: Int
+"""
+State for the Runge-Kutta stepper.
+"""
+type RKState{T,S} <: AbstractState
+    step    ::Step{T,S}
+    dt      ::T
+    work    ::RKWorkArrays{S}
+    timeout ::Int
+    # This is not currently incremented with each step
+    iters   ::Int
 end
 
-function show(io :: IO, state :: TableauState)
+function show(io::IO, state::RKState)
     show(state.step)
     println("dt      = $(state.dt)")
     println("timeout = $(state.timeout)")
-    println("tmp     = $(state.tmp)")
+    println("work    = $(state.work)")
 end
 
 
-function start{S,T}(s :: Solution{TableauStepper{S,T}})
+function start{S,T}(s::Solver{RKStepper{S,T}})
     t0, dt0, y0 = s.ode.t0, s.options.initstep, s.ode.y0
 
     # TODO: we should do the Butcher table conversion somewhere
     lk = lengthks(s.stepper.tableau)
-    tmp = RKTempArrays(zero(y0), # y
-                       zero(y0), # ynew
-                       zero(y0), # yerr
-                       Array(typeof(y0), lk)) # ks
-# m3: above to zeros(typeof(y0), lk) and remove below loop
+    work = RKWorkArrays(zero(y0), # y
+                        zero(y0), # ynew
+                        zero(y0), # yerr
+                        Array(typeof(y0), lk)) # ks
+
+    # we have to allocate each component separately
     for i = 1:lk
-        tmp.ks[i] = zero(y0)
+        work.ks[i]=zero(y0)
     end
 
-    # pre-initialize tmp.ks[1]
-    s.ode.F!(t0,y0,tmp.ks[1])
+    # pre-initialize work.ks[1]
+    s.ode.F!(t0,y0,work.ks[1])
 
-    step = Step(t0,deepcopy(y0),deepcopy(tmp.ks[1]))
+    step = Step(t0,deepcopy(y0),deepcopy(work.ks[1]))
 
     timeout = 0 # for step control
-    return TableauState(step,dt0,tmp,timeout)
-end
-
-
-function done{S,T}(s :: Solution{TableauStepper{S,T}}, state :: TableauState)
-    if state.step.t >= s.options.tstop
-        return true
-    elseif state.dt < s.options.minstep
-        warn("minstep reached")
-        return true
-    end
-    return false
+    return RKState(step,dt0,work,timeout,0)
 end
 
 
@@ -101,26 +108,30 @@ end
 #####################
 
 
-function next{T}(s :: Solution{TableauStepperFixed{T}}, state :: TableauState)
+function next{T}(s::Solver{RKStepperFixed{T}}, state::RKState)
     step = state.step
-    tmp  = state.tmp
+    work = state.work
 
     dof  = length(step.y)
     b    = s.stepper.tableau.b
     dt   = min(state.dt,s.options.tstop-step.t)
 
     # m3: why is it necessary to copy here and then copy back below?
-    tmp.ynew[:] = step.y
+
+    # pwl: to my understanding calc_next_k! needs the starting value
+    # (step.y) but work.ynew is changing in the inner loop, so we need
+    # two distinct arrays, both starting as step.y.
+
+    copy!(work.ynew,step.y)
 
     for k=1:length(b)
-        # m3: here write in tmp not state.tmp:
-        calc_next_k!(state.tmp, k, s.ode, s.stepper.tableau, step, dt)
+        calc_next_k!(work, k, s.ode, s.stepper.tableau, step, dt)
         for d=1:dof
-            tmp.ynew[d] += dt * b[k]*tmp.ks[k][d]
+            work.ynew[d] += dt * b[k]*work.ks[k][d]
         end
     end
     step.t += dt
-    step.y[:] = tmp.ynew
+    copy!(step.y,work.ynew)
     return ((step.t,step.y), state)
 end
 
@@ -130,17 +141,17 @@ end
 ########################
 
 
-function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauState)
+function next{T}(sol::Solver{RKStepperAdaptive{T}}, state::RKState)
 
     const timeout_const = 5
 
     # the initial values
     dt      = state.dt          # dt is the previous stepisze, it is
-                                # modified inside the loop
+    # modified inside the loop
     timeout = state.timeout
-
-    tmp     = state.tmp
+    work    = state.work
     step    = state.step
+    tableau = sol.stepper.tableau
 
     # The while loop continues until we either find a stepsize which
     # leads to a small enough error or the stepsize reaches
@@ -151,21 +162,15 @@ function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauSta
 
     while true
 
-        # Do one step (assumes ks[1]==f0).  After calling tmp.ynew
+        # Do one step (assumes ks[1]==f0).  After calling work.ynew
         # holds the new step.
-        # TODO: return ynew instead of passing it as tmp.ynew?
-        err, newdt, timeout =
-            rk_trial_step!(tmp, sol.ode, step, sol.stepper.tableau, dt, timeout, sol.options)
+        # TODO: return ynew instead of passing it as work.ynew?
 
-        # m3: I liked my setup better with:
-        # rk_embedded_step!(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab)
-        # # Check error and find a new step size:
-        # err, newdt, timeout = stepsize_hw92!(dt, tdir, y, ytrial, yerr, order, timeout,
-        #                                     dof, abstol, reltol, maxstep, norm)
-        #
-        # It that way it's clearer what's done, plus the
-        # rk_trial_step! function is only used once.
+        # work.y and work.yerr and work.ks are updated after this step
+        rk_embedded_step!(work, sol.ode, tableau, step, dt)
 
+        # changes work.yerr
+        err, newdt, timeout = stepsize_hw92!(work, step, tableau, dt, timeout, sol.options)
 
         # trim again in case newdt > dt
         newdt = min(newdt, sol.options.tstop-state.step.t)
@@ -185,13 +190,13 @@ function next{T}(sol :: Solution{TableauStepperAdaptive{T}}, state :: TableauSta
 
             # preload ks[1] for the next step
             if isFSAL(sol.stepper.tableau)
-                tmp.ks[1][:] = tmp.ks[end]
+                copy!(work.ks[1],work.ks[end])
             else
-                sol.ode.F!(step.t+dt, tmp.ynew, tmp.ks[1])
+                sol.ode.F!(step.t+dt, work.ynew, work.ks[1])
             end
 
             # Swap bindings of y and ytrial, avoids one copy
-            step.y, tmp.ynew = tmp.ynew, step.y
+            step.y, work.ynew = work.ynew, step.y
 
             # Update state with the data from the step we have just
             # made:
@@ -209,72 +214,48 @@ end
 # Lower level algorithms #
 ##########################
 
-# m3: docs (or better remove)
-function rk_trial_step!(tmp       :: RKTempArrays,
-                        ode       :: ExplicitODE,
-                        last_step :: Step,
-                        tableau   :: TableauRKExplicit,
-                        dt,
-                        timeout,
-                        options   :: Options)
-
-    # tmp.y and tmp.yerr and tmp.ks are updated after this step
-    rk_embedded_step!(tmp, ode, tableau, last_step, dt)
-
-    # changes tmp.yerr (via in place update)
-    err, newdt, timeout = stepsize_hw92!(tmp, last_step, tableau, dt, timeout, options)
-
-    return err, newdt, timeout
-end
-
-
-function rk_embedded_step!(tmp       :: RKTempArrays,
-                           ode       :: ExplicitODE,
-                           tableau   :: Tableau,
-                           last_step :: Step,
+function rk_embedded_step!(work      ::RKWorkArrays,
+                           ode       ::ExplicitODE,
+                           tableau   ::Tableau,
+                           last_step ::Step,
                            dt)
-# m3: update docs
-    # Does one embedded R-K step updating ytrial, yerr and ks.
-    #
-    # Assumes that ks[:,1] is already calculated!
-    #
-    # Modifies tmp.y, tmp.ynew and tmp.yerr only
+    # Does one embedded R-K step updating work.ynew, work.yerr and work.ks.
+    # Assumes that work.ks[:,1] is already calculated!
+    # Modifies work.y, work.ynew and work.yerr only
 
     y      = last_step.y
     dof    = length(y)
     b      = tableau.b
 
-    # m3: not good: this first creates an array, then copies it.  Use
-    # fill!(A, zero(y[1]))
-    tmp.ynew[:] = zero(y)
-    tmp.yerr[:] = zero(y)
+    fill!(work.ynew, zero(eltype(y)))
+    fill!(work.yerr, zero(eltype(y)))
 
     for s=1:lengthks(tableau)
-        # we skip the first step beacause we assume that tmp.ks[1] is
+        # we skip the first step beacause we assume that work.ks[1] is
         # already computed
         if s > 1
-            calc_next_k!(tmp, s, ode, tableau, last_step, dt)
+            calc_next_k!(work, s, ode, tableau, last_step, dt)
         end
         for d=1:dof
-            tmp.ynew[d] += b[1,s]*tmp.ks[s][d]
-            tmp.yerr[d] += b[2,s]*tmp.ks[s][d]
+            work.ynew[d] += b[1,s]*work.ks[s][d]
+            work.yerr[d] += b[2,s]*work.ks[s][d]
         end
     end
 
     for d=1:dof
-        tmp.yerr[d] = dt*(tmp.ynew[d]-tmp.yerr[d])
-        tmp.ynew[d] = y[d] + dt*tmp.ynew[d]
+        work.yerr[d] = dt*(work.ynew[d]-work.yerr[d])
+        work.ynew[d] = y[d] + dt*work.ynew[d]
     end
 
 end
 
 
-function stepsize_hw92!{T}(tmp,
-                           last_step :: Step,
-                           tableau :: TableauRKExplicit,
-                           dt :: T,
+function stepsize_hw92!{T}(work,
+                           last_step ::Step,
+                           tableau   ::TableauRKExplicit,
+                           dt        ::T,
                            timeout,
-                           options :: Options)
+                           options   ::Options)
     # Estimates the error and a new step size following Hairer &
     # Wanner 1992, p167 (with some modifications)
     #
@@ -287,8 +268,6 @@ function stepsize_hw92!{T}(tmp,
     # - allow component-wise reltol and abstol?
     # - allow other norms
 
-# m3: shouldn't this use options.norm?
-
     ord = minimum(order(tableau))
     timout_after_nan = 5
     fac = [T(8//10), T(9//10), T(1//4)^(1//(ord+1)), T(38//100)^(1//(ord+1))][1]
@@ -300,17 +279,18 @@ function stepsize_hw92!{T}(tmp,
     for d=1:dof
 
         # if outside of domain (usually NaN) then make step size smaller by maximum
-        if isoutofdomain(tmp.y[d])
+        if options.isoutofdomain(work.y[d])
             return T(10), dt*facmin, timout_after_nan
         end
 
         y0 = last_step.y[d] # TODO: is this supposed to be the last successful step?
-        y1 = tmp.ynew[d]    # the approximation to the next step
-        sci = (options.abstol + options.reltol*max(norm(y0),norm(y1)))
-        tmp.yerr[d] = tmp.yerr[d]/sci # Eq 4.10
+        y1 = work.ynew[d]    # the approximation to the next step
+        sci = (options.abstol + options.reltol*max(options.norm(y0),options.norm(y1)))
+        work.yerr[d] = work.yerr[d]/sci # Eq 4.10
     end
 
-    err = norm(tmp.yerr) # Eq. 4.11
+    # TOOD: should we use options.norm here as well?
+    err   = norm(work.yerr) # Eq. 4.11
     newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1//(ord+1)))) # Eq 4.13 modified
 
     if timeout > 0
@@ -322,23 +302,22 @@ function stepsize_hw92!{T}(tmp,
 end
 
 
-# For clarity we pass the RKTempArrays part of the state separately,
+# For clarity we pass the RKWorkArrays part of the state separately,
 # this is the only part of state that can be changed here
-function calc_next_k!(tmp       :: RKTempArrays,
-                      i         :: Int,
-                      ode       :: ExplicitODE,
-                      tableau   :: Tableau,
-                      last_step :: Step,
+function calc_next_k!(work      ::RKWorkArrays,
+                      i         ::Int,
+                      ode       ::ExplicitODE,
+                      tableau   ::Tableau,
+                      last_step ::Step,
                       dt)
     dof = length(last_step.y)
     t, a, c = last_step.t, tableau.a, tableau.c
 
-    tmp.y[:] = last_step.y
+    copy!(work.y,last_step.y)
     for j=1:i-1
         for d=1:dof
-            tmp.y[d] += dt * tmp.ks[j][d] * a[i,j]
+            work.y[d] += dt * work.ks[j][d] * a[i,j]
         end
-        # tmp.y[:] += dt*tmp.ks[j]*a[i,j]
     end
-    ode.F!(t + c[i]*dt, tmp.y, tmp.ks[i])
+    ode.F!(t + c[i]*dt, work.y, work.ks[i])
 end

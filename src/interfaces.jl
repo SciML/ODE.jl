@@ -1,15 +1,15 @@
 const steppers =
     [
      ( :ode23s,        :ModifiedRosenbrockStepper, []),
-     ( :ode1,          :TableauStepperFixed,       [bt_feuler]),
-     ( :ode2_midpoint, :TableauStepperFixed,       [bt_midpoint]),
-     ( :ode2_heun,     :TableauStepperFixed,       [bt_heun]),
-     ( :ode4,          :TableauStepperFixed,       [bt_rk4]),
-     ( :ode21,         :TableauStepperAdaptive,    [bt_rk21]),
-     ( :ode23,         :TableauStepperAdaptive,    [bt_rk23]),
-     ( :ode45_fe,      :TableauStepperAdaptive,    [bt_rk45]),
-     ( :ode45_dp,      :TableauStepperAdaptive,    [bt_dopri5]),
-     ( :ode78,         :TableauStepperAdaptive,    [bt_feh78])
+     ( :ode1,          :RKStepperFixed,            [bt_feuler]),
+     ( :ode2_midpoint, :RKStepperFixed,            [bt_midpoint]),
+     ( :ode2_heun,     :RKStepperFixed,            [bt_heun]),
+     ( :ode4,          :RKStepperFixed,            [bt_rk4]),
+     ( :ode21,         :RKStepperAdaptive,         [bt_rk21]),
+     ( :ode23,         :RKStepperAdaptive,         [bt_rk23]),
+     ( :ode45_fe,      :RKStepperAdaptive,         [bt_rk45]),
+     ( :ode45_dp,      :RKStepperAdaptive,         [bt_dopri5]),
+     ( :ode78,         :RKStepperAdaptive,         [bt_feh78])
 ]
 
 
@@ -29,10 +29,10 @@ for (name,stepper,params) in steppers
                                     stopevent = (t,y)->false,
                                     tstop = T(Inf),
                                     tspan = [tstop],
-                                    # we need these options explicitly for the hinit
+                                    # we need these options explicitly for the dtinit
                                     reltol = eps(T)^T(1//3)/10,
                                     abstol = eps(T)^T(1//2)/10,
-                                    initstep = hinit(F, y0, t0, reltol, abstol; tstop=tstop, order=order($stepper)),
+                                    initstep = dtinit(F, y0, t0, reltol, abstol; tstop=tstop, order=order($stepper)),
                                     kargs...)
 
             step = ($stepper){T}($params...)
@@ -50,7 +50,7 @@ for (name,stepper,params) in steppers
                                   initstep = initstep,
                                   kargs...)
             elseif all(tspan .<= t0)
-# m3: again, seems like a band-aid
+                # m3: again, seems like a band-aid
                 # reverse time integration
                 F_reverse(t,y) = -F(2*t0-t,y)
                 # TODO: is that how the jacobian changes?
@@ -70,6 +70,7 @@ for (name,stepper,params) in steppers
             end
 
             solution = collect(Tuple{T,S},dense(solve(ode,step,opts)))
+            # solution = collect(Tuple{T,S},solve(ode,step,opts))
             n = length(solution)
 
             # return solution
@@ -88,19 +89,19 @@ for (name,stepper,params) in steppers
             return (tn,yn)
         end
 
-        ($name){T<:Number}(F, y0 :: AbstractVector, t0 :: AbstractVector{T}; kargs...) =
+        ($name){T<:Number}(F, y0::AbstractVector, t0::AbstractVector{T}; kargs...) =
             ($name)(F,y0,t0[1];
                     tstop  = t0[end],
                     tspan  = t0,
                     points = :specified,
                     kargs...)
 
-# m3: could this go into the low-level API?
-        function ($name)(F, y0 :: Number, t0; kargs...)
+        # m3: could this go into the low-level API?
+        function ($name)(F, y0::Number, t0; kargs...)
             # TODO: this is slow!
             tn, yn = ($name)((t,y)->[F(t,y[1])], [y0], t0; kargs...)
             yn2  = Array(typeof(y0),length(yn))
-            yn2[:] = map(first,yn)
+            copy!(yn2,map(first,yn))
             return (tn,yn2)
         end
     end

@@ -1,31 +1,38 @@
 # A higher level stepper, defined as a wrapper around another stepper.
-# m3: is this still true?  The wrapper in `next` seems very substantial?
 
+#TODO: how about having an DenseStepper <: AbstractWrapper <: AbstractStepper?
 immutable DenseStepper <: AbstractStepper
-    solver :: Solution # m3: a `solver` is a `Solution`?  Seems a bit strange.
+    solver::Solver
 end
 
-# m3: this seems a bit odd: just return a `Solution` type which is
-# actually not solved yet.
-solve(ode     :: ExplicitODE,
-      stepper :: DenseStepper,
-      options :: Options) = Solution(ode,stepper,options)
+solve(ode::ExplicitODE,
+      stepper::DenseStepper,
+      options::Options) = Solver(ode,stepper,options)
 
-dense(sol :: Solution) = solve(sol.ode, DenseStepper(sol), sol.options)
+dense(sol::Solver) = solve(sol.ode, DenseStepper(sol), sol.options)
 
-# m3: does this not need type-parameters?
-type DenseState
-    s0 :: Step; s1 :: Step
-    last_tout
+"""
+
+The state of the dense stepper
+
+- s0, s1: Previous steps, used to produce interpolated output
+- solver_state: The state of the associated solver
+- ytmp: work array
+
+"""
+type DenseState{T,S} <: AbstractState
+    s0::Step{T,S}
+    s1::Step{T,S}
+    last_tout::T
     first_step
-    solver_state
+    solver_state::AbstractState
     # used for storing the interpolation result
-    ytmp
+    ytmp::S
     solver_done
 end
 
 
-function start(s :: Solution{DenseStepper})
+function start(s::Solver{DenseStepper})
     # extract the real solver
     solver = s.stepper.solver
     t0  = solver.ode.t0
@@ -36,14 +43,17 @@ function start(s :: Solution{DenseStepper})
     step1 = Step(t0,deepcopy(y0),deepcopy(dy0))
     solver_state = start(solver)
     ytmp = deepcopy(y0)
-    return DenseState(step0, step1, t0, true, solver_state, ytmp, false)
+    return DenseState(step0, step1, t0-1, true, solver_state, ytmp, false)
 end
 
 # m3: I think it would be nice to factor out the dense-output and
 # root-finding into its own function.  That way it could be used also
 # independently of the dense-output iterator.  Also, it would make
 # this next function more compact.
-function next(s :: Solution{DenseStepper}, state :: DenseState)
+
+# pwl: I agree, but then the problem is that once you decouple them
+# you would lose the opprotunity to detect the roots with each step.
+function next(s::Solver{DenseStepper}, state::DenseState)
 
 
     # m3: I'm not 100% sure what happens here.  I would implement it like so:
@@ -61,53 +71,69 @@ function next(s :: Solution{DenseStepper}, state :: DenseState)
     #     return ((t, y), state)
     # end
 
+    # pwl: @m3 this is basically what happens here:-), although I'm
+    # not using the index of tspan anywhere explicitly.
+
     solver = s.stepper.solver
 
+    # these guys store the intermediate steps we make
     s0, s1 = state.s0, state.s1
     t0, t1 = s0.t, s1.t
 
-    if state.first_step
-        state.first_step = false
-        return ((s0.t,s0.y),state)
-    end
+    # assuming the last output was done at state.last_tout set the
+    # t_goal to the next larger time from tspan.  Strong inequality
+    # below is crucial, otherwise we would be selecting the same step
+    # every time.
+    tspan  = s.options.tspan
+    t_goal = tspan[findfirst(t->(t>state.last_tout), tspan)]
 
-    # the next output time that we aim at
-    t_goal = s.options.tspan[findfirst(t->(t>state.last_tout), s.options.tspan)]
+    # Keep computing new steps (i.e. new pairs (t0,t1)) until we reach
+    # t0 < t_goal <= t1, then we use interpolation to get the value at
+    # t_goal.  Unless points==:all, then we break the while loop after
+    # making the first step.
+    while t_goal > t1
 
-    # the t0 == t1 part ensures that we make at least one step
-    while t1 < t_goal
-
-        # s1 is the starting point for the new step, while the new
-        # step is saved in s0
+        # s1 stores the last succesfull step, the new step is stored
+        # in s0
 
         if done(solver, state.solver_state)
             warn("The iterator was exhausted before the dense output completed.")
             # prevents calling done(..) twice
             state.solver_done = true
+            # TODO: deepcopy?
+            # Return whatever we got as the last step
             return ((s0.t,s0.y[:]),state)
         else
-            # at this point s0 holds the new step, "s2" if you will
+            # at this point s0 is updated with the new step, "s2" if you will
             ((s0.t,s0.y[:]), state.solver_state) = next(solver, state.solver_state)
         end
 
         # swap s0 and s1
         s0, s1 = s1, s0
-        # update the state
-        state.s0, state.s1 = s0, s1
         # and times
         t0, t1 = s0.t, s1.t
 
-        # we made a successfull step and points == :all
-        if s.options.points == :all || s.options.stopevent(t1,s1.y)
-            t_goal = min(t_goal,t1)
+        # update the state accordingly
+        state.s0, state.s1 = s0, s1
+
+        # we haven't reached t_goal yet (t1<t_goal) but the option
+        # points==:all calls for an output at every successful
+        # step.
+        if s.options.points == :all && t1 < t_goal
+            state.last_tout = t1
+            return ((t1,state.ytmp),state)
+        end
+
+        if s.options.stopevent(t1,s1.y)
             break
         end
 
     end
 
-    # at this point we have t_goal∈[t0,t1] so we can apply the
-    # interpolation
+    # at this point we have t0 < t_goal < t1 so we can apply the
+    # interpolation to get a value of the solution at t_goal
 
+    # TODO: is this necessary?  The solver should store the value of dy.
     solver.ode.F!(t0,s0.y,s0.dy)
     solver.ode.F!(t1,s1.y,s1.dy)
 
@@ -118,7 +144,7 @@ function next(s :: Solution{DenseStepper}, state :: DenseState)
             return 2*res-1      # -1 if false, +1 if true
         end
         t_goal = findroot(stopfun, [s0.t,s1.t], s.options.roottol)
-        # state.ytmp is already overwwriten to the correct result as a
+        # state.ytmp is already overwriten to the correct result as a
         # side-effect of calling stopfun
     else
         hermite_interp!(state.ytmp,t_goal,s0,s1)
@@ -132,11 +158,11 @@ function next(s :: Solution{DenseStepper}, state :: DenseState)
 end
 
 
-function done(s :: Solution{DenseStepper}, state :: DenseState)
+function done(s::Solver{DenseStepper}, state::DenseState)
 
     return (
             state.solver_done ||
-            state.s1.t >= s.options.tspan[end] ||
+            state.last_tout >= s.options.tspan[end] ||
             s.options.stopevent(state.s1.t,state.s1.y)
             )
 end
@@ -159,29 +185,4 @@ function hermite_interp!(y,t,step0::Step,step1::Step)
                 ((1-2*theta)*(y1[i]-y0[i]) + (theta-1)*dt*dy0[i] + theta*dt*dy1[i]) )
     end
     nothing
-end
-
-# m3: docs, move to helpers.jl
-function findroot(f,rng,eps)
-    xl, xr = rng
-    fl, fr = f(xl), f(xr)
-
-    if fl*fr > 0 || xl > xr
-        error("Inconsistent bracket")
-    end
-
-    while xr-xl > eps
-        xm = (xl+xr)/2
-        fm = f(xm)
-
-        if fm*fr > 0
-            xr = xm
-            fr = fm
-        else
-            xl = xm
-            fl = fm
-        end
-    end
-
-    return (xr+xl)/2
 end
