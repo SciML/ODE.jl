@@ -1,4 +1,3 @@
-include("../src/ODE.jl")
 using ODE
 using Base.Test
 

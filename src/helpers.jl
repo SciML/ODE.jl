@@ -1,12 +1,14 @@
 #TODO make it a function on ExplicitODE and Options
+
 """
 
 Chooses an initial step-size basing on the equation, initial data,
 time span and the order of the method of integration.
 
 """
-function dtinit{T}(F, y0, t0::T, reltol, abstol; tstop = T(Inf), order = 1)
-    # Returns first step size
+function dtinit{T,S}(F, y0::Vector{S}, tspan::Vector{T}, reltol, abstol; order = 1)
+    t0 = abs(tspan[1])
+    tstop = abs(tspan[end])
     tau = max(reltol*norm(y0, Inf), abstol)
     d0 = norm(y0, Inf)/tau
     f0 = F(t0, y0)
@@ -33,6 +35,8 @@ function dtinit{T}(F, y0, t0::T, reltol, abstol; tstop = T(Inf), order = 1)
     return min(100*dt0, dt1, abs(tstop-t0))
 end
 
+# a scalar version of the above
+dtinit(F, y0::Number, args...; kargs...) = dtinit((t,y)->[F(t,y[1])], [y0], args...; kargs...)
 
 """
 

@@ -119,9 +119,9 @@ function next(s::Solver{DenseStepper}, state::DenseState)
         # we haven't reached t_goal yet (t1<t_goal) but the option
         # points==:all calls for an output at every successful
         # step.
-        if s.options.points == :all && t1 < t_goal
+        if s.options.points == :all && t1 < t_goal-eps(t1)
             state.last_tout = t1
-            return ((t1,state.ytmp),state)
+            return ((t1,s1.y),state)
         end
 
         if s.options.stopevent(t1,s1.y)
@@ -178,11 +178,16 @@ function hermite_interp!(y,t,step0::Step,step1::Step)
     y0,  y1  = step0.y, step1.y
     dy0, dy1 = step0.dy, step1.dy
 
-    dt       = step1.t-step0.t
-    theta    = (t-step0.t)/dt
-    for i=1:length(y0)
-        y[i] = ((1-theta)*y0[i] + theta*y1[i] + theta*(theta-1) *
-                ((1-2*theta)*(y1[i]-y0[i]) + (theta-1)*dt*dy0[i] + theta*dt*dy1[i]) )
+    if t == step0.t
+        copy!(y,y0)
+    elseif t == step1.t
+        copy!(y,y1)
+    else
+        dt       = step1.t-step0.t
+        theta    = (t-step0.t)/dt
+        for i=1:length(y0)
+            y[i] = ((1-theta)*y0[i] + theta*y1[i] + theta*(theta-1) *
+                    ((1-2*theta)*(y1[i]-y0[i]) + (theta-1)*dt*dy0[i] + theta*dt*dy1[i]) )
+        end
     end
-    nothing
 end

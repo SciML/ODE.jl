@@ -17,28 +17,30 @@ immutable ExplicitODE{T,S} <: AbstractODE
 end
 
 # TODO: change (t,y,J)->fdjacobian(F!,t,y,J) to fdjacobian!(F!)
-ExplicitODE{T,S}(t0::T, y0::S, F!::Function;
-                 jac!::Function = (t,y,J)->fdjacobian!(F!,t,y,J)) =
-    ExplicitODE{T,S}(t0,y0,F!,jac!)
-
+ExplicitODE{T,S<:AbstractVector}(t0::T, y0::S, F!::Function;
+               jac!::Function = (t,y,J)->fdjacobian!(F!,t,y,J)) =
+                   ExplicitODE{T,S}(t0,y0,F!,jac!)
 
 """
+
 This type is not yet implemented, but will serve as an implicitly
 defined ODE (i.e. ODE of the form F(t,y,y')=0.
+
 """
 immutable ImplicitODE{T,S} <: AbstractODE
 end
 
 
 """
+
 Convert a out-of-place explicitly defined ODE function to an in-place function.
 
 Note, this does not help with memory allocations.
+
 """
-function explicit_ineff(t0, y0, F::Function;
+function explicit_ineff(t0, y0::AbstractVector, F::Function;
                         jac = (t,y)->fdjacobian(F,t,y))
     function F!(t,y,dy)
-        # this is why we can't handle a scalar type any more
         copy!(dy,F(t,y))
     end
     function jac!(t,y,J)
@@ -47,16 +49,37 @@ function explicit_ineff(t0, y0, F::Function;
     return ExplicitODE(t0,y0,F!,jac!)
 end
 
+# A temporary solution for handling scalars, should be faster then the
+# previous implementation.  Should be used only at the top level
+# interface.  This function cheats by converting scalar functions F
+# and jac to vector functions F! and jac!.  Still, solving this ODE
+# will result in a vector of length one result, so additional external
+# conversion is necessary.
+function explicit_ineff(t0, y0::Number, F::Function;
+                        jac = (t,y)->fdjacobian(F,t,y))
+    function F!(t,y,dy)
+        dy[1]=F(t,y[1])
+    end
+    function jac!(t,y,J)
+        J[1]=jac(t,y[1])
+    end
+    return ExplicitODE(t0,[y0],F!,jac!)
+end
+
 
 """
+
 The abstract type of the actual algorithm to solve an ODE.
+
 """
 abstract AbstractStepper
 
 
 """
+
 AbstractState keeps the temporary data (state) for the iterator
 Solver{::AbstractStepper}.
+
 """
 abstract AbstractState
 
@@ -90,6 +113,7 @@ end
 
 
 """
+
 Options for ODE solvers.  This type has a key-word constructor which
 will fill the structure with default values.
 
@@ -114,7 +138,7 @@ Dense output options:
 - roottol    TODO
 
 """
-immutable Options{T} # m3:  T->Et
+type Options{T} # m3:  T->Et
     # stepper options
     initstep ::T
     tstop    ::T
@@ -140,8 +164,8 @@ immutable Options{T} # m3:  T->Et
     roottol  ::T
 
     function Options(;
-                     tstop    = T(Inf),
-                     tspan    = T[tstop],
+                     tspan    = T[Inf],
+                     tstop    = tspan[end],
                      reltol   = eps(T)^T(1//3)/10,
                      abstol   = eps(T)^T(1//2)/10,
                      minstep  = 10*eps(T),
@@ -181,7 +205,7 @@ of a numerical solution to an ODE.
 - options: options passed to the stepper
 
 """
-type Solver{T<:AbstractStepper}
+type Solver{T<:AbstractStepper} # TODO: immutable?
     ode     :: AbstractODE
     stepper :: T
     options :: Options
@@ -203,6 +227,13 @@ function collect{T,S}(t::Type{Tuple{T,S}}, s::Solver)
         error("Attempting to collect an infinite list, use tstop or tspan with finite numbers only")
     end
     collect(t, imap(x->deepcopy(x),s))
+end
+
+function collect(s::Solver)
+    if maximum(s.options.tspan) == Inf
+        error("Attempting to collect an infinite list, use tstop or tspan with finite numbers only")
+    end
+    collect(imap(x->deepcopy(x),s))
 end
 
 
