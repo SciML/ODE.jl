@@ -8,9 +8,9 @@ using Compat
 
 ## minimal function export list
 # adaptive non-stiff:
-export ode23, ode45, ode78
+export ode23, ode45, ode78, ode113
 # non-adaptive non-stiff:
-export ode4, ode4ms
+export ode4, ode4ms, ode_am4
 # adaptive stiff:
 export ode23s
 # non-adaptive stiff:
@@ -147,48 +147,7 @@ end
 ###############################################################################
 
 include("runge_kutta.jl")
-
-# ODE_MS Fixed-step, fixed-order multi-step numerical method
-#   with Adams-Bashforth-Moulton coefficients
-function ode_ms(F, x0, tspan, order::Integer)
-    h = diff(tspan)
-    x = Array(typeof(x0), length(tspan))
-    x[1] = x0
-
-    if 1 <= order <= 4
-        b = ms_coefficients4
-    else
-        b = zeros(order, order)
-        b[1:4, 1:4] = ms_coefficients4
-        for s = 5:order
-            for j = 0:(s - 1)
-                # Assign in correct order for multiplication below
-                #  (a factor depending on j and s) .* (an integral of a polynomial with -(0:s), except -j, as roots)
-                p_int = polyint(poly(diagm(-[0:j - 1; j + 1:s - 1])))
-                b[s, s - j] = ((-1)^j / factorial(j)
-                               / factorial(s - 1 - j) * polyval(p_int, 1))
-            end
-        end
-    end
-
-    # TODO: use a better data structure here (should be an order-element circ buffer)
-    xdot = similar(x)
-    for i = 1:length(tspan)-1
-        # Need to run the first several steps at reduced order
-        steporder = min(i, order)
-        xdot[i] = F(tspan[i], x[i])
-
-        x[i+1] = x[i]
-        for j = 1:steporder
-            x[i+1] += h[i]*b[steporder, j]*xdot[i-(steporder-1) + (j-1)]
-        end
-    end
-    return vcat(tspan), x
-end
-
-# Use order 4 by default
-ode4ms(F, x0, tspan) = ode_ms(F, x0, tspan, 4)
-ode5ms(F, x0, tspan) = ODE.ode_ms(F, x0, tspan, 5)
+include("adams_methods.jl")
 
 ###############################################################################
 ## STIFF SOLVERS
@@ -418,11 +377,6 @@ ode4s_s(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, s4_coeffic
 
 # Use Shampine coefficients by default (matching Numerical Recipes)
 const ode4s = ode4s_s
-
-const ms_coefficients4 = [ 1      0      0     0
-                          -1/2    3/2    0     0
-                          5/12  -4/3  23/12 0
-                          -9/24   37/24 -59/24 55/24]
 
 
 end # module ODE

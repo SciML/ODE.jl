@@ -20,7 +20,7 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert istril(a)
         @assert S==length(c)==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.  
+        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.
         new(order,a,b,c)
     end
 end
@@ -100,7 +100,7 @@ const bt_rk23 = TableauRKExplicit(:bogacki_shampine,(2,3), Rational{Int64},
                                    2/9       1/3     4/9     0],
                                   [7/24 1/4 1/3 1/8
                                    2/9 1/3 4/9 0],
-                                  [0, 1//2, 3//4, 1] 
+                                  [0, 1//2, 3//4, 1]
                          )
 
 # Fehlberg https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method
@@ -161,6 +161,7 @@ ode1(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_feuler)
 ode2_midpoint(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_midpoint)
 ode2_heun(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_heun)
 ode4(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_rk4)
+ode78f(fn, y0, tspan) = oderk_adapt(fn, y0, tspan, bt_feh78)
 
 function oderk_fixed(fn, y0, tspan, btab::TableauRKExplicit)
     # Non-arrays y0 treat as scalar
@@ -173,7 +174,7 @@ function oderk_fixed{N,S}(fn, y0::AbstractVector, tspan,
     # TODO: instead of AbstractVector use a Holy-trait
 
     # Needed interface:
-    # On components: 
+    # On components:
     # On y0 container: length, deepcopy, similar, setindex!
     # On time container: getindex, convert. length
 
@@ -233,7 +234,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     #  - note that the type of the components might change!
     # On y0 container: length, similar, setindex!
     # On time container: getindex, convert, length
-    
+
     # For y0 which support indexing.  Currently y0<:AbstractVector but
     # that could be relaxed with a Holy-trait.
     !isadaptive(btab_) && error("Can only use this solver with an adaptive RK Butcher table")
@@ -289,6 +290,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     islaststep = abs(t+dt-tend)<=eps(tend) ? true : false
     timeout = 0 # for step-control
     iter = 2 # the index into tspan and ys
+
     while true
         # do one step (assumes ks[1]==f0)
         rk_embedded_step!(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab)
