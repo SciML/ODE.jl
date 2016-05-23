@@ -11,24 +11,22 @@ function odeadambashforth{N}(F,y0, tspan,order ::Integer)
     if !(2 <= order <= 4)
       error("Currently only orders 2,3, and 4 are implemented for Adam-Bashforth method")
     
-    h = diff(tspan)
+    stepsize = diff(tspan)
     y = Array(typeof(y0), length(tspan))
-    y[1] = x0
+    y[1] = y0
     
-    ##Use Runge-Kunta for initial points necessary to base Adam Basforth off of
-    @inbounds for i = 0:N-1
-        y[i] = use runge-kunta
-    end
+    ##Use Runge-Kunta for initial points necessary to base Adam Basforth off of, if initial values not given
+    t[i:N], y[i:N] = ode_ms(F,y0, tspan[1:N], order)
     
     ##Use Adam Basforth method for subsequent steps
     Integrator = AdamBashforth{order}
-    @inbounds for i = N:niter
-        y = step(Integrator,f,y,t,stepsize,i-1)
+    @inbounds for i = N+1:length(tspan)
+        y = step(Integrator,f,y,t,stepsize,i-1) ::Float64
         y[i] = y
         t = t + stepsize
     end
     ##Return y values
-    yvals
+    y
 end
 
 ##Implementation of the Adam Steps for order 2, 3 and 4
