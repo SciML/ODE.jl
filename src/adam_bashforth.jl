@@ -1,4 +1,3 @@
-module Tmp
 ####################################
 # Explicit Adam-Bashforth solvers
 ####################################
@@ -51,6 +50,4 @@ function ode_ab(F,y0, tspan,order ::Integer)
     end
     ##Return y values
     tspan, yvals
-end
-
 end
