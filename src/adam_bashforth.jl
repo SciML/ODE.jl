@@ -13,20 +13,20 @@ include("ODE.jl")
 abstract Integrator
 immutable AdamBashforth{N} end
 
-@inline function adam_step(::Union{AdamBashforth{2},Type{AdamBashforth{2}}}, f, y, t, stepsize, i)
-    ynext = y[i] + stepsize/2*(3*f(t[i], y[i])
-    - 1*f(t[i-1],y[i-1]))
+@inline function adam_step(::Union{AdamBashforth{2},Type{AdamBashforth{2}}}, ydot, y, stepsize, i)
+    ynext = y[i] + stepsize/2*(3*ydot[i]
+        - 1*ydot[i-1])
 end
-@inline function adam_step(::Union{AdamBashforth{3},Type{AdamBashforth{3}}}, f, y, t, stepsize, i)
-    ynext = y[i] + stepsize/12*(23*f(t[i], y[i])
-    - 16*f(t[i-1],y[i-1])
-    + 5*f(t[i-2],y[i-2]))
+@inline function adam_step(::Union{AdamBashforth{3},Type{AdamBashforth{3}}}, ydot, y, stepsize, i)
+    ynext = y[i] + stepsize/12*(23*ydot[i]
+    - 16*ydot[i-1]
+    + 5*ydot[i-2])
 end
-@inline function adam_step(::Union{AdamBashforth{4},Type{AdamBashforth{4}}}, f, y, t, stepsize, i)
-    ynext = y[i] + stepsize/24*(55*f(t[i], y[i])
-    - 59*f(t[i-1],y[i-1])
-    + 37*f(t[i-2],y[i-2])
-    - 9*f(t[i-3],y[i-3]))
+@inline function adam_step(::Union{AdamBashforth{4},Type{AdamBashforth{4}}}, ydot, y, stepsize, i)
+    ynext = y[i] + stepsize/24*(55*ydot[i]
+    - 59*ydot[i-1]
+    + 37*ydot[i-2]
+    - 9*ydot[i-3])
 end
 
 ##Function: ode_abe(F,y0, tspan, order(optional))
@@ -38,21 +38,24 @@ function ode_ab(F::Function,y0, tspan,order=4 ::Integer)
     end
 
     h = diff(tspan)
-    yvals = Array(typeof(y0), length(tspan))
-    yvals[1] = y0
+    y = Array(typeof(y0), length(tspan))
+    ydot = similar(y)
+    y[1] = y0
+    ydot[1] = F(tspan[1],y[1])
 
     ##Use Runge-Kunta for initial points necessary to base Adam Basforth off of, if initial values not given
     tint, yint= ODE.ode_ms(F,y0, tspan[1:order], order)
-
     for i = 1 : order
-        yvals[i] = yint[i]
+        y[i] = yint[i]
+        ydot[i] = F(tspan[i],y[i])
     end
     ##Use Adam Basforth method for subsequent steps
     Integrator = AdamBashforth{order}
     for i = order+1:length(tspan)
-        yvals[i] = adam_step(Integrator,F,yvals,tspan,h[i-1],i-1)
+        y[i] = adam_step(Integrator,ydot,y,h[i-1],i-1)
+        ydot[i] = F(tspan[i],y[i])
     end
     ##Return y values
-    tspan, yvals
+    return tspan, y
 end
 end #End Module
