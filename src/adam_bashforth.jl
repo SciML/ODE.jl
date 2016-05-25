@@ -1,40 +1,40 @@
 ####################################
-# Explicit Adam-Bashforth solvers
+# Implicit Adam-Bashforth solvers
 ####################################
 # (Hairer & Wanner 1996, Vol I, p.357-358
-#Begin AdamBash module
-module AdamBash
 
-using Polynomials;
-using Compat;
-include("ODE.jl")
 
-##Implementation of the Adam Steps for order 2, 3 and 4 using recursive formualae from Hairer
-abstract Integrator
-immutable AdamBashforth{N} end
-
-@inline function adam_step(::Union{AdamBashforth{2},Type{AdamBashforth{2}}}, ydot, y, stepsize, i)
-    ynext = y[i] + stepsize/2*(3*ydot[i]
-        - 1*ydot[i-1])
-end
-@inline function adam_step(::Union{AdamBashforth{3},Type{AdamBashforth{3}}}, ydot, y, stepsize, i)
-    ynext = y[i] + stepsize/12*(23*ydot[i]
-    - 16*ydot[i-1]
-    + 5*ydot[i-2])
-end
-@inline function adam_step(::Union{AdamBashforth{4},Type{AdamBashforth{4}}}, ydot, y, stepsize, i)
-    ynext = y[i] + stepsize/24*(55*ydot[i]
-    - 59*ydot[i-1]
-    + 37*ydot[i-2]
-    - 9*ydot[i-3])
-end
-
-##Function: ode_abe(F,y0, tspan, order(optional))
+##Function: ode_imp_ab(F,y0, tspan, order(optional))
 ##order is set to 4 by default
-##Adam Bashforth is a fixed step, fixed order, multistep explicit method
-function ode_ab(F::Function,y0, tspan,order=4 ::Integer)
-    if !(2 <= order <= 4)
-        error("Currently only orders 2,3, and 4 are implemented for Adam-Bashforth method")
+##Adam Bashforth is a fixed step, fixed order, multistep Implicit method
+function ode_imp_ab(F::Function,y0, tspan,order=4 ::Integer)
+    if (0 <= order <= 3)
+        coef = am_imp_coefficients3
+        b = ms_coefficients4
+    else
+        #calculating higher order coefficients for implicit Adam Multon method
+        coef = zeros(order+1, order+1)
+        coef[1:4,1:4] = am_imp_coefficients3
+        for s = 4:order
+            for j = 0:s
+                # Assign in correct order for multiplication below
+                #  (a factor depending on j and s) .* (an integral of a polynomial with -(-1:s-1), except -(j-1), as roots)
+                p_int = polyint(poly(diagm(-[-1:j - 2; j:s-1])))
+                coef[s+1, s+1 - j] = ((-1)^j / factorial(j)
+                               / factorial(s - j) * polyval(p_int, 1))
+            end
+        end
+        b = zeros(order, order)
+        b[1:4, 1:4] = ms_coefficients4
+        for s = 5:order
+            for j = 0:(s - 1)
+                # Assign in correct order for multiplication below
+                #  (a factor depending on j and s) .* (an integral of a polynomial with -(0:s), except -j, as roots)
+                p_int = polyint(poly(diagm(-[0:j - 1; j + 1:s - 1])))
+                b[s, s - j] = ((-1)^j / factorial(j)
+                               / factorial(s - 1 - j) * polyval(p_int, 1))
+            end
+        end
     end
 
     h = diff(tspan)
@@ -43,19 +43,34 @@ function ode_ab(F::Function,y0, tspan,order=4 ::Integer)
     y[1] = y0
     ydot[1] = F(tspan[1],y[1])
 
-    ##Use Runge-Kunta for initial points necessary to base Adam Basforth off of, if initial values not given
-    tint, yint= ODE.ode_ms(F,y0, tspan[1:order], order)
-    for i = 1 : order
-        y[i] = yint[i]
-        ydot[i] = F(tspan[i],y[i])
+    ##PECP Method for Implicit Adam solver
+    for i=1:length(tspan)-1
+        steporder = min(i,order)
+
+        ##(P)redict y[i+1] using explicit Adam Bashforth coefficients
+        y[i+1]=y[i]
+        for j=1:steporder
+            y[i+1] += h[i]*b[steporder, j]*ydot[i-(steporder-1) + (j-1)]
+        end
+
+        ##(E)valuate function F at the approximate point tspan[i+1],y[i+1]
+        ydot[i+1] = F(tspan[i+1],y[i+1])
+
+        ##(C)orrect the formula using implicit Adam Multon coefficients
+        y[i+1]=y[i]
+        for j = 1 :steporder+1
+            y[i+1] += h[i]*coef[steporder+1, j]*ydot[i - (steporder) + j]
+        end
+
+        ##(E)valulate the function anew at corrected approximatiion tspan[i+1],y[i+1]
+        ydot[i+1] = F(tspan[i+1], y[i+1])
     end
-    ##Use Adam Basforth method for subsequent steps
-    Integrator = AdamBashforth{order}
-    for i = order+1:length(tspan)
-        y[i] = adam_step(Integrator,ydot,y,h[i-1],i-1)
-        ydot[i] = F(tspan[i],y[i])
-    end
-    ##Return y values
+    #println("Adam...Bash...nuff said")
     return tspan, y
 end
-end #End Module
+
+##Adam Multon Coefficients for Implicit Method
+const am_imp_coefficients3 =[1      0       0       0
+                            1/2     1/2     0       0
+                            -1/12    8/12    5/12   0
+                            1/24    -5/24   19/24   9/24]
