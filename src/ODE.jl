@@ -265,7 +265,8 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     h = tdir * min(abs(h), maxstep)
 
     y = y0
-    tout = Array(typeof(t), 1)
+    # below promotion should maybe be replaced by using make_consistent_types
+    tout = Array(promote_type(typeof(t), Float64), 1)
     tout[1] = t         # first output time
     yout = Array(typeof(y0), 1)
     yout[1] = deepcopy(y)         # first output solution
