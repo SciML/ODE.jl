@@ -2,11 +2,14 @@
 # Explicit Adam-Bashforth solvers
 ####################################
 # (Hairer & Wanner 1996, Vol I, p.357-358
+#Begin AdamBash module
+module AdamBash
+
 using Polynomials;
 using Compat;
 include("ODE.jl")
 
-##Implementation of the Adam Steps for order 2, 3 and 4
+##Implementation of the Adam Steps for order 2, 3 and 4 using recursive formualae from Hairer
 abstract Integrator
 immutable AdamBashforth{N} end
 
@@ -26,8 +29,10 @@ end
     - 9*f(t[i-3],y[i-3]))
 end
 
-##Fixed step, fixed order, multistep explicit method
-function ode_ab(F,y0, tspan,order ::Integer)
+##Function: ode_abe(F,y0, tspan, order(optional))
+##order is set to 4 by default
+##Adam Bashforth is a fixed step, fixed order, multistep explicit method
+function ode_ab(F::Function,y0, tspan,order=4 ::Integer)
     if !(2 <= order <= 4)
         error("Currently only orders 2,3, and 4 are implemented for Adam-Bashforth method")
     end
@@ -39,15 +44,15 @@ function ode_ab(F,y0, tspan,order ::Integer)
     ##Use Runge-Kunta for initial points necessary to base Adam Basforth off of, if initial values not given
     tint, yint= ODE.ode_ms(F,y0, tspan[1:order], order)
 
-    ##Use Adam Basforth method for subsequent steps
     for i = 1 : order
         yvals[i] = yint[i]
     end
+    ##Use Adam Basforth method for subsequent steps
     Integrator = AdamBashforth{order}
     for i = order+1:length(tspan)
         yvals[i] = adam_step(Integrator,F,yvals,tspan,h[i-1],i-1)
-        #yvals[i] = y
     end
     ##Return y values
     tspan, yvals
 end
+end #End Module
