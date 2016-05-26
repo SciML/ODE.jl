@@ -1,7 +1,7 @@
 ####################################
 # Implicit Adam-Bashforth solvers
 ####################################
-# (Hairer & Wanner 1996, Vol I, p.357-358
+# (Hairer & Wanner 1996, Vol I, p.359-360, 372)
 
 
 ##Function: ode_imp_ab(F,y0, t, order(optional))
