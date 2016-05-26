@@ -6,7 +6,6 @@ solvers = [
            ## Non-stiff
            # fixed step
            ODE.ode1,
-           ODE.ode21,
            ODE.ode2_midpoint,
            ODE.ode2_heun,
            ODE.ode4,
