@@ -20,7 +20,7 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert istril(a)
         @assert S==length(c)==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.  
+        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.
         new(order,a,b,c)
     end
 end
@@ -100,7 +100,7 @@ const bt_rk23 = TableauRKExplicit(:bogacki_shampine,(2,3), Rational{Int64},
                                    2/9       1/3     4/9     0],
                                   [7/24 1/4 1/3 1/8
                                    2/9 1/3 4/9 0],
-                                  [0, 1//2, 3//4, 1] 
+                                  [0, 1//2, 3//4, 1]
                          )
 
 # Fehlberg https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method
@@ -173,7 +173,7 @@ function oderk_fixed{N,S}(fn, y0::AbstractVector, tspan,
     # TODO: instead of AbstractVector use a Holy-trait
 
     # Needed interface:
-    # On components: 
+    # On components:
     # On y0 container: length, deepcopy, similar, setindex!
     # On time container: getindex, convert. length
 
@@ -233,7 +233,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     #  - note that the type of the components might change!
     # On y0 container: length, similar, setindex!
     # On time container: getindex, convert, length
-    
+
     # For y0 which support indexing.  Currently y0<:AbstractVector but
     # that could be relaxed with a Holy-trait.
     !isadaptive(btab_) && error("Can only use this solver with an adaptive RK Butcher table")
