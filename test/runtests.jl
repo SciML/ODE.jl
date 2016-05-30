@@ -1,7 +1,7 @@
 using ODE
 using Base.Test
 
-tol = 1e-2
+tols = [5e-2, 1e-2, 1e-2]
 
 solvers = [
            ## Non-stiff
@@ -26,42 +26,61 @@ solvers = [
            # adaptive
            ODE.ode23s]
 
+# Because of https://github.com/JuliaLang/julia/issues/16667
+# which was fixed for BigFloat in https://github.com/JuliaLang/julia/pull/16999
+# but not back-ported to Julia 0.4
+if VERSION<=v"0.5-"
+    dtypes = [Float32, Float64]
+else
+    dtypes = [Float32, Float64, BigFloat]
+end
 for solver in solvers
     println("using $solver")
-    # dy
-    # -- = 6 ==> y = 6t
-    # dt
-    t,y=solver((t,y)->6.0, 0., [0:.1:1;])
-    @test maximum(abs(y-6t)) < tol
+    for (tol,T) in zip(tols, dtypes)
+        if solver==ODE.ode45_fe && T==Float32
+            # For some reason ode45_fe hangs with Float32!
+            continue
+        end
 
-    # dy
-    # -- = 2t ==> y = t.^2
-    # dt
-    t,y=solver((t,y)->2t, 0., [0:.001:1;])
-    @test maximum(abs(y-t.^2)) < tol
+        # dy
+        # -- = 6 ==> y = 6t
+        # dt
+        t,y=solver((t,y)->T(6), T(0), T[0:.1:1;])
+        @test maximum(abs(y-6t)) < tol
+        @test eltype(t)==T
 
+        # dy
+        # -- = 2t ==> y = t.^2
+        # dt
+        t,y=solver((t,y)->T(2)*t, T(0), T[0:.001:1;])
+        @test maximum(abs(y-t.^2)) < tol
+        @test eltype(t)==T
 
-    # dy
-    # -- = y ==> y = y0*e.^t
-    # dt
-    t,y=solver((t,y)->y, 1., [0:.001:1;])
-    @test maximum(abs(y-e.^t)) < tol
+        # dy
+        # -- = y ==> y = y0*e.^t
+        # dt
+        t,y=solver((t,y)->y, T(1), T[0:.001:1;])
+        @test maximum(abs(y-e.^t)) < tol
+        @test eltype(t)==T
 
-    t,y=solver((t,y)->y, 1., [1:-.001:0;])
-    @test maximum(abs(y-e.^(t-1))) < tol
+        t,y=solver((t,y)->y, T(1), T[1:-.001:0;])
+        @test maximum(abs(y-e.^(t-1))) < tol
+        @test eltype(t)==T
 
-    # dv       dw
-    # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
-    # dt       dt
-    #
-    # y = [v, w]
-    t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;])
-    ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
-    @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
+        # dv       dw
+        # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
+        # dt       dt
+        #
+        # y = [v, w]
+        t,y=solver((t,y)->[-y[2]; y[1]], T[1, 2], T[0:.001:2*pi;])
+        ys = hcat(y...).'   # convert Vector{Vector{T}} to Matrix{T}
+        @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
+        @test eltype(t)==T
+    end
 end
 
 # Test negative starting times ODE.ode23s
-@assert length(ODE.ode23s((t,y)->[-y[2]; y[1]], [1., 2.], [-5., 0])[1]) > 1
+@test length(ODE.ode23s((t,y)->[-y[2]; y[1]], [1., 2.], [-5., 0])[1]) > 1
 
 
 # rober testcase from http://www.unige.ch/~hairer/testset/testset.html
