@@ -205,7 +205,6 @@ function ode_ms_adaptive(F, y0, tspan, order::Integer;reltol = 1.0e-5,
 
       #move on to the next step
       n= n+1
-      println("Per saecula saeculorum, Amen")
     end #while loop over steps
 
     return vcat(t), y
@@ -475,7 +474,6 @@ function ode_imp_adap_ab(F, y0, tspan, order::Integer;reltol = 1.0e-5,
 
       #move on to the next step
       n= n+1
-      println("Per saecula saeculorum, Amen")
     end #while loop over steps
 
     return vcat(t), y
