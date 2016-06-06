@@ -147,6 +147,8 @@ end
 ###############################################################################
 
 include("runge_kutta.jl")
+include("adam_bashforth.jl")
+include("adam_bashforth_adaptive.jl")
 
 # ODE_MS Fixed-step, fixed-order multi-step numerical method
 #   with Adams-Bashforth-Moulton coefficients
