@@ -20,7 +20,7 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert istril(a)
         @assert S==length(c)==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.  
+        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.
         new(order,a,b,c)
     end
 end
@@ -100,7 +100,7 @@ const bt_rk23 = TableauRKExplicit(:bogacki_shampine,(2,3), Rational{Int64},
                                    2/9       1/3     4/9     0],
                                   [7/24 1/4 1/3 1/8
                                    2/9 1/3 4/9 0],
-                                  [0, 1//2, 3//4, 1] 
+                                  [0, 1//2, 3//4, 1]
                          )
 
 # Fehlberg https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method
@@ -163,9 +163,9 @@ ode2_heun(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_heun)
 ode4(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_rk4)
 
 function oderk_fixed(fn, y0, tspan, btab::TableauRKExplicit)
-    # Non-arrays y0 treat as scalar
-    fn_(t, y) = [fn(t, y[1])]
-    t,y = oderk_fixed(fn_, [y0], tspan, btab)
+    # For y0 which are scalar-like, wrap them in a vector:
+    fn_{T}(t, y::Vector{T}) = T[fn(t, y[1])]
+    t,y = oderk_fixed(fn_, typeof(y0)[y0], tspan, btab)
     return t, vcat_nosplat(y)
 end
 function oderk_fixed{N,S}(fn, y0::AbstractVector, tspan,
@@ -173,7 +173,7 @@ function oderk_fixed{N,S}(fn, y0::AbstractVector, tspan,
     # TODO: instead of AbstractVector use a Holy-trait
 
     # Needed interface:
-    # On components: 
+    # On components:
     # On y0 container: length, deepcopy, similar, setindex!
     # On time container: getindex, convert. length
 
@@ -215,9 +215,9 @@ const ode45 = ode45_dp
 ode78(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_feh78; kwargs...)
 
 function oderk_adapt(fn, y0, tspan, btab::TableauRKExplicit; kwords...)
-    # For y0 which don't support indexing.
-    fn_ = (t, y) -> [fn(t, y[1])]
-    t,y = oderk_adapt(fn_, [y0], tspan, btab; kwords...)
+    # For y0 which are scalar-like, wrap them in a vector:
+    fn_{T}(t, y::Vector{T}) = T[fn(t, y[1])]
+    t,y = oderk_adapt(fn_, typeof(y0)[y0], tspan, btab; kwords...)
     return t, vcat_nosplat(y)
 end
 function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S};
@@ -233,7 +233,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     #  - note that the type of the components might change!
     # On y0 container: length, similar, setindex!
     # On time container: getindex, convert, length
-    
+
     # For y0 which support indexing.  Currently y0<:AbstractVector but
     # that could be relaxed with a Holy-trait.
     !isadaptive(btab_) && error("Can only use this solver with an adaptive RK Butcher table")
@@ -254,11 +254,12 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     # work arrays:
     y      = similar(y0, Eyf, dof)      # y at time t
     y[:]   = y0
-    ytrial = similar(y0, Eyf, dof) # trial solution at time t+dt
-    yerr   = similar(y0, Eyf, dof) # error of trial solution
+    ytrial = similar(y, dof) # trial solution at time t+dt
+    zero!(ytrial, y[1])
+    yerr   = similar(y, dof) # error of trial solution
     ks = Array(Ty, S)
-    # allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
-    ytmp   = similar(y0, Eyf, dof)
+    # allocate!(ks, y, dof) # no need to allocate as fn is not in-place
+    ytmp   = similar(y, dof)
 
     # output ys
     nsteps_fixed = length(tspan) # these are always output
@@ -366,8 +367,8 @@ function rk_embedded_step!{N,S}(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab:
     # On components: arithmetic, zero
     # On y0 container: fill!, setindex!, getindex
 
-    fill!(ytrial, zero(eltype(ytrial)) )
-    fill!(yerr, zero(eltype(ytrial)) )
+    fill!(ytrial, zero(ytrial[1]) )
+    fill!(yerr, zero(ytrial[1]) )
     for d=1:dof
         ytrial[d] += btab.b[1,1]*ks[1][d]
         yerr[d]   += btab.b[2,1]*ks[1][d]
@@ -441,10 +442,18 @@ end
 
 # Helper functions:
 function allocate!{T}(vec::Vector{T}, y0, dof)
-    # Allocates all vectors inside a Vector{Vector} using the same
-    # kind of container as y0 has and element type eltype(eltype(vec)).
+    # Allocates and zeros all vectors inside a Vector{Vector} using
+    # the same kind of container as y0 has and element type
+    # eltype(eltype(vec)).  Uses zero(y0[1]) to create zeros for each
+    # element.
     for s=1:length(vec)
         vec[s] = similar(y0, eltype(T), dof)
+        zero!(vec[s], y0[1])
+    end
+end
+function zero!(vec, zeroofthis)
+    for i in eachindex(vec)
+        vec[i] = zero(zeroofthis)
     end
 end
 function index_or_push!(vec, i, val)
