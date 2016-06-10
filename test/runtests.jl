@@ -1,7 +1,7 @@
 using ODE
 using Base.Test
 
-tol = 1e-2
+tol = 0.013
 
 solvers = [
            ## Non-stiff
@@ -18,6 +18,7 @@ solvers = [
            ODE.ode45_dp,
            ODE.ode45_fe,
            ODE.ode78,
+           ODE.ode78_dp,
 
            ## Stiff
            # fixed-step
