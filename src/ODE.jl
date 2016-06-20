@@ -120,8 +120,8 @@ function make_consistent_types(fn, y0, tspan, btab::Tableau)
     # On container: eltype, promote_type
     # On time container: eltype
 
-    Ty = typeof(y0)
     Eyf = typeof(y0[1]/(tspan[end]-tspan[1]))
+    Ty = typeof(similar(y0, Eyf, 1))
 
     Et = eltype(tspan)
     @assert Et<:Real
