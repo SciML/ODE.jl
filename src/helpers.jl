@@ -6,7 +6,7 @@ Chooses an initial step-size basing on the equation, initial data,
 time span and the order of the method of integration.
 
 """
-function dtinit{T,S}(F, y0::Vector{S}, tspan::Vector{T}, reltol, abstol; order = 1)
+function dtinit{T}(F, y0, tspan::Vector{T}, reltol, abstol; order = 1)
     t0 = abs(tspan[1])
     tstop = abs(tspan[end])
     tau = max(reltol*norm(y0, Inf), abstol)
@@ -19,10 +19,7 @@ function dtinit{T,S}(F, y0::Vector{S}, tspan::Vector{T}, reltol, abstol; order =
         dt0 = (d0/d1)/100
     end
     # perform Euler step
-    y1 = similar(y0)
-    for d = 1:length(y1)
-        y1[d] = y0[d]+dt0*f0[d]
-    end
+    y1 = y0+dt0*f0
     f1 = F(t0 + dt0, y1)
     # estimate second derivative
     d2 = norm(f1 - f0, Inf)/(tau*dt0)

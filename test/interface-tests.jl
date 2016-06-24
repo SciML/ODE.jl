@@ -36,6 +36,7 @@ Base.abs(y::CompSol) = norm(y, 2.) # TODO not needed anymore once https://github
 Base.abs2(y::CompSol) = norm(y, 2.)
 
 Base.zero(::Type{CompSol}) = CompSol(complex(zeros(2,2)), 0., 0.)
+Base.zero(::CompSol) = zero(CompSol)
 # TODO: This is now an option and has to be passed to the
 # solvers.  Looks ugly and a kind of a pain to handle.
 isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
@@ -90,6 +91,9 @@ for solver in solvers
                   isoutofdomain = isoutofdomain)
     break
     @test norm(y1[end]-y2[end])<0.1
+
+    # test that typeof(tspan)==Vector{Int} does not throw:
+    t,y2 = solver((t,y)->rhs(t, y, delta0, V0, g0), y0, [0,1])
 end
 println("ok.")
 

@@ -19,9 +19,10 @@ immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
     end
 end
 
-
 # TODO: is this correct?
-order(ModifiedRosenbrockStepper) = 2
+order(::ModifiedRosenbrockStepper) = 2
+
+name(::ModifiedRosenbrockStepper) = "Modified Rosenbrock Stepper"
 
 
 # define the set of ODE problems with which this stepper can work

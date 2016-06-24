@@ -4,13 +4,17 @@ We assume that the initial data y0 is given at tspan[1], and that
 tspan[end] is the last integration time.
 
 """
-function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
-                        jacobian::Function  = (t,y)->fdjacobian(F, t, y),
-                        # we need these options explicitly for the dtinit
-                        reltol::T   = eps(T)^T(1//3)/10,
-                        abstol::T   = eps(T)^T(1//2)/10,
-                        initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper)),
-                        kargs...)
+
+function ode{T}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
+                jacobian::Function  = (t,y)->fdjacobian(F, t, y),
+                # we need these options explicitly for the dtinit
+                reltol::T   = eps(T)^T(1//3)/10,
+                abstol::T   = eps(T)^T(1//2)/10,
+                initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper)),
+                kargs...)
+
+# function ode{T}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
+#                          jacobian::Function  = (t,y)->fdjacobian(F, t, y),kargs...)
 
     # TODO: any ideas on how we could improve the interface so that we
     # don't have to use the ugly call to dtinit as a default?
@@ -18,7 +22,7 @@ function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractSteppe
     t0 = tspan[1]
 
     # construct a solver
-    ode  = explicit_ineff(t0,y0,F,jac=jacobian)
+    equation  = explicit_ineff(t0,y0,F,jac=jacobian)
 
     opts = Options{T}(;
                       tspan    = tspan,
@@ -26,7 +30,7 @@ function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractSteppe
                       abstol   = abstol,
                       initstep = initstep,
                       kargs...)
-    solver = solve(ode,stepper,opts)
+    solver = solve(equation,stepper,opts)
 
     # handle different directions of time integration
     if issorted(tspan)
@@ -59,16 +63,24 @@ function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractSteppe
     return (tn,yn)
 end
 
-ode23s{T}(F,y0,t0::Vector{T};kargs...)        = ode(F,y0,t0,ModifiedRosenbrockStepper{T}(); kargs...)
-ode1{T}(F,y0,t0::Vector{T};kargs...)          = ode(F,y0,t0,RKStepperFixed{T}(bt_feuler); kargs...)
-ode2_midpoint{T}(F,y0,t0::Vector{T};kargs...) = ode(F,y0,t0,RKStepperFixed{T}(bt_midpoint); kargs...)
-ode2_heun{T}(F,y0,t0::Vector{T};kargs...)     = ode(F,y0,t0,RKStepperFixed{T}(bt_heun); kargs...)
-ode4{T}(F,y0,t0::Vector{T};kargs...)          = ode(F,y0,t0,RKStepperFixed{T}(bt_rk4); kargs...)
-ode21{T}(F,y0,t0::Vector{T};kargs...)         = ode(F,y0,t0,RKStepperAdaptive{T}(bt_rk21); kargs...)
-ode23{T}(F,y0,t0::Vector{T};kargs...)         = ode(F,y0,t0,RKStepperAdaptive{T}(bt_rk23); kargs...)
-ode45_fe{T}(F,y0,t0::Vector{T};kargs...)      = ode(F,y0,t0,RKStepperAdaptive{T}(bt_rk45); kargs...)
-ode45_dp{T}(F,y0,t0::Vector{T};kargs...)      = ode(F,y0,t0,RKStepperAdaptive{T}(bt_dopri5); kargs...)
-ode78{T}(F,y0,t0::Vector{T};kargs...)         = ode(F,y0,t0,RKStepperAdaptive{T}(bt_feh78); kargs...)
+ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0,ModifiedRosenbrockStepper; kargs...)
+ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:bt_feuler}; kargs...)
+ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0,RKStepperFixed{:bt_midpoint}; kargs...)
+ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0,RKStepperFixed{:bt_heun}; kargs...)
+ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:bt_rk4}; kargs...)
+ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_rk21}; kargs...)
+ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_rk23}; kargs...)
+ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_rk45}; kargs...)
+ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_dopri5}; kargs...)
+ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_feh78}; kargs...)
+
+# this is bugged
+# ode_conv(F,y0,t0,stepper;kargs...)=ode(F,make_consistent(y0,t0,stepper)...;kargs...)
+# a temporary fix
+function ode_conv(F,y0,t0,stepper;kargs...)
+    y1, t1, stepper1 = make_consistent(y0,t0,stepper)
+    ode(F,y1,t1,stepper1;kargs...)
+end
 
 const ode45 = ode45_dp
 
@@ -109,4 +121,28 @@ function reverse_time(sol::Solver)
     options.tspan     = reverse(2*t0.-options.tspan)
     options.stopevent = (t,y)->stopevent(2*t0-t,y)
     return solve(ode_reversed,stepper,options)
+end
+
+
+
+# The the elements of tspan should basically be scalars and support
+# most of the scalar operations.  In particular the element type
+# should be closed under the division.
+function make_consistent{S<:AbstractStepper}(y0, tspan::AbstractVector, stepper::Type{S})
+    t_test = 1/(tspan[end]-tspan[1])
+    Tt = typeof(t_test)
+    t_new = convert(Vector{Tt},tspan)
+
+    y_test = y0./t_test
+    Ty = typeof(y_test)
+    if typejoin(Ty,AbstractArray) == AbstractArray
+        Ey = promote_type(map(typeof,y_test)...)
+        y_new = copy!(similar(y0,Ey),y0)
+    else
+        y_new = convert(Ty,y0)
+    end
+
+    @assert eltype(Tt)<:Real
+
+    return y_new, t_new, stepper{Tt}()
 end

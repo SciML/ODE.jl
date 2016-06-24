@@ -11,16 +11,13 @@ A general Runge-Kutta stepper (it cen represent either, a fixed step
 or an adaptive step algorithm).
 
 """
-immutable RKStepper{Step,T} <: AbstractStepper
-    # m3: this is an abstract type.  Is that ok?
-
-    # pwl: I think this is fine, otherwise we would have to add even
-    # more type parameters to RKStepper
+immutable RKStepper{Kind,tab_name,T<:Number} <: AbstractStepper
     tableau::Tableau
-    function RKStepper(tab)
-        if Step == :fixed && isadaptive(tab)
+    function RKStepper()
+        tab = eval(tab_name)
+        if Kind == :fixed && isadaptive(tab)
             error("Cannot construct a fixed step method from an adaptive step tableau")
-        elseif Step == :adaptive && !isadaptive(tab)
+        elseif Kind == :adaptive && !isadaptive(tab)
             error("Cannot construct an adaptive step method from an fixed step tableau")
         end
         new(convert(T,tab))
@@ -28,16 +25,17 @@ immutable RKStepper{Step,T} <: AbstractStepper
 end
 
 
-typealias RKStepperFixed{T}    RKStepper{:fixed,   T}
-typealias RKStepperAdaptive{T} RKStepper{:adaptive,T}
+typealias RKStepperFixed    RKStepper{:fixed}
+typealias RKStepperAdaptive RKStepper{:adaptive}
 
 
 order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
+name(stepper::RKStepper) = typeof(stepper.tableau)
 
 # TODO: possibly handle the initial stepsize and the tableau conversion here?
-solve{S,T}(ode::ExplicitODE, stepper::RKStepper{S,T}, options::Options{T}) =
-    Solver{RKStepper{S,T}}(ode,stepper,options)
+solve{K,S,T}(ode::ExplicitODE, stepper::RKStepper{K,S,T}, options::Options{T}) =
+    Solver{RKStepper{K,S,T}}(ode,stepper,options)
 
 
 # lower level interface
@@ -78,7 +76,7 @@ function show(io::IO, state::RKState)
 end
 
 
-function start{S,T}(s::Solver{RKStepper{S,T}})
+function start{T<:RKStepper}(s::Solver{T})
     t0, dt0, y0 = s.ode.t0, s.options.initstep, s.ode.y0
 
     # TODO: we should do the Butcher table conversion somewhere
@@ -108,7 +106,7 @@ end
 #####################
 
 
-function next{T}(s::Solver{RKStepperFixed{T}}, state::RKState)
+function next{RKSF<:RKStepperFixed}(s::Solver{RKSF}, state::RKState)
     step = state.step
     work = state.work
 
@@ -141,7 +139,7 @@ end
 ########################
 
 
-function next{T}(sol::Solver{RKStepperAdaptive{T}}, state::RKState)
+function next{RKSA<:RKStepperAdaptive}(sol::Solver{RKSA}, state::RKState)
 
     const timeout_const = 5
 
