@@ -14,7 +14,7 @@ export ode4, ode4ms
 # adaptive stiff:
 export ode23s
 # non-adaptive stiff:
-export ode4s
+export ode4s, ode4s_s
 
 import Base.convert, Base.show
 import Base: start, next, done, call, collect
@@ -30,8 +30,11 @@ include("dense.jl")
 
 # particular solvers
 include("ode23s.jl")
-include("rk.jl")
+include("runge-kutta.jl")
 # include("multistep.jl")
+include("adams-bashford-moulton.jl")
+include("rosenbrock.jl")
+# include("taylor.jl")
 
 include("iterators.jl")
 include("interfaces.jl")

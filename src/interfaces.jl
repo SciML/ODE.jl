@@ -5,19 +5,13 @@ tspan[end] is the last integration time.
 
 """
 
-function ode{T}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
+function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
                 jacobian::Function  = (t,y)->fdjacobian(F, t, y),
                 # we need these options explicitly for the dtinit
                 reltol::T   = eps(T)^T(1//3)/10,
                 abstol::T   = eps(T)^T(1//2)/10,
-                initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper)),
+                initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper))::T,
                 kargs...)
-
-# function ode{T}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
-#                          jacobian::Function  = (t,y)->fdjacobian(F, t, y),kargs...)
-
-    # TODO: any ideas on how we could improve the interface so that we
-    # don't have to use the ugly call to dtinit as a default?
 
     t0 = tspan[1]
 
@@ -74,12 +68,21 @@ ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_rk45}; 
 ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_dopri5}; kargs...)
 ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:bt_feh78}; kargs...)
 
-# this is bugged
-# ode_conv(F,y0,t0,stepper;kargs...)=ode(F,make_consistent(y0,t0,stepper)...;kargs...)
-# a temporary fix
-function ode_conv(F,y0,t0,stepper;kargs...)
-    y1, t1, stepper1 = make_consistent(y0,t0,stepper)
-    ode(F,y1,t1,stepper1;kargs...)
+
+function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},stepper;kargs...)
+
+    if !isleaftype(T)
+        error("The output times have to be of a concrete type.")
+    elseif !(T <:AbstractFloat)
+        error("The time variable should be a floating point number.")
+    end
+
+    if !isleaftype(Ty) & !isleaftype(eltype(Ty))
+        error("The initial data has to be of a concrete type (or an array)")
+    end
+
+    ode(F,y0,t0,stepper{T}();kargs...)
+
 end
 
 const ode45 = ode45_dp
@@ -121,28 +124,4 @@ function reverse_time(sol::Solver)
     options.tspan     = reverse(2*t0.-options.tspan)
     options.stopevent = (t,y)->stopevent(2*t0-t,y)
     return solve(ode_reversed,stepper,options)
-end
-
-
-
-# The the elements of tspan should basically be scalars and support
-# most of the scalar operations.  In particular the element type
-# should be closed under the division.
-function make_consistent{S<:AbstractStepper}(y0, tspan::AbstractVector, stepper::Type{S})
-    t_test = 1/(tspan[end]-tspan[1])
-    Tt = typeof(t_test)
-    t_new = convert(Vector{Tt},tspan)
-
-    y_test = y0./t_test
-    Ty = typeof(y_test)
-    if typejoin(Ty,AbstractArray) == AbstractArray
-        Ey = promote_type(map(typeof,y_test)...)
-        y_new = copy!(similar(y0,Ey),y0)
-    else
-        y_new = convert(Ty,y0)
-    end
-
-    @assert eltype(Tt)<:Real
-
-    return y_new, t_new, stepper{Tt}()
 end

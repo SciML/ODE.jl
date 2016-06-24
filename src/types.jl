@@ -233,7 +233,7 @@ function collect(s::Solver)
     if maximum(s.options.tspan) == Inf
         error("Attempting to collect an infinite list, use tstop or tspan with finite numbers only")
     end
-    collect(imap(x->deepcopy(x),s))
+    collect(imap(deepcopy,s))
 end
 
 

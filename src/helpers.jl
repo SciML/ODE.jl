@@ -29,7 +29,7 @@ function dtinit{T}(F, y0, tspan::Vector{T}, reltol, abstol; order = 1)
         pow = -(2 + log10(max(d1, d2)))/(order+1)
         dt1 = 10^pow
     end
-    return min(100*dt0, dt1, abs(tstop-t0))
+    return T(min(100*dt0, dt1, abs(tstop-t0)))
 end
 
 # a scalar version of the above

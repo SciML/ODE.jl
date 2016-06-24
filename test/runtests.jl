@@ -10,8 +10,8 @@ solvers = [
            ODE.ode2_midpoint,
            ODE.ode2_heun,
            ODE.ode4,
-           # Ode.ode4ms,
-           # ODE.ode5ms,
+           ODE.ode4ms,
+           ODE.ode5ms,
            # adaptive
            ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.
            ODE.ode23,
@@ -42,11 +42,13 @@ for solver in solvers
     @test maximum(abs(y-t.^2)) < tol
 
     # test typeof(tspan)==Vector{Int} does not throw
-    t,y=solver((t,y)->2t, 0., [0,1])
+    @test_throws ErrorException t,y=solver((t,y)->2y, 0., [0,1])
     # test typeof(y0)==Vector{Int} does not throw
-    t,y=solver((t,y)->[2t], [0], [0,1])
+    @test_throws ErrorException t,y=solver((t,y)->[2y], [0], [0,1])
     # test typeof(y0)==Int does not throw
-    t,y=solver((t,y)->2t, 0, [0,1])
+    @test_throws ErrorException t,y=solver((t,y)->2y, 0, [0,1])
+    # test if we can deal with a mixed case
+    @test_throws ErrorException t,y=solver((t,y)->2y, Number[1,1.1,BigInt(1)], Rational[0,1])
 
     # dy
     # -- = y ==> y = y0*e.^t
