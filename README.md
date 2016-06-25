@@ -8,6 +8,8 @@ Various basic Ordinary Differential Equation solvers implemented in Julia.
 Pull requests are always highly welcome to fix bugs, add solvers, or anything else!
 
 # API discussions
+
+[![Join the chat at https://gitter.im/pwl/ODE.jl](https://badges.gitter.im/pwl/ODE.jl.svg)](https://gitter.im/pwl/ODE.jl?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 There are currently discussions about how the Julian API for ODE solvers should look like, and the current documentation is more like a wishlist than a documentation. The API has changed considerably since the initial v0.1 release, so be carefull when you upgrade to v0.2 or later versions.
 
 # Current status of the project
