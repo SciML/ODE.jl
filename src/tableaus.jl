@@ -50,6 +50,7 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
     # second for error calc.
     b::Matrix{T}
     c::Vector{T}
+    isFSAL::Bool
     function TableauRKExplicit(order,a,b,c)
         @assert isa(S,Integer)
         @assert isa(Name,Symbol)
@@ -58,7 +59,8 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert S==length(c)==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
         @assert norm(sum(a,2)-c'',Inf)<T(1e-10) # consistency.
-        new(order,a,b,c)
+        isFSAL = (a[end,:]==b[1,:] && c[end]==1)
+        new(order,a,b,c,isFSAL)
     end
 end
 
@@ -84,7 +86,7 @@ lengthks(tab::TableauRKExplicit) = length(tab.c)
 function Base.convert{Tnew<:Real,Name,S,T}(::Type{Tnew}, tab::TableauRKExplicit{Name,S,T})
     # Converts the tableau coefficients to the new type Tnew
     newflds = ()
-    @compat for n in fieldnames(tab)
+    @compat for n in [:a,:b,:c]
         fld = getfield(tab,n)
         if eltype(fld)==T
             newflds = tuple(newflds..., conv_field(Tnew, fld))
@@ -92,16 +94,12 @@ function Base.convert{Tnew<:Real,Name,S,T}(::Type{Tnew}, tab::TableauRKExplicit{
             newflds = tuple(newflds..., fld)
         end
     end
-    TableauRKExplicit{Name,S,Tnew}(newflds...) # TODO: could this be done more generically in a type-stable way?
+    TableauRKExplicit{Name,S,Tnew}(tab.order, newflds...) # TODO: could this be done more generically in a type-stable way?
 end
 
 
 isexplicit(b::TableauRKExplicit) = istril(b.a) # Test whether it's an explicit method
 isadaptive(b::TableauRKExplicit) = size(b.b, 1)==2
-
-
-# First same as last.  Means ks[:,end]=ks_nextstep[:,1], c.f. H&W p.167
-isFSAL(btab::TableauRKExplicit) = btab.a[end,:]==btab.b[1,:] && btab.c[end]==1 # the latter is not needed really
 
 ## Tableaus for explicit RK methods
 # Fixed step:

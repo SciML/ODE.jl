@@ -181,7 +181,7 @@ function next{RKSA<:RKStepperAdaptive}(sol::Solver{RKSA}, state::RKState)
             # step is accepted
 
             # preload ks[1] for the next step
-            if isFSAL(sol.stepper.tableau)
+            if sol.stepper.tableau.isFSAL
                 copy!(work.ks[1],work.ks[end])
             else
                 sol.ode.F!(step.t+dt, work.ynew, work.ks[1])
@@ -262,28 +262,27 @@ function stepsize_hw92!{T}(work,
 
     ord = minimum(order(tableau))
     timout_after_nan = 5
-    fac = [T(8//10), T(9//10), T(1//4)^(1//(ord+1)), T(38//100)^(1//(ord+1))][1]
+    # fac = T[0.8, 0.9, (0.25)^(1/(ord+1)), (0.38)^(1/(ord+1))][1]
+    fac = T(8//10)
     facmax = T(5) # maximal step size increase. 1.5-5
     facmin = 1./facmax  # maximal step size decrease. ?
     dof = length(last_step.y)
 
+    if findfirst(options.isoutofdomain,work.y) != 0
+        return T(10), dt*facmin, timout_after_nan
+    end
+
     # in-place calculate yerr./tol
     for d=1:dof
-
-        # if outside of domain (usually NaN) then make step size smaller by maximum
-        if options.isoutofdomain(work.y[d])
-            return T(10), dt*facmin, timout_after_nan
-        end
-
         y0 = last_step.y[d] # TODO: is this supposed to be the last successful step?
         y1 = work.ynew[d]    # the approximation to the next step
-        sci = (options.abstol + options.reltol*max(options.norm(y0),options.norm(y1)))
-        work.yerr[d] = work.yerr[d]/sci # Eq 4.10
+        sci = (options.abstol + options.reltol*max(norm(y0),norm(y1)))
+        work.yerr[d] ./= sci # Eq 4.10
     end
 
     # TOOD: should we use options.norm here as well?
     err   = norm(work.yerr) # Eq. 4.11
-    newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1//(ord+1)))) # Eq 4.13 modified
+    newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1/(ord+1)))) # Eq 4.13 modified
 
     if timeout > 0
         newdt = min(newdt, dt)
