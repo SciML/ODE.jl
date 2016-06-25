@@ -2,7 +2,7 @@
 #   with provided coefficients.
 function oderosenbrock{Ty,T}(F, x0::Ty, tspan::AbstractVector{T},
                              gamma, a, b, c;
-                             jacobian = nothing,
+                             jacobian = forward_jacobian(F,x0),
                              kargs...)
 
     if !isleaftype(T)
@@ -15,12 +15,6 @@ function oderosenbrock{Ty,T}(F, x0::Ty, tspan::AbstractVector{T},
         error("The initial data has to be of a concrete type (or an array)")
     end
 
-    if typeof(jacobian) == Function
-        G = jacobian
-    else
-        G = (t, x)->fdjacobian(F, t, x)
-    end
-
     h = diff(tspan)
     x = Array(typeof(x0), length(tspan))
     x[1] = x0
@@ -30,7 +24,7 @@ function oderosenbrock{Ty,T}(F, x0::Ty, tspan::AbstractVector{T},
         ts = tspan[solstep]
         hs = h[solstep]
         xs = x[solstep]
-        dFdx = G(ts, xs)
+        dFdx = jacobian(ts, xs)
         # FIXME
         if size(dFdx,1) == 1
             jac = 1/gamma/hs - dFdx[1]

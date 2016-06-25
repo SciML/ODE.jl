@@ -11,7 +11,7 @@ Fields:
 """
 immutable ExplicitODE{T,S} <: AbstractODE
     t0  ::T
-    y0  ::S
+    y0  ::AbstractArray{S}
     F!  ::Function
     jac!::Function
 end
@@ -38,14 +38,9 @@ Convert a out-of-place explicitly defined ODE function to an in-place function.
 Note, this does not help with memory allocations.
 
 """
-function explicit_ineff(t0, y0::AbstractVector, F::Function;
-                        jac = (t,y)->fdjacobian(F,t,y))
-    function F!(t,y,dy)
-        copy!(dy,F(t,y))
-    end
-    function jac!(t,y,J)
-        copy!(J,jac(t,y))
-    end
+function explicit_ineff(t0, y0::AbstractVector, F::Function, jac)
+    F!(t,y,dy) =copy!(dy,F(t,y))
+    jac!(t,y,J)=copy!(J,jac(t,y))
     return ExplicitODE(t0,y0,F!,jac!)
 end
 
@@ -55,14 +50,9 @@ end
 # and jac to vector functions F! and jac!.  Still, solving this ODE
 # will result in a vector of length one result, so additional external
 # conversion is necessary.
-function explicit_ineff(t0, y0::Number, F::Function;
-                        jac = (t,y)->fdjacobian(F,t,y))
-    function F!(t,y,dy)
-        dy[1]=F(t,y[1])
-    end
-    function jac!(t,y,J)
-        J[1]=jac(t,y[1])
-    end
+function explicit_ineff(t0, y0, F::Function, jac)
+    F!(t,y,dy) =(dy[1]=F(t,y[1]))
+    jac!(t,y,J)=(J[1]=jac(t,y[1]))
     return ExplicitODE(t0,[y0],F!,jac!)
 end
 
@@ -234,46 +224,4 @@ function collect(s::Solver)
         error("Attempting to collect an infinite list, use tstop or tspan with finite numbers only")
     end
     collect(imap(deepcopy,s))
-end
-
-
-# some leftovers from the previous implementation
-
-# FIXME: This doesn't really work if x is anything but a Vector or a scalar
-function fdjacobian(F, t, x::Number)
-    ftx = F(t, x)
-
-    # The 100 below is heuristic
-    dx = (x .+ (x==0))./100
-    dFdx = (F(t,x+dx)-ftx)./dx
-
-    return dFdx
-end
-
-function fdjacobian(F, t, x::Vector)
-    ftx = F(t, x)
-    lx = max(length(x),1)
-    dFdx = zeros(eltype(x), lx, lx)
-    for j = 1:lx
-        # The 100 below is heuristic
-        dx = zeros(eltype(x), lx)
-        dx[j] = (x[j] .+ (x[j]==0))./100
-        dFdx[:,j] = (F(t,x+dx)-ftx)./dx[j]
-    end
-    return dFdx
-end
-
-function fdjacobian!{T}(F!, t, x::Vector{T}, J::Array{T,2})
-    ftx = similar(x)
-    ftx2= similar(x)
-    dx  = similar(x)
-    F!(t,x,ftx)
-    lx = max(length(x),1)
-    dFdx = zeros(eltype(x), lx, lx)
-    for j = 1:lx
-        # The 100 below is heuristic
-        dx[j] = (x[j] .+ (x[j]==0))./100
-        F!(t,x+dx,ftx2)
-        J[:,j] = (ftx2-ftx)./dx[j]
-    end
 end

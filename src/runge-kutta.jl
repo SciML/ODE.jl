@@ -114,12 +114,6 @@ function next{RKSF<:RKStepperFixed}(s::Solver{RKSF}, state::RKState)
     b    = s.stepper.tableau.b
     dt   = min(state.dt,s.options.tstop-step.t)
 
-    # m3: why is it necessary to copy here and then copy back below?
-
-    # pwl: to my understanding calc_next_k! needs the starting value
-    # (step.y) but work.ynew is changing in the inner loop, so we need
-    # two distinct arrays, both starting as step.y.
-
     copy!(work.ynew,step.y)
 
     for k=1:length(b)

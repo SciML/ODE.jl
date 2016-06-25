@@ -6,17 +6,17 @@ tspan[end] is the last integration time.
 """
 
 function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
-                jacobian::Function  = (t,y)->fdjacobian(F, t, y),
-                # we need these options explicitly for the dtinit
-                reltol::T   = eps(T)^T(1//3)/10,
-                abstol::T   = eps(T)^T(1//2)/10,
-                initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper))::T,
-                kargs...)
+                        jac = forward_jacobian(F,y0),
+                        # we need these options explicitly for the dtinit
+                        reltol::T   = eps(T)^T(1//3)/10,
+                        abstol::T   = eps(T)^T(1//2)/10,
+                        initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper))::T,
+                        kargs...)
 
     t0 = tspan[1]
 
     # construct a solver
-    equation  = explicit_ineff(t0,y0,F,jac=jacobian)
+    equation  = explicit_ineff(t0,y0,F,jac)
 
     opts = Options{T}(;
                       tspan    = tspan,
