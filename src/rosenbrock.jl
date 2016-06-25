@@ -1,6 +1,9 @@
 #ODEROSENBROCK Solve stiff differential equations, Rosenbrock method
 #   with provided coefficients.
-function oderosenbrock{Ty,T}(F, x0::Ty, tspan::AbstractVector{T}, gamma, a, b, c; jacobian=nothing, kargs...)
+function oderosenbrock{Ty,T}(F, x0::Ty, tspan::AbstractVector{T},
+                             gamma, a, b, c;
+                             jacobian = nothing,
+                             kargs...)
 
     if !isleaftype(T)
         error("The output times have to be of a concrete type.")
@@ -15,7 +18,7 @@ function oderosenbrock{Ty,T}(F, x0::Ty, tspan::AbstractVector{T}, gamma, a, b, c
     if typeof(jacobian) == Function
         G = jacobian
     else
-        G = (t, x)->fdjacobian(F, x, t)
+        G = (t, x)->fdjacobian(F, t, x)
     end
 
     h = diff(tspan)
@@ -67,7 +70,7 @@ const kr4_coefficients = (0.231,
                             6.02015272865   0.1597500684673  0        0
                            -1.856343618677 -8.50538085819   -2.08407513602 0],)
 
-ode4s_kr(F, x0, tspan; jacobian=nothing, kargs...) = oderosenbrock(F, x0, tspan, kr4_coefficients...; jacobian=jacobian, kargs...)
+ode4s_kr(F, x0, tspan; kargs...) = oderosenbrock(F, x0, tspan, kr4_coefficients...; kargs...)
 
 # Shampine coefficients
 const s4_coefficients = (0.5,
@@ -81,7 +84,7 @@ const s4_coefficients = (0.5,
                            372/25   12/5    0   0
                           -112/125 -54/125 -2/5 0],)
 
-ode4s_s(F, x0, tspan; jacobian=nothing, kargs...) = oderosenbrock(F, x0, tspan, s4_coefficients...; jacobian=jacobian, kargs...)
+ode4s_s(F, x0, tspan; kargs...) = oderosenbrock(F, x0, tspan, s4_coefficients...; kargs...)
 
 # Use Shampine coefficients by default (matching Numerical Recipes)
 const ode4s = ode4s_s
