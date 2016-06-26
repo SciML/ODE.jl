@@ -20,19 +20,19 @@ The state of the dense stepper
 - ytmp: work array
 
 """
-type DenseState{T,S} <: AbstractState
-    s0::Step{T,S}
-    s1::Step{T,S}
+type DenseState{St<:AbstractState,T,Y} <: AbstractState{T,Y}
+    s0::Step{T,Y}
+    s1::Step{T,Y}
     last_tout::T
     first_step
-    solver_state::AbstractState
+    solver_state::St
     # used for storing the interpolation result
-    ytmp::S
+    ytmp::Y
     solver_done
 end
 
 
-function start(s::Solver{DenseStepper})
+function start{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S})
     # extract the real solver
     solver = s.stepper.solver
     t0  = solver.ode.t0
@@ -53,7 +53,7 @@ end
 
 # pwl: I agree, but then the problem is that once you decouple them
 # you would lose the opprotunity to detect the roots with each step.
-function next(s::Solver{DenseStepper}, state::DenseState)
+function next{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
 
 
     # m3: I'm not 100% sure what happens here.  I would implement it like so:
@@ -158,7 +158,7 @@ function next(s::Solver{DenseStepper}, state::DenseState)
 end
 
 
-function done(s::Solver{DenseStepper}, state::DenseState)
+function done{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
 
     return (
             state.solver_done ||

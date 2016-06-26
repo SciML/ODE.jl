@@ -11,19 +11,18 @@ A general Runge-Kutta stepper (it cen represent either, a fixed step
 or an adaptive step algorithm).
 
 """
-immutable RKStepper{Kind,tab_name,T<:Number} <: AbstractStepper
-    tableau::Tableau
+immutable RKStepper{Kind,Name,T} <: AbstractStepper{T}
+    tableau::TableauRKExplicit{T}
     function RKStepper()
-        tab = eval(tab_name)
+        tab = convert(T,tableaus_rk_explicit[Name])
         if Kind == :fixed && isadaptive(tab)
             error("Cannot construct a fixed step method from an adaptive step tableau")
         elseif Kind == :adaptive && !isadaptive(tab)
             error("Cannot construct an adaptive step method from an fixed step tableau")
         end
-        new(convert(T,tab))
+        new(tab)
     end
 end
-
 
 typealias RKStepperFixed    RKStepper{:fixed}
 typealias RKStepperAdaptive RKStepper{:adaptive}
@@ -33,9 +32,9 @@ order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
 name(stepper::RKStepper) = typeof(stepper.tableau)
 
-# TODO: possibly handle the initial stepsize and the tableau conversion here?
-solve{K,S,T}(ode::ExplicitODE, stepper::RKStepper{K,S,T}, options::Options{T}) =
-    Solver{RKStepper{K,S,T}}(ode,stepper,options)
+# TODO: possibly handle the initial stepsize here?
+solve(ode::ExplicitODE, stepper::RKStepper, options) =
+          Solver(ode,stepper,options)
 
 
 # lower level interface
@@ -48,21 +47,21 @@ Pre allocated arrays to store temporary data.  Used only by
 Runge-Kutta stepper.
 
 """
-type RKWorkArrays{T}
-    y   ::T
-    ynew::T
-    yerr::T
-    ks  ::Vector{T}
+type RKWorkArrays{Y}
+    y   ::Y
+    ynew::Y
+    yerr::Y
+    ks  ::Vector{Y}
 end
 
 
 """
 State for the Runge-Kutta stepper.
 """
-type RKState{T,S} <: AbstractState
-    step    ::Step{T,S}
+type RKState{T,Y} <: AbstractState{T,Y}
+    step    ::Step{T,Y}
     dt      ::T
-    work    ::RKWorkArrays{S}
+    work    ::RKWorkArrays{Y}
     timeout ::Int
     # This is not currently incremented with each step
     iters   ::Int
@@ -76,10 +75,9 @@ function show(io::IO, state::RKState)
 end
 
 
-function start{T<:RKStepper}(s::Solver{T})
+function start{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
     t0, dt0, y0 = s.ode.t0, s.options.initstep, s.ode.y0
 
-    # TODO: we should do the Butcher table conversion somewhere
     lk = lengthks(s.stepper.tableau)
     work = RKWorkArrays(zero(y0), # y
                         zero(y0), # ynew
@@ -94,7 +92,7 @@ function start{T<:RKStepper}(s::Solver{T})
     # pre-initialize work.ks[1]
     s.ode.F!(t0,y0,work.ks[1])
 
-    step = Step(t0,deepcopy(y0),deepcopy(work.ks[1]))
+    step = Step(t0,copy(y0),copy(work.ks[1]))
 
     timeout = 0 # for step control
     return RKState(step,dt0,work,timeout,0)
@@ -106,7 +104,9 @@ end
 #####################
 
 
-function next{RKSF<:RKStepperFixed}(s::Solver{RKSF}, state::RKState)
+# function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKState)
+# function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state)
+function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state)
     step = state.step
     work = state.work
 
@@ -133,7 +133,7 @@ end
 ########################
 
 
-function next{RKSA<:RKStepperAdaptive}(sol::Solver{RKSA}, state::RKState)
+function next{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state)
 
     const timeout_const = 5
 
@@ -247,7 +247,7 @@ function stepsize_hw92!{T}(work,
                            tableau   ::TableauRKExplicit,
                            dt        ::T,
                            timeout,
-                           options   ::Options)
+                           options   ::Options{T})
     # Estimates the error and a new step size following Hairer &
     # Wanner 1992, p167 (with some modifications)
     #

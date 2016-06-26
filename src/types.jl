@@ -1,4 +1,4 @@
-abstract AbstractODE
+abstract AbstractODE{T,Y}
 
 """
 Explicitly defined ODE of form dy = F(t,y).
@@ -9,17 +9,23 @@ Fields:
 - F!: ODE function `F!(t,y,dy)` which modifies `dy` in-place
 - jac!: TODO
 """
-immutable ExplicitODE{T,S} <: AbstractODE
+immutable ExplicitODE{T,Y} <: AbstractODE{T,Y}
     t0  ::T
-    y0  ::AbstractArray{S}
+    y0  ::Y
     F!  ::Function
     jac!::Function
+    function ExplicitODE(t0::T, y0::Y, F!::Function, jac!::Function)
+        new(t0,y0,F!,jac!)
+    end
 end
 
-# TODO: change (t,y,J)->fdjacobian(F!,t,y,J) to fdjacobian!(F!)
-ExplicitODE{T,S<:AbstractVector}(t0::T, y0::S, F!::Function;
-               jac!::Function = (t,y,J)->fdjacobian!(F!,t,y,J)) =
-                   ExplicitODE{T,S}(t0,y0,F!,jac!)
+ExplicitODE{T,Y}(t0::T, y0::Y, F!::Function;
+                 jac!::Function = forward_jacobian!(F!,similar(y0))) =
+                 ExplicitODE{T,Y}(t0,y0,F!,jac!)
+
+function forward_jacobian!(F!,tmp)
+    (t,y,J)->ForwardDiff.jacobian!(J,(y,dy)->F!(t,y,dy),tmp,y)
+end
 
 """
 
@@ -27,7 +33,7 @@ This type is not yet implemented, but will serve as an implicitly
 defined ODE (i.e. ODE of the form F(t,y,y')=0.
 
 """
-immutable ImplicitODE{T,S} <: AbstractODE
+immutable ImplicitODE{T,Y} <: AbstractODE{T,Y}
 end
 
 
@@ -38,10 +44,10 @@ Convert a out-of-place explicitly defined ODE function to an in-place function.
 Note, this does not help with memory allocations.
 
 """
-function explicit_ineff(t0, y0::AbstractVector, F::Function, jac)
+function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function, jac)
     F!(t,y,dy) =copy!(dy,F(t,y))
     jac!(t,y,J)=copy!(J,jac(t,y))
-    return ExplicitODE(t0,y0,F!,jac!)
+    return ExplicitODE(t0,y0,F!,jac! = jac!)
 end
 
 # A temporary solution for handling scalars, should be faster then the
@@ -50,10 +56,10 @@ end
 # and jac to vector functions F! and jac!.  Still, solving this ODE
 # will result in a vector of length one result, so additional external
 # conversion is necessary.
-function explicit_ineff(t0, y0, F::Function, jac)
+function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function, jac)
     F!(t,y,dy) =(dy[1]=F(t,y[1]))
     jac!(t,y,J)=(J[1]=jac(t,y[1]))
-    return ExplicitODE(t0,[y0],F!,jac!)
+    return ExplicitODE(t0,[y0],F!,jac! = jac!)
 end
 
 
@@ -62,7 +68,7 @@ end
 The abstract type of the actual algorithm to solve an ODE.
 
 """
-abstract AbstractStepper
+abstract AbstractStepper{T}
 
 
 """
@@ -71,7 +77,7 @@ AbstractState keeps the temporary data (state) for the iterator
 Solver{::AbstractStepper}.
 
 """
-abstract AbstractState
+abstract AbstractState{T,Y}
 
 # m3:
 # - docs
@@ -128,7 +134,7 @@ Dense output options:
 - roottol    TODO
 
 """
-type Options{T} # m3:  T->Et
+type Options{T}
     # stepper options
     initstep ::T
     tstop    ::T
@@ -142,7 +148,7 @@ type Options{T} # m3:  T->Et
     isoutofdomain::Function
 
     # dense output options
-    tspan    ::Vector{T}
+    tspan    ::AbstractVector{T}
     points   ::Symbol
 
     # m3: I think this should be an array of functions.  Depending on some
@@ -162,7 +168,7 @@ type Options{T} # m3:  T->Et
                      maxstep  = 1/minstep,
                      # TODO: we need a better guess here, possibly
                      # overwrite it in the call to solve()
-                     initstep = max(min(reltol,abstol,maxstep),minstep),
+                     initstep = minstep,
                      norm     = Base.norm,
                      maxiters = T(Inf),
                      points   = :all,
@@ -195,18 +201,14 @@ of a numerical solution to an ODE.
 - options: options passed to the stepper
 
 """
-type Solver{T<:AbstractStepper} # TODO: immutable?
-    ode     :: AbstractODE
-    stepper :: T
-    options :: Options
+immutable Solver{O<:AbstractODE,S<:AbstractStepper,T}
+    ode     :: O
+    stepper :: S
+    options :: Options{T}
 end
 
-
-# TODO: is this the right way to implement the mid level interface?
-solve(ode, stepper; kargs...) = solve(ode, stepper, Options(kargs...))
-
 # filter the wrong combinations of ode and stepper
-solve{T,S}(ode :: T, stepper :: S, options :: Options) = error("The $S doesn't support $T")
+solve{T,S}(ode::T, stepper::S, options) = error("The $S doesn't support $T")
 
 
 # normally we return the working array, which changes at each step and

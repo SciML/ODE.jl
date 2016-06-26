@@ -2,11 +2,6 @@
 # (also used by MATLAB's ODE23s); see Sec. 4.1 in
 #
 # [SR97] L.F. Shampine and M.W. Reichelt: "The MATLAB ODE Suite," SIAM Journal on Scientific Computing, Vol. 18, 1997, pp. 1–22
-#
-# supports keywords: points = :all | :specified (using dense output)
-#                    jacobian = G(t,y)::Function | nothing (FD)
-
-# Internal
 
 immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
     d :: T
@@ -26,8 +21,8 @@ name(::ModifiedRosenbrockStepper) = "Modified Rosenbrock Stepper"
 
 
 # define the set of ODE problems with which this stepper can work
-solve(ode :: ExplicitODE, stepper :: ModifiedRosenbrockStepper, options :: Options) =
-    Solver{ModifiedRosenbrockStepper}(ode,stepper,options)
+solve(ode::ExplicitODE, stepper::ModifiedRosenbrockStepper, options) =
+    Solver(ode, stepper, options)
 
 
 # lower level interface (iterator)
@@ -61,7 +56,7 @@ function show(io::IO, state :: RosenbrockState)
 end
 
 
-function start(s :: Solver{ModifiedRosenbrockStepper})
+function start{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s :: Solver{O,S})
     t  = s.ode.t0
     dt = s.options.initstep
     y  = s.ode.y0
@@ -84,8 +79,7 @@ function start(s :: Solver{ModifiedRosenbrockStepper})
 end
 
 
-function next(s     :: Solver{ModifiedRosenbrockStepper},
-              state :: RosenbrockState)
+function next{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state)
 
     stepper = s.stepper
     ode     = s.ode
