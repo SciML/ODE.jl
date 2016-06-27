@@ -273,7 +273,7 @@ function stepsize_hw92!{T}(work,
         # TODO: for some reason calling options.isoutofdomain
         # generates a lot of allocations
 
-        # if options.isoutofdomain(work.y[d])
+        # if options.isoutofdomain(work.y[d])::Bool
         if isnan(work.y[d])
             return T(10), dt*facmin, timout_after_nan
         end

@@ -4,8 +4,8 @@
 # [SR97] L.F. Shampine and M.W. Reichelt: "The MATLAB ODE Suite," SIAM Journal on Scientific Computing, Vol. 18, 1997, pp. 1–22
 
 immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
-    d :: T
-    e32 :: T
+    d  ::T
+    e32::T
 
     function ModifiedRosenbrockStepper()
         d   = T(1/(2 + sqrt(2)))
@@ -36,18 +36,18 @@ The state for the Rosenbrock stepper
 - iters: Number of successful steps made
 
 """
-type RosenbrockState{T,S} <: AbstractState
-    step ::Step{T,S}
+type RosenbrockState{T,Y} <: AbstractState
+    step ::Step{T,Vector{Y}}
     dt   ::T
-    F1   ::S
-    F2   ::S
-    J # :: ?
+    F1   ::Vector{Y}
+    F2   ::Vector{Y}
+    J    ::Matrix{Y}
     iters::Int
 end
 
 
 # for debugging
-function show(io::IO, state :: RosenbrockState)
+function show(io::IO, state::RosenbrockState)
     show(io,state.step)
     println("dt =$(state.dt)")
     println("F1 =$(state.F1)")
@@ -56,7 +56,7 @@ function show(io::IO, state :: RosenbrockState)
 end
 
 
-function start{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s :: Solver{O,S})
+function start{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S})
     t  = s.ode.t0
     dt = s.options.initstep
     y  = s.ode.y0
@@ -64,7 +64,7 @@ function start{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s :: Solver{O,S})
 
     J  = Array(eltype(y),length(y),length(y))
 
-    step  = Step(t,deepcopy(y),deepcopy(dy))
+    step  = Step(t,copy(y),copy(dy))
     state = RosenbrockState(step,
                             dt,
                             zero(y), # F1
@@ -104,18 +104,7 @@ function next{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state
         # trim the step size to match the bounds of integration
         dt = min(s.options.tstop-t,dt)
 
-        # TODO: this should go to a specialized function for type stabilty sake
-        # maybe make W a part of ExplicitODE?  Same for tder below?
-        if size(J,1) == 1
-            W = one(J) - dt*d*J
-        else
-            # note: if there is a mass matrix M on the lhs of the ODE, i.e.,
-            #   M * dy/dt = F(t,y)
-            # we can simply replace eye(J) by M in the following expression
-            # (see Sec. 5 in [SR97])
-
-            W = lufact( eye(J) - dt*d*J )
-        end
+        W = lufact!( eye(J) - dt*d*J )
 
         # Approximate time-derivative of F, we are using F1 as a
         # temporary array
@@ -131,11 +120,11 @@ function next{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state
         ode.F!(t+dt,   ynew,      F2)
         k3 = W \ (F2 - e32*(k2 - F1) - 2*(k1 - F0) + tder )
 
-        delta = max(opts.reltol*max(opts.norm(y),
-                                    opts.norm(ynew)),
+        delta = max(opts.reltol*max(opts.norm(y)::eltype(y),
+                                    opts.norm(ynew)::eltype(y)),
                     opts.abstol) # allowable error
 
-        err = (dt/6)*opts.norm(k1 - 2*k2 + k3)/delta # error estimate
+        err = (dt/6)*(opts.norm(k1 - 2*k2 + k3)::eltype(y))/delta # error estimate
 
         # upon a failed step decrease the step size
         dtnew = min(opts.maxstep,
