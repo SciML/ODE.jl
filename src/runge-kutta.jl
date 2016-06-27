@@ -104,8 +104,6 @@ end
 #####################
 
 
-# function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKState)
-# function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state)
 function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state)
     step = state.step
     work = state.work
@@ -133,9 +131,9 @@ end
 ########################
 
 
-function next{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state)
+const timeout_const = 5
 
-    const timeout_const = 5
+function next{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state)
 
     # the initial values
     dt      = state.dt          # dt is the previous stepisze, it is
@@ -239,6 +237,7 @@ function rk_embedded_step!(work      ::RKWorkArrays,
         work.ynew[d] = y[d] + dt*work.ynew[d]
     end
 
+    return nothing
 end
 
 
@@ -246,7 +245,7 @@ function stepsize_hw92!{T}(work,
                            last_step ::Step,
                            tableau   ::TableauRKExplicit,
                            dt        ::T,
-                           timeout,
+                           timeout   ::Int,
                            options   ::Options{T})
     # Estimates the error and a new step size following Hairer &
     # Wanner 1992, p167 (with some modifications)
@@ -268,12 +267,17 @@ function stepsize_hw92!{T}(work,
     facmin = 1./facmax  # maximal step size decrease. ?
     dof = length(last_step.y)
 
-    if findfirst(options.isoutofdomain,work.y) != 0
-        return T(10), dt*facmin, timout_after_nan
-    end
-
     # in-place calculate yerr./tol
     for d=1:dof
+
+        # TODO: for some reason calling options.isoutofdomain
+        # generates a lot of allocations
+
+        # if options.isoutofdomain(work.y[d])
+        if isnan(work.y[d])
+            return T(10), dt*facmin, timout_after_nan
+        end
+
         y0 = last_step.y[d] # TODO: is this supposed to be the last successful step?
         y1 = work.ynew[d]    # the approximation to the next step
         sci = (options.abstol + options.reltol*max(norm(y0),norm(y1)))
@@ -311,4 +315,5 @@ function calc_next_k!(work      ::RKWorkArrays,
         end
     end
     ode.F!(t + c[i]*dt, work.y, work.ks[i])
+    return nothing
 end

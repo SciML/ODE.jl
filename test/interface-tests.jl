@@ -40,6 +40,10 @@ Base.zero(::CompSol) = zero(CompSol)
 # TODO: This is now an option and has to be passed to the
 # solvers.  Looks ugly and a kind of a pain to handle.
 isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
+# TODO: We should decide on which version do we pick.  The isnan
+# variant seems to be causing less trouble (see the allocation comment
+# in runge_kutta.jl).
+Base.isnan(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
 
 # Because the new RK solvers wrap scalars in an array and because of
 # https://github.com/JuliaLang/julia/issues/11053 these are also needed:

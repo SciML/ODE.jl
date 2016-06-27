@@ -1,7 +1,7 @@
 using ODE
 using Base.Test
 
-tol = 1e-2
+const tol = 1e-2
 
 solvers = [
            ## Non-stiff
@@ -93,5 +93,6 @@ let
     @test norm(refsol-y[end], Inf) < 2e-10
 end
 include("interface-tests.jl")
+include("iterators.jl")
 
 println("All looks OK")

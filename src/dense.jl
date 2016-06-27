@@ -37,12 +37,12 @@ function start{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S})
     solver = s.stepper.solver
     t0  = solver.ode.t0
     y0  = solver.ode.y0
-    dy0 = deepcopy(y0)
+    dy0 = copy(y0)
     solver.ode.F!(t0,y0,dy0)
-    step0 = Step(t0,deepcopy(y0),deepcopy(dy0))
-    step1 = Step(t0,deepcopy(y0),deepcopy(dy0))
+    step0 = Step(t0,copy(y0),copy(dy0))
+    step1 = Step(t0,copy(y0),copy(dy0))
     solver_state = start(solver)
-    ytmp = deepcopy(y0)
+    ytmp = copy(y0)
     return DenseState(step0, step1, t0-1, true, solver_state, ytmp, false)
 end
 
