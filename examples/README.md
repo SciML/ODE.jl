@@ -8,3 +8,5 @@ You can also directly see the result without installing anything. Just follow th
 * [Simple differential equation](http://nbviewer.jupyter.org/github/JuliaLang/ODE.jl/blob/master/examples/Simple_Differential_Equation.ipynb)
 * [Lorenz Attractor](http://nbviewer.jupyter.org/github/JuliaLang/ODE.jl/blob/master/examples/Lorenz_Attractor.ipynb)
 * [Terminal Velocity](http://nbviewer.jupyter.org/github/JuliaLang/ODE.jl/blob/master/examples/Terminal_Velocity.ipynb)
+* [Duffing oscillator](https://github.com/YingboMa/ODE.jl/tree/ym/examples/examples)
+* [Van der Pol oscillator](https://github.com/YingboMa/ODE.jl/blob/ym/examples/examples/Van%20der%20Pol%20oscillator.ipynb)
