@@ -34,11 +34,15 @@ for solver in solvers
     # we need to fix initstep for the fixed-step methods
     t,y=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1)
     @test maximum(abs(y-6t)) < tol
+    t,y=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1, jac = (t,y)->0.)
+    @test maximum(abs(y-6t)) < tol
 
     # dy
     # -- = 2t ==> y = t.^2
     # dt
     t,y=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001)
+    @test maximum(abs(y-t.^2)) < tol
+    t,y=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001, jac = (t,y)->0.)
     @test maximum(abs(y-t.^2)) < tol
 
     # test typeof(tspan)==Vector{Int} does not throw
@@ -55,8 +59,12 @@ for solver in solvers
     # dt
     t,y=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001)
     @test maximum(abs(y-e.^t)) < tol
+    t,y=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001, jac = (t,y)->1.)
+    @test maximum(abs(y-e.^t)) < tol
 
     t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001)
+    @test maximum(abs(y-e.^(t-1))) < tol
+    t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001, jac = (t,y)->1.)
     @test maximum(abs(y-e.^(t-1))) < tol
 
     # dv       dw
@@ -65,6 +73,9 @@ for solver in solvers
     #
     # y = [v, w]
     t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001)
+    ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
+    @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
+    t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001, jac=(t,y)->Float64[[0,1] [-1,0]])
     ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
     @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
 end
