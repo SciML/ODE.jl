@@ -20,11 +20,11 @@ immutable ExplicitODE{T,Y} <: AbstractODE{T,Y}
 end
 
 ExplicitODE{T,Y}(t0::T, y0::Y, F!::Function;
-                 jac!::Function = forward_jacobian!(F!,similar(y0))) =
+                 jac!::Function = forward_jacobian!(F!,similar(y0)), kargs...) =
                  ExplicitODE{T,Y}(t0,y0,F!,jac!)
 
 function forward_jacobian!(F!,tmp)
-    (t,y,J)->ForwardDiff.jacobian!(J,(y,dy)->F!(t,y,dy),tmp,y)
+    (t,y,J)->ForwardDiff.jacobian!(J,(dy,y)->F!(t,y,dy),tmp,y)
 end
 
 """
@@ -44,10 +44,10 @@ Convert a out-of-place explicitly defined ODE function to an in-place function.
 Note, this does not help with memory allocations.
 
 """
-function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function, jac)
+function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function; kargs...)
     F!(t,y,dy) =copy!(dy,F(t,y))
     jac!(t,y,J)=copy!(J,jac(t,y))
-    return ExplicitODE(t0,y0,F!,jac! = jac!)
+    return ExplicitODE(t0,y0,F!;kargs...)
 end
 
 # A temporary solution for handling scalars, should be faster then the
@@ -56,10 +56,10 @@ end
 # and jac to vector functions F! and jac!.  Still, solving this ODE
 # will result in a vector of length one result, so additional external
 # conversion is necessary.
-function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function, jac)
+function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function; kargs...)
     F!(t,y,dy) =(dy[1]=F(t,y[1]))
     jac!(t,y,J)=(J[1]=jac(t,y[1]))
-    return ExplicitODE(t0,[y0],F!,jac! = jac!)
+    return ExplicitODE(t0,[y0],F!;kargs...)
 end
 
 

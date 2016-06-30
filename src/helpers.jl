@@ -67,13 +67,3 @@ function findroot(f,rng,eps)
 
     return (xr+xl)/2
 end
-
-
-# generate a jacobian using ForwardDiff
-function forward_jacobian(F,y0::AbstractArray)
-    (t,y)->ForwardDiff.jacobian(y->F(t,y),y)
-end
-
-function forward_jacobian(F,y0)
-    (t,y)->ForwardDiff.derivative(y->F(t,y),y)
-end

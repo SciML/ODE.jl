@@ -6,7 +6,6 @@ tspan[end] is the last integration time.
 """
 
 function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
-                        jac = forward_jacobian(F,y0),
                         # we need these options explicitly for the dtinit
                         reltol::T   = eps(T)^T(1//3)/10,
                         abstol::T   = eps(T)^T(1//2)/10,
@@ -16,7 +15,7 @@ function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractSteppe
     t0 = tspan[1]
 
     # construct a solver
-    equation  = explicit_ineff(t0,y0,F,jac)
+    equation  = explicit_ineff(t0,y0,F;kargs...)
 
     opts = Options{T}(;
                       tspan    = tspan,
@@ -56,6 +55,12 @@ function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractSteppe
 
     return (tn,yn)
 end
+
+"""
+    ODE.odeXX(F,y0,t0;kargs...)
+
+Solves an ODE `y'=F(t,y)` with initial conditions `y0` and `t0`.
+"""
 
 ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0,ModifiedRosenbrockStepper; kargs...)
 ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:feuler}; kargs...)
