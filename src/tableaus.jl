@@ -10,8 +10,6 @@ abstract Tableau{T<:Real}
 # S is the number of stages (an int)
 # T is the type of the coefficients
 #
-# TODO: have a type parameter which specifies adaptive vs non-adaptive
-#
 # For all types of tableaus it assumes fields:
 # order::(Int...) # order of the method(s)
 #
@@ -78,28 +76,13 @@ function TableauRKExplicit(name::AbstractString, order::(@compat(Tuple{Vararg{In
                          convert(Matrix{T},b), convert(Vector{T},c) )
 end
 
-
-# TODO: remove conv_field
-conv_field{T,N}(D,a::Array{T,N}) = convert(Array{D,N}, a)
-
-
 lengthks(tab::TableauRKExplicit) = length(tab.c)
 
-# TODO: there should be a better way to do it
-function Base.convert{Tnew<:Real,T}(::Type{Tnew}, tab::TableauRKExplicit{T})
-    # Converts the tableau coefficients to the new type Tnew
-    newflds = ()
-    @compat for n in [:a,:b,:c]
-        fld = getfield(tab,n)
-        if eltype(fld)==T
-            newflds = tuple(newflds..., conv_field(Tnew, fld))
-        else
-            newflds = tuple(newflds..., fld)
-        end
-    end
-    TableauRKExplicit{Tnew}(tab.name, tab.order, newflds...) # TODO: could this be done more generically in a type-stable way?
-end
-
+Base.convert{Tnew<:Real,T}(::Type{TableauRKExplicit{Tnew}}, tab::TableauRKExplicit{T}) =
+    TableauRKExplicit{Tnew}(tab.name, tab.order,
+                            convert(Matrix{Tnew},tab.a),
+                            convert(Matrix{Tnew},tab.b),
+                            convert(Vector{Tnew},tab.c))
 
 isexplicit(b::TableauRKExplicit) = istril(b.a) # Test whether it's an explicit method
 isadaptive(b::TableauRKExplicit) = size(b.b, 1)==2

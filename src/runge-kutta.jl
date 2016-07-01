@@ -14,7 +14,7 @@ or an adaptive step algorithm).
 immutable RKStepper{Kind,Name,T} <: AbstractStepper{T}
     tableau::TableauRKExplicit{T}
     function RKStepper()
-        tab = convert(T,tableaus_rk_explicit[Name])
+        tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
         if Kind == :fixed && isadaptive(tab)
             error("Cannot construct a fixed step method from an adaptive step tableau")
         elseif Kind == :adaptive && !isadaptive(tab)
