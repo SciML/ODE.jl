@@ -6,7 +6,7 @@ Chooses an initial step-size basing on the equation, initial data,
 time span and the order of the method of integration.
 
 """
-function dtinit{T}(F, y0, tspan::Vector{T}, reltol, abstol; order = 1)
+function dtinit{T}(F, y0, tspan::AbstractVector{T}, reltol, abstol; order = 1)
     t0 = abs(tspan[1])
     tstop = abs(tspan[end])
     tau = max(reltol*norm(y0, Inf), abstol)

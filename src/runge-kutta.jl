@@ -285,7 +285,7 @@ function stepsize_hw92!{T}(work,
     end
 
     # TOOD: should we use options.norm here as well?
-    err   = norm(work.yerr) # Eq. 4.11
+    err   = options.norm(work.yerr) # Eq. 4.11
     newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1/(ord+1)))) # Eq 4.13 modified
 
     if timeout > 0

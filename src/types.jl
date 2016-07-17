@@ -24,7 +24,8 @@ ExplicitODE{T,Y}(t0::T, y0::Y, F!::Function;
                  ExplicitODE{T,Y}(t0,y0,F!,jac!)
 
 function forward_jacobian!(F!,tmp)
-    (t,y,J)->ForwardDiff.jacobian!(J,(dy,y)->F!(t,y,dy),tmp,y)
+    jac!(t,y,J)=ForwardDiff.jacobian!(J,(dy,y)->F!(t,y,dy),tmp,y)
+    return jac!
 end
 
 """
