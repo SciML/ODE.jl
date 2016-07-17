@@ -1,68 +1,75 @@
-abstract AbstractODE{T,Y}
+abstract AbstractIVP{T,Y}
 
 """
-Explicitly defined ODE of form dy = F(t,y).
 
-Fields:
+Defines the mathematical part of an IVP (initial value problem)
+specified in the general form:
 
-- t0, y0: initial conditions
-- F!: ODE function `F!(t,y,dy)` which modifies `dy` in-place
-- jac!: TODO
+`F(t, y) =  G(t, y, dy)` with `y(t0)= y0`
+
+Depending on the combination of the parameters this type can represent
+a wide range of problems, including ODE, DAE and IMEX.  Nevertheless
+not all solvers will support any combinations of `F` and `G`.  Note
+that not specifying `G` amounts to `G=dy/dt`.
+
+
+- `tspan` -- tuple `(start_t,end_t)`
+- `y0` -- initial condition
+- `F!` -- in-place `F` function `F!(t,y,res)`.  If `F=0` set to `nothing`.
+- `G!` -- in-place `G` function `G!(t,y,dy,res)`.  If `G=dy/dt` then
+          set to `nothing` (or `dy` if the solver supports this).  Can
+          also be a mass matrix for a RHS `M dy/dt`
+- `J!` -- in-place Jacobian function `J!(t,y,dy,res)`.
+
+TODO: how to fit the sparsity pattern in J?
+
 """
-immutable ExplicitODE{T,Y} <: AbstractODE{T,Y}
+type IVP{T,Y,F,G,J} <: AbstractIVP{T,Y}
     t0  ::T
     y0  ::Y
-    F!  ::Function
-    jac!::Function
-    function ExplicitODE(t0::T, y0::Y, F!::Function, jac!::Function)
-        new(t0,y0,F!,jac!)
-    end
-end
-
-ExplicitODE{T,Y}(t0::T, y0::Y, F!::Function;
-                 jac!::Function = forward_jacobian!(F!,similar(y0)), kargs...) =
-                 ExplicitODE{T,Y}(t0,y0,F!,jac!)
-
-function forward_jacobian!(F!,tmp)
-    jac!(t,y,J)=ForwardDiff.jacobian!(J,(dy,y)->F!(t,y,dy),tmp,y)
-    return jac!
+    dy0 ::Y
+    F!  ::F
+    G!  ::G
+    J!  ::J
 end
 
 """
 
-This type is not yet implemented, but will serve as an implicitly
-defined ODE (i.e. ODE of the form F(t,y,y')=0.
+Explicit ODE representing the problem
+
+`dy = F(t,y)` with `y(t0)=y0`
+
+- t0, y0: initial conditions
+- F!: in place version of `F` called by `F!(t,y,dy)`
+- J!: (optional) computes `J=dF/dy` in place, called with `J!(t,y,J)`
 
 """
-immutable ImplicitODE{T,Y} <: AbstractODE{T,Y}
-end
+typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
+@compat (::Type{ExplicitODE}){T,Y}(t0::T,
+                                   y0::Y,
+                                   F!::Function;
+                                   J!::Function = forward_jacobian!(F!,similar(y0))) =
+                                       ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
 
 
 """
 
-Convert a out-of-place explicitly defined ODE function to an in-place function.
+Implicit ODE representing the problem
 
-Note, this does not help with memory allocations.
+`F(t,y,dy)=0` with `y(t0)=y0` and optionally `y'(t0)=dy0`
+
+- t0, y0: initial conditions
+- F!: in place version of `F` called by `F!(t,y,dy)`
+- J!: (optional) computes `J=dF/dy+a*dF/dy'` for prescribed `a`, called with `J!(t,y,dy,a)`
 
 """
-function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function; kargs...)
-    F!(t,y,dy) =copy!(dy,F(t,y))
-    jac!(t,y,J)=copy!(J,jac(t,y))
-    return ExplicitODE(t0,y0,F!;kargs...)
-end
-
-# A temporary solution for handling scalars, should be faster then the
-# previous implementation.  Should be used only at the top level
-# interface.  This function cheats by converting scalar functions F
-# and jac to vector functions F! and jac!.  Still, solving this ODE
-# will result in a vector of length one result, so additional external
-# conversion is necessary.
-function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function; kargs...)
-    F!(t,y,dy) =(dy[1]=F(t,y[1]))
-    jac!(t,y,J)=(J[1]=jac(t,y[1]))
-    return ExplicitODE(t0,[y0],F!;kargs...)
-end
-
+typealias ImplicitODE{T,Y} IVP{T,Y,Void,Function,Function}
+@compat (::Type{ImplicitODE}){T,Y}(t0::T,
+                                   y0::Y,
+                                   G!::Function;
+                                   J!::Function = forward_jacobian_implicit!(F!,similar(y0)),
+                                   dy0::Y = zero(y0)) =
+                                       ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
 
 """
 
@@ -192,6 +199,7 @@ function show{T}(io::IO, opts :: Options{T})
     end
 end
 
+
 """
 
 This is an iterable type, each call to next(...) produces a next step
@@ -202,7 +210,7 @@ of a numerical solution to an ODE.
 - options: options passed to the stepper
 
 """
-immutable Solver{O<:AbstractODE,S<:AbstractStepper,T}
+immutable Solver{O<:AbstractIVP,S<:AbstractStepper,T}
     ode     :: O
     stepper :: S
     options :: Options{T}

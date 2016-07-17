@@ -67,3 +67,21 @@ function findroot(f,rng,eps)
 
     return (xr+xl)/2
 end
+
+# generate a jacobian using ForwardDiff
+function forward_jacobian(F,y0::AbstractArray)
+    (t,y)->ForwardDiff.jacobian(y->F(t,y),y)
+end
+
+function forward_jacobian(F,y0)
+    (t,y)->ForwardDiff.derivative(y->F(t,y),y)
+end
+
+function forward_jacobian!(F!,tmp)
+    jac!(t,y,J)=ForwardDiff.jacobian!(J,(dy,y)->F!(t,y,dy),tmp,y)
+    return jac!
+end
+
+function forward_jacobian_implicit!(F!,tmp)
+    error("Not implemented yet")
+end

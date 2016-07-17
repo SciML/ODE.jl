@@ -35,7 +35,7 @@ for solver in solvers
     # we need to fix initstep for the fixed-step methods
     t,y=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1)
     @test maximum(abs(y-6t)) < tol
-    tj,yj=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1, jac! = (t,y,dy)->dy[1]=0.0)
+    tj,yj=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1, J! = (t,y,dy)->dy[1]=0.0)
     @test maximum(abs(yj-6tj)) < tol
     @test norm(map(norm,yj-y,Inf))<eps(1.)
 
@@ -44,7 +44,7 @@ for solver in solvers
     # dt
     t,y=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001)
     @test maximum(abs(y-t.^2)) < tol
-    tj,yj=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001, jac! = (t,y,dy)->dy[1]=0.0)
+    tj,yj=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001, J! = (t,y,dy)->dy[1]=0.0)
     @test maximum(abs(yj-tj.^2)) < tol
     @test norm(map(norm,yj-y,Inf))<eps(1.)
 
@@ -53,13 +53,13 @@ for solver in solvers
     # dt
     t,y=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001)
     @test maximum(abs(y-e.^t)) < tol
-    tj,yj=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001, jac! = (t,y,dy)->dy[1]=1.0)
+    tj,yj=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
     @test maximum(abs(yj-e.^tj)) < tol
     @test norm(map(norm,yj-y,Inf))<eps(1.)
 
     t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001)
     @test maximum(abs(y-e.^(t-1))) < tol
-    tj,yj=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001, jac! = (t,y,dy)->dy[1]=1.0)
+    tj,yj=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
     @test maximum(abs(yj-e.^(tj-1))) < tol
     @test norm(map(norm,yj-y,Inf))<eps(1.)
 
@@ -71,7 +71,7 @@ for solver in solvers
     t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001)
     ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
     @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
-    tj,yj=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001, jac! = (t,y,dy)->copy!(dy,Float64[[0,1] [-1,0]]))
+    tj,yj=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001, J! = (t,y,dy)->copy!(dy,Float64[[0,1] [-1,0]]))
     ysj = hcat(yj...).'   # convert Vector{Vector{Float}} to Matrix{Float}
     @test maximum(abs(ysj-[cos(tj)-2*sin(tj) 2*cos(tj)+sin(tj)])) < tol
     @test norm(map(norm,yj-y,Inf))<eps(1.)

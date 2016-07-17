@@ -80,7 +80,7 @@ function test_ode()
                     Fscal = (t,y)->F(t,[y])[1]
                     y0scal = y0[1]
                     # with jacobian
-                    tj,yj = ODE.ode(Fscal,y0scal,tspan,stepper,points=points,initstep = h0,jac! = jac!)
+                    tj,yj = ODE.ode(Fscal,y0scal,tspan,stepper,points=points,initstep = h0,J! = jac!)
                     @test_approx_eq_eps yj map(x->sol(x)[1],tj) tol
                     # without jacobian
                     t,y   = ODE.ode(Fscal,y0scal,tspan,stepper,points=points,initstep = h0)
@@ -99,7 +99,7 @@ function test_ode()
 
                 # ODE.odeXX vector interface
                 # with jacobian
-                tj,yj = ODE.ode(F,y0,tspan,stepper,points=points,initstep = h0,jac! = jac!)
+                tj,yj = ODE.ode(F,y0,tspan,stepper,points=points,initstep = h0,J! = jac!)
                 @test_approx_eq_eps hcat(yj...) hcat(map(sol,tj)...) tol
                 # without jacobian
                 t,y   = ODE.ode(F,y0,tspan,stepper,points=points,initstep = h0)

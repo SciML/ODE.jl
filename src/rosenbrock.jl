@@ -1,13 +1,3 @@
-# generate a jacobian using ForwardDiff
-function forward_jacobian(F,y0::AbstractArray)
-    (t,y)->ForwardDiff.jacobian(y->F(t,y),y)
-end
-
-function forward_jacobian(F,y0)
-    (t,y)->ForwardDiff.derivative(y->F(t,y),y)
-end
-
-
 #ODEROSENBROCK Solve stiff differential equations, Rosenbrock method
 #   with provided coefficients.
 function oderosenbrock{Ty,T}(F, x0::Ty, tspan::AbstractVector{T},

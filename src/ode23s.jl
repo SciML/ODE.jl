@@ -73,7 +73,7 @@ function start{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S})
                             0)       # iters
     # initialize the derivative and the Jacobian
     s.ode.F!(t,y,step.dy)
-    s.ode.jac!(t,y,state.J)
+    s.ode.J!(t,y,state.J)
 
     return state
 end
@@ -89,7 +89,7 @@ function next{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state
     F1, F2, J = state.F1, state.F2, state.J
 
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
-    # F!, jac! = ode.F!, ode.jac!
+    # F!, J! = ode.F!, ode.J!
     d, e32 = stepper.d, stepper.e32
 
     F0 = dy
@@ -138,7 +138,7 @@ function next{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state
             state.dt   = dtnew
             step.y[:]  = ynew
             step.dy[:] = F2
-            ode.jac!(step.t,step.y,J)
+            ode.J!(step.t,step.y,J)
 
             return ((step.t,step.y), state)
         else

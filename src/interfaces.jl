@@ -10,12 +10,13 @@ function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractSteppe
                         reltol::T   = eps(T)^T(1//3)/10,
                         abstol::T   = eps(T)^T(1//2)/10,
                         initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper))::T,
+                        jac = forward_jacobian(F,copy(y0)),
                         kargs...)
 
     t0 = tspan[1]
 
     # construct a solver
-    equation  = explicit_ineff(t0,y0,F;kargs...)
+    equation  = explicit_ineff(t0,y0,F,jac)
 
     opts = Options{T}(;
                       tspan    = tspan,
@@ -115,12 +116,12 @@ function reverse_time(sol::Solver)
 
     # TODO: is that how the jacobian changes?
     function jac_reverse!(t,y,J)
-        ode.jac!(2*t0-t,y,J)
+        ode.J!(2*t0-t,y,J)
         J[:]=-J
     end
 
     # ExplicitODE is immutable
-    ode_reversed = ExplicitODE(t0,y0,F_reverse!,jac! = jac_reverse!)
+    ode_reversed = ExplicitODE(t0,y0,F_reverse!,J! = jac_reverse!)
     stopevent = options.stopevent
 
     # TODO: we are modifying options here, should we construct new
@@ -129,4 +130,30 @@ function reverse_time(sol::Solver)
     options.tspan     = reverse(2*t0.-options.tspan)
     options.stopevent = (t,y)->stopevent(2*t0-t,y)
     return solve(ode_reversed,stepper,options)
+end
+
+
+"""
+
+Convert a out-of-place explicitly defined ODE function to
+ExplicitODE.  As the name suggests, the result is not going to be very
+efficient.
+
+"""
+function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function, jac::Function)
+    F!(t,y,dy) =copy!(dy,F(t,y))
+    jac!(t,y,J)=copy!(J,jac(t,y))
+    return ExplicitODE(t0,y0,F!; J! = jac!)
+end
+
+# A temporary solution for handling scalars, should be faster then the
+# previous implementation.  Should be used only at the top level
+# interface.  This function cheats by converting scalar functions F
+# and jac to vector functions F! and jac!.  Still, solving this ODE
+# will result in a vector of length one result, so additional external
+# conversion is necessary.
+function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function, jac)
+    F!(t,y,dy) =(dy[1]=F(t,y[1]))
+    jac!(t,y,J)=(J[1]=jac(t,y[1]))
+    return ExplicitODE(t0,[y0],F!; J! = jac!)
 end
