@@ -4,9 +4,7 @@ module ODE
 
 using Polynomials
 using Compat
-using Iterators
 using ForwardDiff
-using Parameters
 
 import Base.convert, Base.show
 import Base: start, next, done, call, collect
