@@ -3,26 +3,30 @@
 #
 # [SR97] L.F. Shampine and M.W. Reichelt: "The MATLAB ODE Suite," SIAM Journal on Scientific Computing, Vol. 18, 1997, pp. 1–22
 
-immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
+immutable ModifiedRosenbrockStepper{T<:Number,O<:Options} <: AbstractStepper
     d  ::T
     e32::T
-
-    function ModifiedRosenbrockStepper()
-        d   = T(1/(2 + sqrt(2)))
-        e32 = T(6 + sqrt(2))
-        new(d,e32)
-    end
+    options::O
 end
+
+@compat function (::Type{ModifiedRosenbrockStepper{T}}){T}(;options...)
+    d   = T(1/(2 + sqrt(2)))
+    e32 = T(6 + sqrt(2))
+    opt = AdaptiveOptions{T}(;options...)
+    ModifiedRosenbrockStepper(d,e32,opt)
+end
+
 
 # TODO: is this correct?
 order(::ModifiedRosenbrockStepper) = 2
 
 name(::ModifiedRosenbrockStepper) = "Modified Rosenbrock Stepper"
 
+isadaptive(::ModifiedRosenbrockStepper) = true
 
 # define the set of ODE problems with which this stepper can work
-solve(ode::ExplicitODE, stepper::ModifiedRosenbrockStepper, options) =
-    Solver(ode, stepper, options)
+solve{T,S<:ModifiedRosenbrockStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
+    Solver(ode,stepper{T}(;options...))
 
 
 # lower level interface (iterator)
@@ -58,7 +62,7 @@ end
 
 function start{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S})
     t  = s.ode.t0
-    dt = s.options.initstep
+    dt = s.stepper.options.initstep
     y  = s.ode.y0
     dy = zero(y)
 
@@ -84,7 +88,7 @@ function next{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state
     stepper = s.stepper
     ode     = s.ode
     step    = state.step
-    opts    = s.options
+    opts    = s.stepper.options
 
     F1, F2, J = state.F1, state.F2, state.J
 
@@ -97,12 +101,12 @@ function next{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state
     while true
 
         state.iters += 1
-        if state.iters > s.options.maxiters
+        if state.iters > opts.maxiters
             return ((step.t,step.y), state)
         end
 
         # trim the step size to match the bounds of integration
-        dt = min(s.options.tstop-t,dt)
+        dt = min(opts.tstop-t,dt)
 
         W = lufact!( eye(J) - dt*d*J )
 
