@@ -1,4 +1,14 @@
+# The main types:
+# - IVP -- holds the mathematical aspects of a IVP
+# - AbstractStepper -- an integrator/solver  (maybe AbstractIntegrator?)
+# - Solver -- holds IVP + Stepper (maybe ProblemSpec, Problem, Spec?)
+# - AbstractState -- holds the iterator state
+#   - Step -- holds the state at one time
+# -
+
+
 abstract AbstractIVP{T,Y}
+Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = T,Y
 
 """
 
@@ -32,6 +42,9 @@ type IVP{T,Y,F,G,J} <: AbstractIVP{T,Y}
     G!  ::G
     J!  ::J
 end
+@compat Base.eltype(t::Type{IVP}) = eltype(supertype(t))
+Base.eltype(t::IVP) = eltype(typeof(t))
+
 
 """
 
@@ -45,31 +58,34 @@ Explicit ODE representing the problem
 
 """
 typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
-@compat (::Type{ExplicitODE}){T,Y}(t0::T,
-                                   y0::Y,
-                                   F!::Function;
-                                   J!::Function = forward_jacobian!(F!,similar(y0))) =
-                                       ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
-
+function ExplicitODE{T,Y}(t0::T,
+                          y0::Y,
+                          F!::Function;
+                          J!::Function = forward_jacobian!(F!,similar(y0)))
+    ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
+end
 
 """
 
 Implicit ODE representing the problem
 
-`F(t,y,dy)=0` with `y(t0)=y0` and optionally `y'(t0)=dy0`
+`G(t,y,dy)=0` with `y(t0)=y0` and optionally `y'(t0)=dy0`
 
 - t0, y0: initial conditions
-- F!: in place version of `F` called by `F!(t,y,dy)`
-- J!: (optional) computes `J=dF/dy+a*dF/dy'` for prescribed `a`, called with `J!(t,y,dy,a)`
+- G!: in place version of `G` called by `G!(res,t,y,dy)`,
+      returns residual in-place in `res`.
+- J!: (optional) computes `J=dF/dy+a*dF/dy'` for prescribed `a`, called with `J!(out,t,y,dy,a)`.
+      Returns Jacobian in-place in `out`.
 
 """
 typealias ImplicitODE{T,Y} IVP{T,Y,Void,Function,Function}
-@compat (::Type{ImplicitODE}){T,Y}(t0::T,
-                                   y0::Y,
-                                   G!::Function;
-                                   J!::Function = forward_jacobian_implicit!(F!,similar(y0)),
-                                   dy0::Y = zero(y0)) =
-                                       ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
+function ImplicitODE{T,Y}(t0::T,
+                          y0::Y,
+                          G!::Function;
+                          J!::Function = forward_jacobian_implicit!(G!,similar(y0)),
+                          dy0::Y = zero(y0))
+    ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
+end
 
 """
 
@@ -102,10 +118,10 @@ Holds a value of a function and its derivative at time t.  This is
 usually used to store the solution of an ODE at particular times.
 
 """
-type Step{T,S}
+type Step{T,Y}
     t ::T
-    y ::S
-    dy::S
+    y ::Y
+    dy::Y
 end
 
 
@@ -116,8 +132,6 @@ function show(io::IO, state::Step)
 end
 
 
-abstract AbstractSolver{T,Y}
-
 """
 
 This is an iterable type, each call to next(...) produces a next step
@@ -127,16 +141,17 @@ output type (`Tuple{T,Y}`) for iteration.
 - ode: is the prescrived ode, along with the initial data
 - stepper: the algorithm used to produce subsequent steps
 
+
 """
-immutable Solver{O<:AbstractIVP,S<:AbstractStepper,T,Y} <: AbstractSolver{T,Y}
+immutable Solver{O<:AbstractIVP,S<:AbstractStepper}
     ode     :: O
     stepper :: S
 end
+#m3:
+# - calling this `Solver` still trips me up
 
-Base.eltype{T,Y}(::Type{AbstractSolver{T,Y}}) = Tuple{T,Y}
-
-Solver{T,Y}(ode::AbstractIVP{T,Y},stepper::AbstractStepper{T}) =
-    Solver{typeof(ode),typeof(stepper),T,Y}(ode,stepper)
+Base.eltype{O}(::Type{Solver{O}}) = eltype(O)
+Base.eltype{O}(::Solver{O}) = eltype(O)
 
 # filter the wrong combinations of ode and stepper
 solve{T,S}(ode::T, stepper::Type{S}, options...) =
@@ -144,7 +159,8 @@ solve{T,S}(ode::T, stepper::Type{S}, options...) =
 
 # In Julia 0.5 the collect needs length to be defined, we cannot do
 # that for a solver
-function collect{T,Y}(s::AbstractSolver{T,Y})
+function collect(s::Solver)
+    T,Y = eltype(s)
     pairs = Array(Tuple{T,Y},0)
     for (t,y) in s
         push!(pairs,(t,copy(y)))
@@ -152,20 +168,21 @@ function collect{T,Y}(s::AbstractSolver{T,Y})
     return pairs
 end
 
-# Transpose a solver to get a (Vector(t),Vector(yout)) style output
-type SolverT{T,Y} <: AbstractSolver{T,Y}
-    solver::AbstractSolver{T,Y}
-end
+#m3: Is this necessary?  -> this would need the AbstractSolver so I commented it.
+# # Transpose a solver to get a (Vector(t),Vector(yout)) style output
+# type SolverT{O,S} <: Solver{O,S}
+#     solver::Solver{T,Y}
+# end
 
-Base.transpose(s::AbstractSolver) = SolverT(s)
-Base.transpose(s::SolverT) = s.solver
+# Base.transpose(s::Solver) = SolverT(s)
+# Base.transpose(s::SolverT) = s.solver
 
-function collect{T,Y}(s::SolverT{T,Y})
-    tout = Array(T,0)
-    yout = Array(Y,0)
-    for (t,y) in s.solver
-        push!(tout,t)
-        push!(yout,y)
-    end
-    return (tout,yout)
-end
+# function collect{T,Y}(s::SolverT{T,Y})
+#     tout = Array(T,0)
+#     yout = Array(Y,0)
+#     for (t,y) in s.solver
+#         push!(tout,t)
+#         push!(yout,y)
+#     end
+#     return (tout,yout)
+# end

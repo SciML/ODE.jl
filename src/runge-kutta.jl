@@ -7,7 +7,7 @@ include("tableaus.jl")
 
 """
 
-A general Runge-Kutta stepper (it cen represent either, a fixed step
+A general Runge-Kutta stepper (it can represent either, a fixed step
 or an adaptive step algorithm).
 
 """
