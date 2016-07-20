@@ -16,30 +16,28 @@ immutable RKStepper{Kind,Name,T,O<:StepperOptions} <: AbstractStepper{T}
     options::O
 end
 
+typealias RKStepperFixed    RKStepper{:fixed}
+typealias RKStepperAdaptive RKStepper{:adaptive}
 
-@compat function (::Type{RKStepper{Kind,Name,T}}){Kind,Name,T}(ode;options...)
+
+@compat function (::Type{RKStepper{Kind,Name,T}}){Kind,Name,T}(;options...)
     tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
     if Kind == :fixed && isadaptive(tab)
         error("Cannot construct a fixed step method from an adaptive step tableau")
     elseif Kind == :adaptive && !isadaptive(tab)
         error("Cannot construct an adaptive step method from an fixed step tableau")
     end
-    ord = minimum(order(tab))
-    options = StepperOptions{T}(ode,ord;options...)
-    RKStepper{Kind,Name,T,typeof(options)}(tab,options)
+    opts = StepperOptions{T}(;options...)
+    RKStepper{Kind,Name,T,typeof(opts)}(tab,opts)
 end
-
-
-typealias RKStepperFixed    RKStepper{:fixed}
-typealias RKStepperAdaptive RKStepper{:adaptive}
 
 
 order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
-name(stepper::RKStepper) = typeof(stepper.tableau)
+name(stepper::RKStepper) = stepper.tableau.name
 
 solve{T,S<:RKStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
-    Solver(ode,stepper{T}(ode;options...))
+    Solver(ode,stepper{T}(;options...))
 
 # lower level interface
 

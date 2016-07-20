@@ -1,4 +1,4 @@
-include("ODE.jl")
+include("../src/ODE.jl")
 
 module Test
 
@@ -13,15 +13,10 @@ st   = ODE.RKStepperAdaptive{:rk45}
 ode  = ODE.ExplicitODE(t0,y0,(t,y,dy)->dy[1]=y[1])
 opts = Dict(:initstep=>0.1,
             :tstop=>1.,
-            :tspan=>[0.,1.],
+            # :tspan=>[0.,1.],
             :points=>:specified,
             :reltol=>1e-5,
             :abstol=>1e-5)
-
-stepper = st{T}(ode)
-sol = ODE.Solver(ode,stepper)
-println(sol)
-
 
 sol = ODE.solve(ode,st;opts...)
 den = ODE.dense(sol;opts...)
@@ -39,8 +34,5 @@ end
 
 println(collect(sol))
 println(collect(den))
-
-println(collect(sol'))
-println(collect(den'))
 
 end
