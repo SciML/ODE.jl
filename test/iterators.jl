@@ -26,15 +26,15 @@ testsets = [
                  :isscalar => true,
                  :name  => "y'=y",
                  :initstep => 0.001),
-            Dict(
-                 :F!    => (t,y,dy)->dy[1]=y[1],
-                 :y0    => [1.0],
-                 :tspan => [1:-0.001:0;],
-                 :jac   => (t,y,dy)->dy[1]=1.0,
-                 :sol   => t->[exp(t-1)],
-                 :isscalar => true,
-                 :name  => "y'=y backwards",
-                 :initstep => 0.001),
+            # Dict(
+            #      :F!    => (t,y,dy)->dy[1]=y[1],
+            #      :y0    => [1.0],
+            #      :tspan => [1:-0.001:0;],
+            #      :jac   => (t,y,dy)->dy[1]=1.0,
+            #      :sol   => t->[exp(t-1)],
+            #      :isscalar => true,
+            #      :name  => "y'=y backwards",
+            #      :initstep => 0.001),
             Dict(
                  :F!    => (t,y,dy)->(dy[1]=-y[2];dy[2]=y[1]),
                  :y0    => [1.0,2.0],
@@ -68,7 +68,7 @@ function test_ode()
         for ts in testsets
             println("Testing problem $(ts[:name])")
 
-            tspan, h0, stepper = ts[:tspan], ts[:initstep], rks{eltype(ts[:tspan])}()
+            tspan, h0, stepper = ts[:tspan], ts[:initstep], rks
 
             y0, F!, jac!, sol = ts[:y0], ts[:F!], ts[:jac], ts[:sol]
 
@@ -117,8 +117,11 @@ function test_ode()
                 # test the iterator interface (they only support forward time integration)
                 if issorted(tspan)
                     equation = ODE.ExplicitODE(tspan[1],y0,F!)
-                    opts     = ODE.Options{eltype(tspan)}(tspan = tspan,initstep = h0,points = points)
-                    solver   = ODE.solve(equation,stepper,opts)
+                    opts     = Dict(:tspan => tspan,
+                                    :initstep => h0,
+                                    :points => points)
+
+                    solver   = ODE.solve(equation,stepper;opts...)
 
                     for (t,y) in solver
                         @test_approx_eq_eps y sol(t) tol

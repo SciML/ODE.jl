@@ -38,11 +38,6 @@ immutable DenseStepper{S<:Solver,O<:DenseOptions} <: AbstractStepper
 end
 
 
-@compat function (::Type{DenseStepper{T}}){T,S<:Solver}(solver::S;options...)
-    DenseStepper(solver,DenseOptions{T}(;options...))
-end
-
-
 function dense{O<:ExplicitODE}(sol::Solver{O}; options...)
     T,_ = eltype(sol)
     opt = DenseOptions{T}(;options...)
