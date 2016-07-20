@@ -1,3 +1,12 @@
+# The main types:
+# - IVP -- holds the mathematical aspects of a IVP
+# - AbstractStepper -- an integrator/solver
+# - AbstractSolver -- holds IVP + Stepper
+# - AbstractState -- holds the iterator state
+#   - Step -- holds the state at one time
+# -
+
+
 abstract AbstractIVP{T,Y}
 
 """
@@ -45,31 +54,34 @@ Explicit ODE representing the problem
 
 """
 typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
-@compat (::Type{ExplicitODE}){T,Y}(t0::T,
-                                   y0::Y,
-                                   F!::Function;
-                                   J!::Function = forward_jacobian!(F!,similar(y0))) =
-                                       ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
-
+function ExplicitODE{T,Y}(t0::T,
+                           y0::Y,
+                           F!::Function;
+                           J!::Function = forward_jacobian!(F!,similar(y0)))
+    ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
+end
 
 """
 
 Implicit ODE representing the problem
 
-`F(t,y,dy)=0` with `y(t0)=y0` and optionally `y'(t0)=dy0`
+`G(t,y,dy)=0` with `y(t0)=y0` and optionally `y'(t0)=dy0`
 
 - t0, y0: initial conditions
-- F!: in place version of `F` called by `F!(t,y,dy)`
-- J!: (optional) computes `J=dF/dy+a*dF/dy'` for prescribed `a`, called with `J!(t,y,dy,a)`
+- G!: in place version of `G` called by `G!(res,t,y,dy)`,
+      returns residual in-place in `res`.
+- J!: (optional) computes `J=dF/dy+a*dF/dy'` for prescribed `a`, called with `J!(out,t,y,dy,a)`.
+      Returns Jacobian in-place in `out`.
 
 """
 typealias ImplicitODE{T,Y} IVP{T,Y,Void,Function,Function}
-@compat (::Type{ImplicitODE}){T,Y}(t0::T,
-                                   y0::Y,
-                                   G!::Function;
-                                   J!::Function = forward_jacobian_implicit!(F!,similar(y0)),
-                                   dy0::Y = zero(y0)) =
-                                       ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
+function ImplicitODE{T,Y}(t0::T,
+                          y0::Y,
+                          G!::Function;
+                          J!::Function = forward_jacobian_implicit!(G!,similar(y0)),
+                          dy0::Y = zero(y0))
+    ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
+end
 
 """
 
@@ -127,11 +139,15 @@ output type (`Tuple{T,Y}`) for iteration.
 - ode: is the prescrived ode, along with the initial data
 - stepper: the algorithm used to produce subsequent steps
 
+
 """
 immutable Solver{O<:AbstractIVP,S<:AbstractStepper,T,Y} <: AbstractSolver{T,Y}
     ode     :: O
     stepper :: S
 end
+#m3:
+# - above O also holds the T and Y type information -> thus remove T,Y.
+# - calling this `Solver` still trips me up
 
 Base.eltype{T,Y}(::Type{AbstractSolver{T,Y}}) = Tuple{T,Y}
 
@@ -152,6 +168,7 @@ function collect{T,Y}(s::AbstractSolver{T,Y})
     return pairs
 end
 
+#m3: Is this necessary?
 # Transpose a solver to get a (Vector(t),Vector(yout)) style output
 type SolverT{T,Y} <: AbstractSolver{T,Y}
     solver::AbstractSolver{T,Y}

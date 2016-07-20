@@ -1,5 +1,6 @@
 abstract Options{T}
 
+#m3: these are default options for adaptive stepper
 """
 
 Options for ODE solvers.  This type has a key-word constructor which
@@ -15,7 +16,7 @@ General:
 - maxstep  ::T  maximal allowed step
 - norm           function to calculate the norm in step control
 - maxiters ::T  maximum number of steps
-- isoutofdomain::Function checks if the solution became non-numeric (NaN or Inf)
+- isoutofdomain::Function checks if the solution is outside of the allowed domain
 
 """
 immutable StepperOptions{T<:Number,N<:Function,O<:Function} <: Options{T}
