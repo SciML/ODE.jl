@@ -54,7 +54,7 @@ function show{T}(io::IO, opts :: Options{T})
     end
 end
 
-
+#pwl: should this be dropped?
 function dtinit{T}(ode::ExplicitODE{T},order::Int,reltol::T,abstol::T,tstop::T)
     t0 = ode.t0
     y0 = ode.y0
