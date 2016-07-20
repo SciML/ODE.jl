@@ -6,14 +6,14 @@ using Polynomials
 using Compat
 using Iterators
 using ForwardDiff
+using Parameters
 
 import Base.convert, Base.show
 import Base: start, next, done, call, collect
 
-## complete function export list: see runtests.jl
-
 # basic type definitions
 include("types.jl")
+include("options.jl")
 include("helpers.jl")
 
 # dense output wrapper

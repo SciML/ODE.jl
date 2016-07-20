@@ -5,38 +5,30 @@ tspan[end] is the last integration time.
 
 """
 
-function ode{T<:Number}(F, y0, tspan::AbstractVector{T}, stepper::AbstractStepper;
-                        # we need these options explicitly for the dtinit
-                        reltol::T   = eps(T)^T(1//3)/10,
-                        abstol::T   = eps(T)^T(1//2)/10,
-                        initstep::T = dtinit(F, y0, tspan, reltol, abstol; order=order(stepper))::T,
-                        jac = forward_jacobian(F,copy(y0)),
-                        kargs...)
+function ode{T<:Number,S<:AbstractStepper}(F, y0,
+                                           tspan::AbstractVector{T},
+                                           stepper::Type{S};
+                                           jac = forward_jacobian(F,copy(y0)),
+                                           kargs...)
 
     t0 = tspan[1]
 
     # construct a solver
     equation  = explicit_ineff(t0,y0,F,jac)
 
-    opts = Options{T}(;
-                      tspan    = tspan,
-                      reltol   = reltol,
-                      abstol   = abstol,
-                      initstep = initstep,
-                      kargs...)
-    solver = solve(equation,stepper,opts)
+    solver = solve(equation,stepper;kargs...)
 
     # handle different directions of time integration
     if issorted(tspan)
         # do nothing, we are already set with the solver
-        solution = collect(dense(solver))
+        solution = collect(dense(solver;kargs...))
     elseif issorted(reverse(tspan))
         # Reverse the time direction if necessary.  dense() only works
         # for positive time direction.
 
         # TODO: still ugly but slightly less bandaid-like then the
         # previous solution
-        solution = map(ty->(2*t0-ty[1],ty[2]),collect(dense(reverse_time(solver))))
+        solution = map(ty->(2*t0-ty[1],ty[2]),collect(dense(reverse_time(solver; kargs...);kargs...)))
     else
         warn("Unsorted output times are not supported")
         return ([t0],[y0])
@@ -87,7 +79,7 @@ function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},stepper;kargs...)
         error("The initial data has to be of a concrete type (or an array)")
     end
 
-    ode(F,y0,t0,stepper{T}();kargs...)
+    ode(F,y0,t0,stepper;kargs...)
 
 end
 
@@ -102,8 +94,12 @@ time direction is not supported by steppers (including the dense
 output).  This only works for ExplicitODE.
 
 """
-function reverse_time(sol::Solver)
-    ode, options, stepper = sol.ode, sol.options, sol.stepper
+function reverse_time(sol::Solver;
+                      tstop = tstop,
+                      tspan = tspan,
+                      stopevent=stopevent,
+                      kargs...)
+    ode, stepper = sol.ode, sol.stepper
 
     t0 = ode.t0
     y0 = ode.y0
@@ -122,14 +118,13 @@ function reverse_time(sol::Solver)
 
     # ExplicitODE is immutable
     ode_reversed = ExplicitODE(t0,y0,F_reverse!,J! = jac_reverse!)
-    stopevent = options.stopevent
 
     # TODO: we are modifying options here, should we construct new
     # options insted?
-    options.tstop     = 2*t0-options.tstop
-    options.tspan     = reverse(2*t0.-options.tspan)
-    options.stopevent = (t,y)->stopevent(2*t0-t,y)
-    return solve(ode_reversed,stepper,options)
+    tstop     = 2*t0-options.tstop
+    tspan     = reverse(2*t0.-options.tspan)
+    stopevent = (t,y)->stopevent(2*t0-t,y)
+    return solve(ode_reversed,stepper; tstop = tstop, tspan = tspan, stopevent = stopevent, kargs...)
 end
 
 

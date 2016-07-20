@@ -11,18 +11,24 @@ A general Runge-Kutta stepper (it cen represent either, a fixed step
 or an adaptive step algorithm).
 
 """
-immutable RKStepper{Kind,Name,T} <: AbstractStepper{T}
+immutable RKStepper{Kind,Name,T,O<:StepperOptions} <: AbstractStepper{T}
     tableau::TableauRKExplicit{T}
-    function RKStepper()
-        tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
-        if Kind == :fixed && isadaptive(tab)
-            error("Cannot construct a fixed step method from an adaptive step tableau")
-        elseif Kind == :adaptive && !isadaptive(tab)
-            error("Cannot construct an adaptive step method from an fixed step tableau")
-        end
-        new(tab)
-    end
+    options::O
 end
+
+
+@compat function (::Type{RKStepper{Kind,Name,T}}){Kind,Name,T}(ode;options...)
+    tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
+    if Kind == :fixed && isadaptive(tab)
+        error("Cannot construct a fixed step method from an adaptive step tableau")
+    elseif Kind == :adaptive && !isadaptive(tab)
+        error("Cannot construct an adaptive step method from an fixed step tableau")
+    end
+    ord = minimum(order(tab))
+    options = StepperOptions{T}(ode,ord;options...)
+    RKStepper{Kind,Name,T,typeof(options)}(tab,options)
+end
+
 
 typealias RKStepperFixed    RKStepper{:fixed}
 typealias RKStepperAdaptive RKStepper{:adaptive}
@@ -32,10 +38,8 @@ order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
 name(stepper::RKStepper) = typeof(stepper.tableau)
 
-# TODO: possibly handle the initial stepsize here?
-solve(ode::ExplicitODE, stepper::RKStepper, options) =
-          Solver(ode,stepper,options)
-
+solve{T,S<:RKStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
+    Solver(ode,stepper{T}(ode;options...))
 
 # lower level interface
 
@@ -76,7 +80,8 @@ end
 
 
 function start{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
-    t0, dt0, y0 = s.ode.t0, s.options.initstep, s.ode.y0
+    stepper = s.stepper
+    t0, dt0, y0 = s.ode.t0, stepper.options.initstep, s.ode.y0
 
     lk = lengthks(s.stepper.tableau)
     work = RKWorkArrays(zero(y0), # y
@@ -110,7 +115,7 @@ function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state)
 
     dof  = length(step.y)
     b    = s.stepper.tableau.b
-    dt   = min(state.dt,s.options.tstop-step.t)
+    dt   = min(state.dt,s.stepper.options.tstop-step.t)
 
     copy!(work.ynew,step.y)
 
@@ -141,14 +146,16 @@ function next{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state)
     timeout = state.timeout
     work    = state.work
     step    = state.step
-    tableau = sol.stepper.tableau
+    stepper = sol.stepper
+    tableau = stepper.tableau
+    options = stepper.options
 
     # The while loop continues until we either find a stepsize which
     # leads to a small enough error or the stepsize reaches
     # prob.minstep
 
     # trim the inital stepsize to avoid overshooting
-    dt      = min(dt, sol.options.tstop-state.step.t)
+    dt      = min(dt, options.tstop-state.step.t)
 
     while true
 
@@ -160,12 +167,12 @@ function next{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state)
         rk_embedded_step!(work, sol.ode, tableau, step, dt)
 
         # changes work.yerr
-        err, newdt, timeout = stepsize_hw92!(work, step, tableau, dt, timeout, sol.options)
+        err, newdt, timeout = stepsize_hw92!(work, step, tableau, dt, timeout, options)
 
         # trim again in case newdt > dt
-        newdt = min(newdt, sol.options.tstop-state.step.t)
+        newdt = min(newdt, options.tstop-state.step.t)
 
-        if abs(newdt) < sol.options.minstep  # minimum step size reached, break
+        if abs(newdt) < options.minstep  # minimum step size reached, break
             # passing the newdt to state will result in done()
             state.dt = newdt
             break

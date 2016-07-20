@@ -1,15 +1,54 @@
 # A higher level stepper, defined as a wrapper around another stepper.
 
-#TODO: how about having an DenseStepper <: AbstractWrapper <: AbstractStepper?
-immutable DenseStepper <: AbstractStepper
-    solver::Solver
+"""
+
+Dense output options:
+
+- tspan    ::Vector{T}  output times
+- points   ::Symbol which points are returned: `:specified` only the
+  ones in tspan or `:all` which includes also the step-points of the solver.
+- stopevent  Stop integration at a zero of this function
+- roottol    TODO
+
+"""
+
+immutable DenseOptions{T<:Number,S<:Function} <: Options{T}
+    tspan    ::Vector{T}
+    tstop    ::T
+    points   ::Symbol
+    stopevent::S
+    roottol  ::T
 end
 
-solve(ode::ExplicitODE,
-      stepper::DenseStepper,
-      options::Options) = Solver(ode,stepper,options)
+@compat function (::Type{DenseOptions{T}}){T,S}(;
+                                                tstop         = T(Inf),
+                                                tspan::Vector = T[tstop],
+                                                points::Symbol= :all,
+                                                stopevent::S  = (t,y)->false,
+                                                roottol       = eps(T)^T(1//3),
+                                                kargs...)
+    DenseOptions{T,S}(tspan,tstop,points,stopevent,roottol)
+end
 
-dense(sol::Solver) = solve(sol.ode, DenseStepper(sol), sol.options)
+
+#TODO: how about having an DenseStepper <: AbstractWrapper <: AbstractStepper?
+immutable DenseStepper{S<:Solver,O<:DenseOptions} <: AbstractStepper
+    solver::S
+    options::O
+end
+
+
+@compat function (::Type{DenseStepper{T}}){T,S<:Solver}(solver::S;
+                                                        options...)
+    DenseStepper(solver,DenseOptions{T}(;options...))
+end
+
+
+function dense{O<:ExplicitODE,S,T,Y}(sol::Solver{O,S,T,Y}; options...)
+    opt = DenseOptions{T}(;options...)
+    den = DenseStepper(sol,opt)
+    Solver{O,typeof(den),T,Y}(sol.ode, den)
+end
 
 """
 
@@ -75,6 +114,7 @@ function next{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
     # not using the index of tspan anywhere explicitly.
 
     solver = s.stepper.solver
+    options = s.stepper.options
 
     # these guys store the intermediate steps we make
     s0, s1 = state.s0, state.s1
@@ -84,7 +124,7 @@ function next{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
     # t_goal to the next larger time from tspan.  Strong inequality
     # below is crucial, otherwise we would be selecting the same step
     # every time.
-    tspan  = s.options.tspan
+    tspan  = options.tspan
     t_goal = tspan[findfirst(t->(t>state.last_tout), tspan)]
 
     # Keep computing new steps (i.e. new pairs (t0,t1)) until we reach
@@ -119,12 +159,12 @@ function next{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
         # we haven't reached t_goal yet (t1<t_goal) but the option
         # points==:all calls for an output at every successful
         # step.
-        if s.options.points == :all && t1 < t_goal-eps(t1)
+        if options.points == :all && t1 < t_goal-eps(t1)
             state.last_tout = t1
             return ((t1,s1.y),state)
         end
 
-        if s.options.stopevent(t1,s1.y)
+        if options.stopevent(t1,s1.y)
             break
         end
 
@@ -137,13 +177,13 @@ function next{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
     solver.ode.F!(t0,s0.y,s0.dy)
     solver.ode.F!(t1,s1.y,s1.dy)
 
-    if s.options.stopevent(t1,s1.y)
+    if options.stopevent(t1,s1.y)
         function stopfun(t)
             hermite_interp!(state.ytmp,t,s0,s1)
-            res = Int(s.options.stopevent(t,state.ytmp))
+            res = Int(options.stopevent(t,state.ytmp))
             return 2*res-1      # -1 if false, +1 if true
         end
-        t_goal = findroot(stopfun, [s0.t,s1.t], s.options.roottol)
+        t_goal = findroot(stopfun, [s0.t,s1.t], options.roottol)
         # state.ytmp is already overwriten to the correct result as a
         # side-effect of calling stopfun
     else
@@ -160,10 +200,12 @@ end
 
 function done{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
 
+    options = s.stepper.options
+
     return (
             state.solver_done ||
-            state.last_tout >= s.options.tspan[end] ||
-            s.options.stopevent(state.s1.t,state.s1.y)
+            state.last_tout >= options.tspan[end] ||
+            options.stopevent(state.s1.t,state.s1.y)
             )
 end
 
