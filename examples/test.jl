@@ -16,7 +16,7 @@ for st in steppers
     ode  = ODE.ExplicitODE(t0,y0,(t,y,dy)->dy[1]=y[1])
     opts = Dict(:initstep=>0.1,
                 :tstop=>1.,
-                # :tspan=>[0.,1.],
+                :tspan=>[0.0,0.5,1.0],
                 :points=>:specified,
                 :reltol=>1e-5,
                 :abstol=>1e-5)
