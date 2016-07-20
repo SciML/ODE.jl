@@ -13,7 +13,7 @@ function ode{T,Y,S<:AbstractStepper}(F, y0::Y,
     t0 = tspan[1]
 
     # construct a solver
-    equation  = explicit_ineff(t0,y0,F)
+    equation  = explicit_ineff(t0,y0,F;kargs...)
     solver  = solve(equation, stepper; tspan = tspan, kargs...)
     dsolver = dense(solver;            tspan = tspan, kargs...)
 
@@ -73,9 +73,9 @@ ExplicitODE.  As the name suggests, the result is not going to be very
 efficient.
 
 """
-function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function)
-    F!(t,y,dy) = copy!(dy,F(t,y))
-    return ExplicitODE(t0,y0,F!)
+function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function; kargs...)
+    F!(t,y,dy) =copy!(dy,F(t,y))
+    return ExplicitODE(t0,y0,F!; kargs...)
 end
 
 # A temporary solution for handling scalars, should be faster then the
@@ -84,7 +84,7 @@ end
 # and jac to vector functions F! and jac!.  Still, solving this ODE
 # will result in a vector of length one result, so additional external
 # conversion is necessary.
-function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function)
-    F!(t,y,dy) = (dy[1]=F(t,y[1]))
-    return ExplicitODE(t0,[y0],F!)
+function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function; kargs...)
+    F!(t,y,dy) =(dy[1]=F(t,y[1]))
+    return ExplicitODE(t0,[y0],F!; kargs...)
 end

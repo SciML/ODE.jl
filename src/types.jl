@@ -61,7 +61,8 @@ typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
 @compat function (::Type{ExplicitODE}){T,Y}(t0::T,
                                             y0::Y,
                                             F!::Function;
-                                            J!::Function = forward_jacobian!(F!,similar(y0)))
+                                            J!::Function = forward_jacobian!(F!,similar(y0)),
+                                            kargs...)
     ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
 end
 
@@ -83,7 +84,8 @@ typealias ImplicitODE{T,Y} IVP{T,Y,Void,Function,Function}
                                             y0::Y,
                                             G!::Function;
                                             J!::Function = forward_jacobian_implicit!(G!,similar(y0)),
-                                            dy0::Y = zero(y0))
+                                            dy0::Y = zero(y0),
+                                            kargs...)
     ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
 end
 
