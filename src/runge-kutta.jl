@@ -5,16 +5,18 @@ include("tableaus.jl")
 
 # intermediate level interface
 
+
 """
 
 A general Runge-Kutta stepper (it can represent either, a fixed step
 or an adaptive step algorithm).
 
 """
-immutable RKStepper{Kind,Name,T,O<:StepperOptions} <: AbstractStepper{T}
+immutable RKStepper{Kind,Name,T,O<:Options} <: AbstractStepper{T}
     tableau::TableauRKExplicit{T}
     options::O
 end
+
 
 typealias RKStepperFixed    RKStepper{:fixed}
 typealias RKStepperAdaptive RKStepper{:adaptive}
@@ -22,12 +24,17 @@ typealias RKStepperAdaptive RKStepper{:adaptive}
 
 @compat function (::Type{RKStepper{Kind,Name,T}}){Kind,Name,T}(;options...)
     tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
-    if Kind == :fixed && isadaptive(tab)
-        error("Cannot construct a fixed step method from an adaptive step tableau")
-    elseif Kind == :adaptive && !isadaptive(tab)
-        error("Cannot construct an adaptive step method from an fixed step tableau")
+    if Kind == :fixed
+        opts = FixedOptions{T}(;options...)
+        if isadaptive(tab)
+            error("Cannot construct a fixed step method from an adaptive step tableau")
+        end
+    elseif Kind == :adaptive
+        opts = AdaptiveOptions{T}(;options...)
+        if !isadaptive(tab)
+            error("Cannot construct an adaptive step method from an fixed step tableau")
+        end
     end
-    opts = StepperOptions{T}(;options...)
     RKStepper{Kind,Name,T,typeof(opts)}(tab,opts)
 end
 
@@ -35,6 +42,9 @@ end
 order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
 name(stepper::RKStepper) = stepper.tableau.name
+
+isadaptive(::RKStepper{:adaptive}) = true
+isadaptive(::RKStepper{:fixed}) = false
 
 solve{T,S<:RKStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
     Solver(ode,stepper{T}(;options...))

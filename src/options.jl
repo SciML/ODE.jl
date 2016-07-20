@@ -1,10 +1,9 @@
 abstract Options{T}
 
-#m3: these are default options for adaptive stepper
 """
 
-Options for ODE solvers.  This type has a key-word constructor which
-will fill the structure with default values.
+Generic options for adaptive ODE solvers.  This type has a key-word
+constructor which will fill the structure with default values.
 
 General:
 
@@ -19,7 +18,7 @@ General:
 - isoutofdomain::Function checks if the solution is outside of the allowed domain
 
 """
-immutable StepperOptions{T<:Number,N<:Function,O<:Function} <: Options{T}
+immutable AdaptiveOptions{T,N<:Function,O<:Function} <: Options{T}
     tstop::T
     reltol::T
     abstol::T
@@ -31,20 +30,43 @@ immutable StepperOptions{T<:Number,N<:Function,O<:Function} <: Options{T}
     isoutofdomain::O
 end
 
-@compat function (::Type{StepperOptions{T}}){T,N,O}(;
-                                                    tstop    = T(Inf),
-                                                    reltol   = eps(T)^T(1//3)/10,
-                                                    abstol   = eps(T)^T(1//2)/10,
-                                                    minstep  = 10*eps(T),
-                                                    maxstep  = 1/minstep,
-                                                    initstep = minstep,
-                                                    norm::N  = Base.norm,
-                                                    steps    = repeated(initstep),
-                                                    maxiters = T(Inf),
-                                                    isoutofdomain::O = Base.isnan,
-                                                    kargs...)
+@compat function (::Type{AdaptiveOptions{T}}){T,N,O}(;
+                                                     tstop    = T(Inf),
+                                                     reltol   = eps(T)^T(1//3)/10,
+                                                     abstol   = eps(T)^T(1//2)/10,
+                                                     minstep  = 10*eps(T),
+                                                     maxstep  = 1/minstep,
+                                                     initstep = minstep,
+                                                     norm::N  = Base.norm,
+                                                     maxiters = T(Inf),
+                                                     isoutofdomain::O = Base.isnan,
+                                                     kargs...)
 
-    StepperOptions{T,N,O}(tstop,reltol,abstol,minstep,maxstep,initstep,norm,maxiters,isoutofdomain)
+    AdaptiveOptions{T,N,O}(tstop,reltol,abstol,minstep,maxstep,initstep,norm,maxiters,isoutofdomain)
+end
+
+"""
+
+Generic options for fixed step ODE solvers.  This type has a key-word
+constructor which will fill the structure with default values.
+
+General:
+
+- initstep ::T  initial step
+- tstop    ::T  end integration time
+
+"""
+immutable FixedOptions{T} <: Options{T}
+    tstop::T
+    initstep::T
+end
+
+@compat function (::Type{FixedOptions{T}}){T}(;
+                                              tstop    = T(Inf),
+                                              initstep = minstep,
+                                              kargs...)
+
+    FixedOptions{T}(tstop,initstep)
 end
 
 function show{T}(io::IO, opts :: Options{T})
