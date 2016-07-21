@@ -14,8 +14,10 @@ function ode{T,Y,S<:AbstractStepper}(F, y0::Y,
 
     # construct a solver
     equation  = explicit_ineff(t0,y0,F;kargs...)
-    solver  = solve(equation, stepper; tspan = tspan, kargs...)
-    dsolver = dense(solver;            tspan = tspan, kargs...)
+    dsolver  = solve(equation, DenseStepper;
+                     mehtod = stepper,
+                     tspan = tspan,
+                     kargs...)
 
     # determine if we have to unpack y
     extract = Y <: Number

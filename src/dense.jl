@@ -38,11 +38,14 @@ immutable DenseStepper{S<:Solver,O<:DenseOptions} <: AbstractStepper
 end
 
 
-function dense{O<:ExplicitODE}(sol::Solver{O}; options...)
-    T,_ = eltype(sol)
-    opt = DenseOptions{T}(;options...)
-    den = DenseStepper(sol,opt)
-    Solver(sol.ode, den)
+function solve{T,S<:DenseStepper}(ode::ExplicitODE{T},
+                                  ::Type{S};
+                                  method = RKStepperAdaptive{:rk45},
+                                  options...)
+    sol_orig = Solver(ode,method{T}(; options...))
+    dense_options = DenseOptions{T}(; options...)
+    dense_stepper = S(sol_orig,dense_options)
+    return Solver(ode,dense_stepper)
 end
 
 """
