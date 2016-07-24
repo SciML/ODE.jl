@@ -168,3 +168,119 @@ function collect(s::Solver)
     end
     return pairs
 end
+
+
+# Iteration: take one step on a ODE/DAE `Problem`
+#
+# Define:
+# start(iter) -> state
+# next(iter, state) -> output(state), state
+# done(iter, state) -> bool
+#
+# Perhaps unintuitively, the next step is computed in `done`.  Such
+# implementation allows to decide if the iterator is exhausted in case
+# when the next step was computed but it was deemed incorrect.  In
+# such situation `done` returns `false` after computing the step and
+# the failed step is never sees the light of the day (by being
+# returned by `next`).
+#
+# TODO: this implementation fails to return the zeroth step (t0,y0)
+#
+# TODO: store the current Step outside of the actual state
+# Base.start(sol::Solver) = (init(sol), Step(ode.sol))
+
+Base.start(sol::Solver) = init(sol)
+
+function Base.done(s::Solver, st)
+    # Determine whether the next step can be made
+    status = onestep!(s, st)
+    return !successful(status)
+end
+
+function Base.next(sol::Solver, st)
+    # Output the step (we know that `done` allowed it, so we are safe
+    # to do it)
+    return output(st), st
+end
+
+
+"""
+TODO: Holds the solver status after onestep.
+"""
+type Status{T} end
+successful(status::Status) = status == StatusContinue
+const StatusContinue = Status{:cont}()
+const StatusFailed = Status{:failed}()
+const StatusFinished = Status{:finished}()
+
+#####
+# Interface to implement by solvers to hook into iteration
+#####
+#
+# See runge_kutta.jl and rosenbrock.jl for example implementations.
+
+# A stepper has to implement
+# - init
+# - output
+# and either
+# - onestep!
+# - trialstep!, errorcontrol! and accept!
+
+"""
+
+Determines wheter we can take one step.  This is the core function to
+be implemented by a solver.  Note that adaptive solvers may want to
+implement only some of the substeps.
+
+"""
+
+# onestep! tries to find out if the next step can be made
+function onestep!(sol::Solver, state::AbstractState)
+    opt = sol.stepper.options
+    while true
+        status = trialstep!(sol, state)
+
+        if !successful(status)
+            return status
+        else
+            err, statuserr = errorcontrol!(sol, state)
+            if !successful(statuserr)
+                return statuserr
+            elseif err <= 1
+                statusaccept = accept!(sol, state)
+                if !successful(statusaccept)
+                    return statusaccept
+                else
+                    return status
+                end
+            end
+        end
+
+    end
+end
+
+
+"""
+Advances the solution to new state by a given time step.  Updates
+state in-place such that it reflects the new state.
+Returns the stats for this step (TODO).
+"""
+trialstep!{O,S}(::Solver{O,S}, ::AbstractState) =
+    error("Function `trialstep!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
+
+"""
+Accepts (in-place) the computed step state back to the previous state after a failed
+trial step.  The reverting needn't be 100% as long as a new trial step
+can be calculated from it.
+Returns nothing.
+"""
+accept!{O,S}(::Solver{O,S}, ::AbstractState) =
+    error("Function `accept!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
+
+
+"""
+Estimates the error (such that a step is accepted if err<=1), a new dt
+and a new order.  Updates state with new dt and order (as appropriate).
+Returns err & stats (TODO).
+"""
+errorcontrol!{T}(::Solver, ::AbstractState{T}) = zero(T), Status()

@@ -25,7 +25,6 @@ include("adams-bashford-moulton.jl")
 include("rosenbrock.jl")
 # include("taylor.jl")
 
-include("iterators.jl")
 include("interfaces.jl")
 
 end # module ODE

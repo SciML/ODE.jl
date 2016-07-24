@@ -43,9 +43,6 @@ order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
 name(stepper::RKStepper) = stepper.tableau.name
 
-isadaptive(::RKStepper{:adaptive}) = true
-isadaptive(::RKStepper{:fixed}) = false
-
 solve{T,S<:RKStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
     Solver(ode,stepper{T}(;options...))
 
@@ -73,11 +70,16 @@ State for the Runge-Kutta stepper.
 type RKState{T,Y} <: AbstractState{T,Y}
     step    ::Step{T,Y}
     dt      ::T
+    newdt   ::T
     work    ::RKWorkArrays{Y}
     timeout ::Int
     # This is not currently incremented with each step
     iters   ::Int
 end
+
+
+output(st::RKState) = st.step.t, st.step.y
+
 
 function show(io::IO, state::RKState)
     show(state.step)
@@ -87,9 +89,12 @@ function show(io::IO, state::RKState)
 end
 
 
-function start{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
+function init{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
     stepper = s.stepper
     t0, dt0, y0 = s.ode.t0, stepper.options.initstep, s.ode.y0
+
+    # clip the dt0 if t0+dt0 exceeds tstop
+    dt0 = min(dt0,stepper.options.tstop-t0)
 
     lk = lengthks(s.stepper.tableau)
     work = RKWorkArrays(zero(y0), # y
@@ -108,7 +113,7 @@ function start{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
     step = Step(t0,copy(y0),copy(work.ks[1]))
 
     timeout = 0 # for step control
-    return RKState(step,dt0,work,timeout,0)
+    return RKState(step,dt0,dt0,work,timeout,0)
 end
 
 
@@ -117,9 +122,14 @@ end
 #####################
 
 
-function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state)
+function onestep!{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKState)
     step = state.step
     work = state.work
+
+    if step.t >= s.stepper.options.tstop
+        # nothing left to integrate
+        return StatusFinished
+    end
 
     dof  = length(step.y)
     b    = s.stepper.tableau.b
@@ -135,7 +145,7 @@ function next{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state)
     end
     step.t += dt
     copy!(step.y,work.ynew)
-    return ((step.t,step.y), state)
+    return StatusContinue
 end
 
 
@@ -146,72 +156,81 @@ end
 
 const timeout_const = 5
 
-function next{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state)
-
-    # the initial values
-    dt      = state.dt          # dt is the previous stepisze, it is
-    # modified inside the loop
-    timeout = state.timeout
+# `trialstep!` ends with a step computed for the stepsize `state.dt`
+# and stores it in `work.y`, so `work.y` contains a candidate for
+# `y(t+dt)` with `dt=state.dt`.
+function trialstep!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::RKState)
     work    = state.work
     step    = state.step
     stepper = sol.stepper
     tableau = stepper.tableau
     options = stepper.options
 
-    # The while loop continues until we either find a stepsize which
-    # leads to a small enough error or the stepsize reaches
-    # prob.minstep
+    # use the proposed step size to perform the computations
+    state.dt = state.newdt
+    dt = state.dt
 
-    # trim the inital stepsize to avoid overshooting
-    dt      = min(dt, options.tstop-state.step.t)
-
-    while true
-
-        # Do one step (assumes ks[1]==f0).  After calling work.ynew
-        # holds the new step.
-        # TODO: return ynew instead of passing it as work.ynew?
-
-        # work.y and work.yerr and work.ks are updated after this step
-        rk_embedded_step!(work, sol.ode, tableau, step, dt)
-
-        # changes work.yerr
-        err, newdt, timeout = stepsize_hw92!(work, step, tableau, dt, timeout, options)
-
-        # trim again in case newdt > dt
-        newdt = min(newdt, options.tstop-state.step.t)
-
-        if abs(newdt) < options.minstep  # minimum step size reached, break
-            # passing the newdt to state will result in done()
-            state.dt = newdt
-            break
-        end
-
-        if err > 1 # error is too large, repeat the step with smaller dt
-            # redo step with smaller dt and reset the timeout
-            dt      = newdt
-            timeout = timeout_const
-        else
-            # step is accepted
-
-            # preload ks[1] for the next step
-            if sol.stepper.tableau.isFSAL
-                copy!(work.ks[1],work.ks[end])
-            else
-                sol.ode.F!(step.t+dt, work.ynew, work.ks[1])
-            end
-
-            # Swap bindings of y and ytrial, avoids one copy
-            step.y, work.ynew = work.ynew, step.y
-
-            # Update state with the data from the step we have just
-            # made:
-            step.t += dt
-            state.dt = newdt
-            state.timeout = timeout
-            break
-        end
+    if step.t >= options.tstop
+        # nothing left to integrate
+        return StatusFinished
     end
-    return ((step.t,step.y),state)
+
+    if dt < options.minstep
+        # minimum step size reached
+        return StatusFailed
+    end
+
+    # work.y and work.yerr and work.ks are updated after this step
+    rk_embedded_step!(work, sol.ode, tableau, step, dt)
+
+    return StatusContinue
+end
+
+# computes the error for the candidate solution `y(t+dt)` with
+# `dt=state.dt` and proposes a new time step
+function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::RKState)
+    work = state.work
+    step = state.step
+    stepper = sol.stepper
+    tableau = stepper.tableau
+    timeout = state.timeout
+    options = stepper.options
+    err, state.newdt, state.timeout =
+        stepsize_hw92!(work, step, tableau, state.dt, state.timeout, options)
+
+    # trim in case newdt > dt
+    state.newdt = min(state.newdt, options.tstop-state.step.t)
+
+    if err > 1
+        # The error is too large, the step will be rejected.  We reset
+        # the timeout and set the new stepsize
+        state.timeout = timeout_const
+    end
+
+    return err, StatusContinue
+end
+
+# Here we assume that trialstep! and errorcontrol! have already been
+# called, that is `work.y` holds `y(t+dt)` with `dt=state.dt`, and
+# error was small enough for us to keep `y(t+dt)` as the next step.
+function accept!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::RKState)
+    work    = state.work
+    step    = state.step
+    tableau = sol.stepper.tableau
+
+    # preload ks[1] for the next step
+    if tableau.isFSAL
+        copy!(work.ks[1],work.ks[end])
+    else
+        sol.ode.F!(step.t+state.dt, work.ynew, work.ks[1])
+    end
+
+    # Swap bindings of y and ytrial, avoids one copy
+    step.y, work.ynew = work.ynew, step.y
+    # state.dt holds the size of the last successful step
+    step.t += state.dt
+
+    return StatusContinue
 end
 
 
@@ -301,7 +320,7 @@ function stepsize_hw92!{T}(work,
 
     # TOOD: should we use options.norm here as well?
     err   = options.norm(work.yerr) # Eq. 4.11
-    newdt = min(options.maxstep, dt*max(facmin, fac*(1/err)^(1/(ord+1)))) # Eq 4.13 modified
+    newdt = min(options.maxstep, dt*clamp(fac*(1/err)^(1/(ord+1)),facmin,facmax)) # Eq 4.13 modified
 
     if timeout > 0
         newdt = min(newdt, dt)
