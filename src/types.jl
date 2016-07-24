@@ -260,27 +260,47 @@ function onestep!(sol::Solver, state::AbstractState)
 end
 
 
+# TODO: the docs here are still confusing, I would rather have a
+# separate type to store the `accepted` step (perhaps `Step`?) and
+# call `trialstep!(solver,state,step)` to fill the `state` with the
+# newly made step, then `accept!(solver,state,step)` would use the
+# data in `state` to fill the `step` with new step.  This way we could
+# also implement a standard `output` function that would work on
+# `step` instead of `state`.  The step would contain the current state
+# of the solution: `(t,y)` at minimum, but it could also be
+# `(t,y,dy,dt)`.  Thoughts?
 """
-Advances the solution to new state by a given time step.  Updates
-state in-place such that it reflects the new state.
-Returns the stats for this step (TODO).
+
+Advances the solution by trying to compute a single step.  The new
+step is kept in the `state` in work arrays so that `statuserr!` can
+compute the magnitude of its error.  If the error is small enough
+`accept!` saves the step in the `state`.
+
+Returns `Status`.
+
 """
 trialstep!{O,S}(::Solver{O,S}, ::AbstractState) =
     error("Function `trialstep!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
 
 """
-Accepts (in-place) the computed step state back to the previous state after a failed
-trial step.  The reverting needn't be 100% as long as a new trial step
-can be calculated from it.
-Returns nothing.
+
+Accepts (in-place) the computed step if `errorcontrol!` gave a small
+enough error.
+
+Returns `Status`.
+
 """
 accept!{O,S}(::Solver{O,S}, ::AbstractState) =
     error("Function `accept!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
 
 
 """
-Estimates the error (such that a step is accepted if err<=1), a new dt
-and a new order.  Updates state with new dt and order (as appropriate).
-Returns err & stats (TODO).
+
+Estimates the error (such that a step is accepted if
+err<=1).  Depending on the stepper it may update the state, e.g. by
+computing a new dt or a new order.
+
+Returns `(err,Status)`.
+
 """
 errorcontrol!{T}(::Solver, ::AbstractState{T}) = zero(T), Status()
