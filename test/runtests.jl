@@ -57,12 +57,12 @@ for solver in solvers
     @test maximum(abs(yj-e.^tj)) < tol
     @test norm(yj-y,Inf)<eps(1.)
 
-    # # reverse time integration
-    # t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001)
-    # @test maximum(abs(y-e.^(t-1))) < tol
-    # tj,yj=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
-    # @test maximum(abs(yj-e.^(tj-1))) < tol
-    # @test norm(yj-y,Inf)<eps(1.)
+    # reverse time integration
+    t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001)
+    @test maximum(abs(y-e.^(t-1))) < tol
+    tj,yj=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
+    @test maximum(abs(yj-e.^(tj-1))) < tol
+    @test norm(yj-y,Inf)<eps(1.)
 
     # dv       dw
     # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)

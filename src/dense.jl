@@ -148,6 +148,7 @@ function next_interval!(solver,state,step_prev,tout)
         else
             t1   = step_prev.t
             t2,_ = output(state)
+            t1, t2 = sort([t1,t2])
             if t1 <= tout <= t2
                 # we found the enclosing times
                 return cont
