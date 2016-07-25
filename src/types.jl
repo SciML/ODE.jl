@@ -172,7 +172,7 @@ end
 
 # Iteration: take one step on a ODE/DAE `Problem`
 #
-# Define:
+# Defines:
 # start(iter) -> state
 # next(iter, state) -> output(state), state
 # done(iter, state) -> bool
@@ -181,7 +181,7 @@ end
 # implementation allows to decide if the iterator is exhausted in case
 # when the next step was computed but it was deemed incorrect.  In
 # such situation `done` returns `false` after computing the step and
-# the failed step is never sees the light of the day (by being
+# the failed step never sees the light of the day (by not being
 # returned by `next`).
 #
 # TODO: this implementation fails to return the zeroth step (t0,y0)
@@ -192,9 +192,10 @@ end
 Base.start(sol::Solver) = init(sol)
 
 function Base.done(s::Solver, st)
-    # Determine whether the next step can be made
-    status = onestep!(s, st)
-    return !successful(status)
+    # Determine whether the next step can be made by calling the
+    # stepping routine.  onestep! will take the step in-place.
+    finished = onestep!(s, st)
+    return finished
 end
 
 function Base.next(sol::Solver, st)
@@ -203,15 +204,25 @@ function Base.next(sol::Solver, st)
     return output(st), st
 end
 
+#m3: I don't think it makes sense to type-fy this.  TODO: delete
+# """
+# TODO: Holds the solver status after onestep.
+# """
+# type Status{T} end
+# successful(status::Status) = status == StatusContinue
+# const StatusContinue = Status{:cont}()
+# const StatusFailed = Status{:failed}()
+# const StatusFinished = Status{:finished}()
+"""
+Holds the solver status, used inside of `onestep!`.
 
+Values:
+
+- cont -- continue integration
+- abort -- abort integration
+- finish -- integration reached the end
 """
-TODO: Holds the solver status after onestep.
-"""
-type Status{T} end
-successful(status::Status) = status == StatusContinue
-const StatusContinue = Status{:cont}()
-const StatusFailed = Status{:failed}()
-const StatusFinished = Status{:finished}()
+@enum Status cont abort finish
 
 #####
 # Interface to implement by solvers to hook into iteration
@@ -226,36 +237,42 @@ const StatusFinished = Status{:finished}()
 # - onestep!
 # - trialstep!, errorcontrol! and accept!
 
-"""
-
-Determines wheter we can take one step.  This is the core function to
-be implemented by a solver.  Note that adaptive solvers may want to
-implement only some of the substeps.
+const _notdone = false
+const _done = true
 
 """
 
-# onestep! tries to find out if the next step can be made
+Take a step, modifies `state` in-place.  This is the core function to
+be implemented by a solver.  However, if possible solvers should opt
+to implement the sub-step functions `trialstep!`, `errorcontrol!` and
+`accept!`, instead of directly `onestep!`.
+
+Input:
+
+- sol::Solver, state::AbstractState
+
+Output:
+
+- Bool: `false`: continue iteration, `true`: terminate iteration.
+
+substeps.
+"""
 function onestep!(sol::Solver, state::AbstractState)
     opt = sol.stepper.options
     while true
         status = trialstep!(sol, state)
-
-        if !successful(status)
-            return status
-        else
-            err, statuserr = errorcontrol!(sol, state)
-            if !successful(statuserr)
-                return statuserr
-            elseif err <= 1
-                statusaccept = accept!(sol, state)
-                if !successful(statusaccept)
-                    return statusaccept
-                else
-                    return status
-                end
-            end
+        err, status = errorcontrol!(sol, state, status)
+        if err<=1 && status==cont
+            # a successful step
+            accept!(sol, state)
+            return _notdone
+        elseif status==abort
+            warn("Aborting!") # TODO something more fancy here
+            return _done
+        elseif status==finish
+            return _done
         end
-
+        # else: try again with smaller step
     end
 end
 
@@ -269,12 +286,17 @@ end
 # `step` instead of `state`.  The step would contain the current state
 # of the solution: `(t,y)` at minimum, but it could also be
 # `(t,y,dy,dt)`.  Thoughts?
+#
+#m3: No, that doesn't work if we want to allow zero-allocation
+#    algorithms.  Unless you make `step` part of `state` but then it
+#    becomes pointless.
+
 """
 
 Advances the solution by trying to compute a single step.  The new
-step is kept in the `state` in work arrays so that `statuserr!` can
+step is kept in the `state` in work arrays so that `errorcontrol!` can
 compute the magnitude of its error.  If the error is small enough
-`accept!` saves the step in the `state`.
+`accept!` updates `state` to reflect the state at the new time.
 
 Returns `Status`.
 
@@ -284,23 +306,25 @@ trialstep!{O,S}(::Solver{O,S}, ::AbstractState) =
 
 """
 
-Accepts (in-place) the computed step if `errorcontrol!` gave a small
-enough error.
+Estimates the error (such that a step is accepted if err<=1).
+Depending on the stepper it may update the state, e.g. by computing a
+new dt or a new order (but not by computing a new solution!).
+
+Returns `(err,Status)`.
+
+Defaults to return (0,cont), i.e. accept step.  This can be used for
+fixed-step solvers where no error control is done.
+"""
+errorcontrol!{T}(::Solver,::AbstractState{T}) = zero(T), cont
+
+
+"""
+
+Accepts (in-place) the computed step.  Called if `errorcontrol!` gave
+a small enough error.
 
 Returns `Status`.
 
 """
 accept!{O,S}(::Solver{O,S}, ::AbstractState) =
     error("Function `accept!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
-
-
-"""
-
-Estimates the error (such that a step is accepted if
-err<=1).  Depending on the stepper it may update the state, e.g. by
-computing a new dt or a new order.
-
-Returns `(err,Status)`.
-
-"""
-errorcontrol!{T}(::Solver, ::AbstractState{T}) = zero(T), Status()
