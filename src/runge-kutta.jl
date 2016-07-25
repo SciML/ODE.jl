@@ -128,7 +128,7 @@ function onestep!{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKSta
 
     if tdir(s)*step.t >= tdir(s)*s.stepper.options.tstop
         # nothing left to integrate
-        return true
+        return finish
     end
 
     dof  = length(step.y)
@@ -145,7 +145,7 @@ function onestep!{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKSta
     end
     step.t += dt
     copy!(step.y,work.ynew)
-    return false
+    return cont
 end
 
 
@@ -176,7 +176,8 @@ function trialstep!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state
     end
 
     if abs(dt) < options.minstep
-        # minimum step size reached
+        # TODO: use some sort of logging system
+        println("Minimum step size reached")
         return abort
     end
 
