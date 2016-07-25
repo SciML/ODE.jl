@@ -189,8 +189,7 @@ end
 # computes the error for the candidate solution `y(t+dt)` with
 # `dt=state.dt` and proposes a new time step
 function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S},
-                                                            state::RKState,
-                                                            status::Status)
+                                                            state::RKState)
     work = state.work
     step = state.step
     stepper = sol.stepper
@@ -209,7 +208,7 @@ function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S},
         state.timeout = timeout_const
     end
 
-    return err, status
+    return err, cont
 end
 
 # Here we assume that trialstep! and errorcontrol! have already been
@@ -232,7 +231,7 @@ function accept!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::R
     # state.dt holds the size of the last successful step
     step.t += state.dt
 
-    return nothing
+    return cont
 end
 
 

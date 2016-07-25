@@ -222,7 +222,7 @@ Values:
 - abort -- abort integration
 - finish -- integration reached the end
 """
-@enum Status cont abort finish
+@enum Status cont abort finish # TODO these need better names
 
 #####
 # Interface to implement by solvers to hook into iteration
@@ -262,18 +262,31 @@ function onestep!(sol::Solver, state::AbstractState)
     opt = sol.stepper.options
     while true
         status = trialstep!(sol, state)
-        err, status = errorcontrol!(sol, state, status)
-        if err<=1 && status==cont
-            # a successful step
-            accept!(sol, state)
-            return _notdone
-        elseif status==abort
-            warn("Aborting!") # TODO something more fancy here
+        # This could be moved into a @check macro:
+        if status==abort
+            warn("Abort in trialstep!")
             return _done
         elseif status==finish
             return _done
         end
-        # else: try again with updates as done inside errorcontrol!
+
+        err, status_err = errorcontrol!(sol, state)
+        if status_err==abort
+            warn("Abort in errorcontrol!")
+            return _done
+        end
+        if err<=1 && status==cont
+            # a successful step
+            status_acc = accept!(sol, state)
+            if status_acc==abort
+                warn("Abort in accept!")
+                return _done
+            else
+                return _notdone
+            end
+        end
+        # if we get here: try step again with updated state (step
+        # size, order) as done inside errorcontrol!
     end
 end
 
@@ -309,17 +322,16 @@ trialstep!{O,S}(::Solver{O,S}, ::AbstractState) =
 
 Estimates the error (such that a step is accepted if err<=1).
 Depending on the stepper it may update the state, e.g. by computing a
-new dt or a new order (but not by computing a new solution!).  It also
-takes the `status` as input, which should probably just be passed
-through, but could be modified.
+new dt or a new order (but not by computing a new solution!).
 
 Returns `(err,Status)`.
 
-Defaults to return (0,cont), i.e. accept step.  This can be used for
-fixed-step solvers where no error control is done.
-"""
-errorcontrol!{T}(::Solver,::AbstractState{T}) = zero(T), cont
+If the `status==abort` then the integration is aborted, status values
+of `cont` and `finish` are ignored.
 
+"""
+errorcontrol!{T}(::Solver,::AbstractState{T}) =
+    error("Function `errorcontrol!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
 
 """
 
