@@ -48,16 +48,16 @@ Solves an ODE `y'=F(t,y)` with initial conditions `y0` and `t0`.
 """
 
 ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0,ModifiedRosenbrockStepper; kargs...)
-# ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:feuler}; kargs...)
-# ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0,RKStepperFixed{:midpoint}; kargs...)
-# ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0,RKStepperFixed{:heun}; kargs...)
-# ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:rk4}; kargs...)
-# ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:rk21}; kargs...)
-# ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:rk23}; kargs...)
-# ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:rk45}; kargs...)
-# ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:dopri5}; kargs...)
-# const ode45 = ode45_dp
-# ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:feh78}; kargs...)
+ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:feuler}; kargs...)
+ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0,RKStepperFixed{:midpoint}; kargs...)
+ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0,RKStepperFixed{:heun}; kargs...)
+ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:rk4}; kargs...)
+ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:rk21}; kargs...)
+ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:rk23}; kargs...)
+ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:rk45}; kargs...)
+ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:dopri5}; kargs...)
+const ode45 = ode45_dp
+ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:feh78}; kargs...)
 
 
 function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},stepper;kargs...)

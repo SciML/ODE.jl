@@ -57,10 +57,9 @@ const steppers = [ODE.RKStepperFixed{:feuler},
                   ODE.RKStepperAdaptive{:rk45},
                   ODE.RKStepperAdaptive{:dopri5},
                   ODE.RKStepperAdaptive{:feh78},
-                  #ODE.ModifiedRosenbrockStepper{}
+                  ODE.ModifiedRosenbrockStepper
                   ]
 
-warn("TODO: re-enable some tests")
 function test_ode()
     tol = 0.002
 

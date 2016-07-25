@@ -107,8 +107,10 @@ abstract AbstractState{T,Y}
 
 """
 Returns variables returned during iterations.
+
+output(st::AbstractState) = t,y,dy
 """
-output(st::AbstractState) = st.step.t, st.step.y
+output(st::AbstractState) = st.step.t, st.step.y, st.step.dy
 
 
 

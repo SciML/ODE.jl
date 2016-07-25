@@ -142,7 +142,7 @@ function errorcontrol!{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
 
      # allowable error
-    delta = max(opts.reltol*max(opts.norm(y), opts.norm(ynew),opts.abstol))
+    delta = max(opts.reltol*max(opts.norm(y), opts.norm(ynew)),opts.abstol)
 
     # error estimate
     err = (abs(dt)/6)*(opts.norm(k1 - 2*k2 + k3))/delta

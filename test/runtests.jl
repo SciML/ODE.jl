@@ -6,23 +6,23 @@ const tol = 1e-2
 solvers = [
            ## Non-stiff
            # fixed step
-           # ODE.ode1,
-           # ODE.ode2_midpoint,
-           # ODE.ode2_heun,
-           # ODE.ode4,
-           # ODE.ode4ms,
-           # ODE.ode5ms,
-           # # adaptive
-           # ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.
-           # ODE.ode23,
-           # ODE.ode45_dp,
-           # ODE.ode45_fe,
-           # ODE.ode78,
+           ODE.ode1,
+           ODE.ode2_midpoint,
+           ODE.ode2_heun,
+           ODE.ode4,
+           ODE.ode4ms,
+           ODE.ode5ms,
+           # adaptive
+           ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.
+           ODE.ode23,
+           ODE.ode45_dp,
+           ODE.ode45_fe,
+           ODE.ode78,
 
-           # ## Stiff
-           # # fixed-step
-           # ODE.ode4s_s,
-           # ODE.ode4s_kr,
+           ## Stiff
+           # fixed-step
+           ODE.ode4s_s,
+           ODE.ode4s_kr,
            # adaptive
            ODE.ode23s]
 
