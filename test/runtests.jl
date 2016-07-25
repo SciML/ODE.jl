@@ -13,7 +13,7 @@ solvers = [
            ODE.ode4ms,
            ODE.ode5ms,
            # adaptive
-           ODE.ode21, # this fails on Travis with 0.4?! TODO revert once fixed.
+           ODE.ode21,
            ODE.ode23,
            ODE.ode45_dp,
            ODE.ode45_fe,

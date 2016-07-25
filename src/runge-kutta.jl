@@ -178,7 +178,7 @@ function trialstep!(ode::ExplicitODE, stepper::RKStepperAdaptive, state::RKState
 
     if abs(dt) < options.minstep
         # TODO: use some sort of logging system
-        println("Minimum step size reached")
+        warn("Minimum step size reached")
         return abort
     end
 

@@ -112,7 +112,7 @@ function trialstep!(ode::ExplicitODE,
     # increment iteration counter
     state.iters += 1
     if state.iters > opts.maxiters
-        println("Reached maximum number of iterations $(opts.maxiters)")
+        warn("Reached maximum number of iterations $(opts.maxiters)")
         return abort
     end
 
@@ -172,8 +172,8 @@ function accept!(ode::ExplicitODE,
     step = state.step
     # update the state
     step.t     = step.t+state.dtold
-    step.y[:]  = state.ynew
-    step.dy[:] = state.F2
+    copy!(step.y, state.ynew)
+    copy!(step.dy, state.F2)
     ode.J!(step.t,step.y,state.J)
 
     return cont
