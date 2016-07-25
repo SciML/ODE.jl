@@ -200,7 +200,7 @@ function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S},
         stepsize_hw92!(work, step, tableau, state.dt, state.timeout, options)
 
     # trim in case newdt > dt
-    state.newdt = min(state.newdt, options.tstop-state.step.t)
+    state.newdt = min(state.newdt, options.tstop-(state.step.t+state.dt))
 
     if err > 1
         # The error is too large, the step will be rejected.  We reset
