@@ -164,8 +164,6 @@ end
 Base.eltype{O}(::Type{Solver{O}}) = eltype(O)
 Base.eltype{O}(::Solver{O}) = eltype(O)
 
-tdir(s::Solver) = sign(s.stepper.options.tstop - s.ode.t0)
-
 # filter the wrong combinations of ode and stepper
 solve{O,S}(ode::O, stepper::Type{S}, options...) =
     error("The $S doesn't support $O")
@@ -201,12 +199,12 @@ end
 # TODO: store the current Step outside of the actual state
 # Base.start(sol::Solver) = (init(sol), Step(ode.sol))
 
-Base.start(sol::Solver) = init(sol)
+Base.start(sol::Solver) = init(sol.ode,sol.stepper)
 
 function Base.done(s::Solver, st)
     # Determine whether the next step can be made by calling the
     # stepping routine.  onestep! will take the step in-place.
-    status = onestep!(s, st)
+    status = onestep!(s.ode, s.stepper, st)
     # can't this be a function on a status?
     if status==cont
         return false
@@ -283,27 +281,16 @@ Output:
 - Bool: `false`: continue iteration, `true`: terminate iteration.
 
 substeps.
-
-TODO: this effectively dispatches on the type of state, we should
-splice the Solver as IVP and Stepper and make calls as follows
-
-```
-function onestep!(ode::ExplicitODE, stepper::DenseStepper, state)
-```
-
-We always access s.stepper and s.ode anyway and the definitions would
-look more readable.
-
 """
-function onestep!(sol::Solver, state::AbstractState)
-    opt = sol.stepper.options
+function onestep!(ode::IVP, stepper::AbstractStepper, state::AbstractState)
+    opt = stepper.options
     while true
-        status = trialstep!(sol, state)
-        err, status_err = errorcontrol!(sol, state)
+        status = trialstep!(ode, stepper, state)
+        err, status_err = errorcontrol!(ode, stepper, state)
         status &= status_err
         if err<=1
             # a successful step
-            status &= accept!(sol, state)
+            status &= accept!(ode, stepper, state)
             return status
         elseif status==abort || status==finish
             return status
@@ -338,7 +325,7 @@ compute the magnitude of its error.  If the error is small enough
 Returns `Status`.
 
 """
-trialstep!{O,S}(::Solver{O,S}, ::AbstractState) =
+trialstep!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
     error("Function `trialstep!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
 
 """
@@ -353,7 +340,7 @@ If the `status==abort` then the integration is aborted, status values
 of `cont` and `finish` are ignored.
 
 """
-errorcontrol!{T}(::Solver,::AbstractState{T}) =
+errorcontrol!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
     error("Function `errorcontrol!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
 
 """
@@ -364,5 +351,5 @@ a small enough error.
 Returns `Status`.
 
 """
-accept!{O,S}(::Solver{O,S}, ::AbstractState) =
+accept!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
     error("Function `accept!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")

@@ -43,6 +43,8 @@ order(stepper::RKStepper) = minimum(order(stepper.tableau))
 
 name(stepper::RKStepper) = stepper.tableau.name
 
+tdir(ode::ExplicitODE, stepper::RKStepper) = sign(stepper.options.tstop - ode.t0)
+
 solve{T,S<:RKStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
     Solver(ode,stepper{T}(;options...))
 
@@ -86,14 +88,13 @@ function show(io::IO, state::RKState)
 end
 
 
-function init{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
-    stepper = s.stepper
-    t0, dt0, y0 = s.ode.t0, stepper.options.initstep, s.ode.y0
+function init(ode::ExplicitODE,stepper::RKStepper)
+    t0, dt0, y0 = ode.t0, stepper.options.initstep, ode.y0
 
     # clip the dt0 if t0+dt0 exceeds tstop
-    dt0 = tdir(s)*min(abs(dt0),abs(stepper.options.tstop-t0))
+    dt0 = tdir(ode,stepper)*min(abs(dt0),abs(stepper.options.tstop-t0))
 
-    lk = lengthks(s.stepper.tableau)
+    lk = lengthks(stepper.tableau)
     work = RKWorkArrays(zero(y0), # y
                         zero(y0), # ynew
                         zero(y0), # yerr
@@ -105,7 +106,7 @@ function init{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
     end
 
     # pre-initialize work.ks[1]
-    s.ode.F!(t0,y0,work.ks[1])
+    ode.F!(t0,y0,work.ks[1])
 
     step = Step(t0,copy(y0),copy(work.ks[1]))
 
@@ -119,23 +120,25 @@ end
 #####################
 
 
-function onestep!{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKState)
+function onestep!(ode::ExplicitODE, stepper::RKStepperFixed, state::RKState)
     step = state.step
     work = state.work
 
-    if tdir(s)*step.t >= tdir(s)*s.stepper.options.tstop
+    td = tdir(ode,stepper)
+
+    if td*step.t >= td*stepper.options.tstop
         # nothing left to integrate
         return finish
     end
 
     dof  = length(step.y)
-    b    = s.stepper.tableau.b
-    dt   = tdir(s)*min(abs(state.dt),abs(s.stepper.options.tstop-step.t))
+    b    = stepper.tableau.b
+    dt   = td*min(abs(state.dt),abs(stepper.options.tstop-step.t))
 
     copy!(work.ynew,step.y)
 
     for k=1:length(b)
-        calc_next_k!(work, k, s.ode, s.stepper.tableau, step, dt)
+        calc_next_k!(work, k, ode, stepper.tableau, step, dt)
         for d=1:dof
             work.ynew[d] += dt * b[k]*work.ks[k][d]
         end
@@ -156,18 +159,19 @@ const timeout_const = 5
 # `trialstep!` ends with a step computed for the stepsize `state.dt`
 # and stores it in `work.y`, so `work.y` contains a candidate for
 # `y(t+dt)` with `dt=state.dt`.
-function trialstep!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::RKState)
+function trialstep!(ode::ExplicitODE, stepper::RKStepperAdaptive, state::RKState)
     work    = state.work
     step    = state.step
-    stepper = sol.stepper
     tableau = stepper.tableau
     options = stepper.options
+
+    td = tdir(ode,stepper)
 
     # use the proposed step size to perform the computations
     state.dt = state.newdt
     dt = state.dt
 
-    if tdir(sol)*step.t >= tdir(sol)*options.tstop
+    if td*step.t >= td*options.tstop
         # nothing left to integrate
         return finish
     end
@@ -179,26 +183,28 @@ function trialstep!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state
     end
 
     # work.y and work.yerr and work.ks are updated after this step
-    rk_embedded_step!(work, sol.ode, tableau, step, dt)
+    rk_embedded_step!(work, ode, tableau, step, dt)
 
     return cont
 end
 
 # computes the error for the candidate solution `y(t+dt)` with
 # `dt=state.dt` and proposes a new time step
-function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S},
-                                                            state::RKState)
+function errorcontrol!(ode::ExplicitODE,
+                       stepper::RKStepperAdaptive,
+                       state::RKState)
     work = state.work
     step = state.step
-    stepper = sol.stepper
     tableau = stepper.tableau
     timeout = state.timeout
     options = stepper.options
     err, state.newdt, state.timeout =
         stepsize_hw92!(work, step, tableau, state.dt, state.timeout, options)
 
+    td = tdir(ode,stepper)
+
     # trim in case newdt > dt
-    state.newdt = tdir(sol)*min(abs(state.newdt), abs(options.tstop-(state.step.t+state.dt)))
+    state.newdt = td*min(abs(state.newdt), abs(options.tstop-(state.step.t+state.dt)))
 
     if err > 1
         # The error is too large, the step will be rejected.  We reset
@@ -212,16 +218,18 @@ end
 # Here we assume that trialstep! and errorcontrol! have already been
 # called, that is `work.y` holds `y(t+dt)` with `dt=state.dt`, and
 # error was small enough for us to keep `y(t+dt)` as the next step.
-function accept!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::RKState)
+function accept!(ode::ExplicitODE,
+                 stepper::RKStepperAdaptive,
+                 state::RKState)
     work    = state.work
     step    = state.step
-    tableau = sol.stepper.tableau
+    tableau = stepper.tableau
 
     # preload ks[1] for the next step
     if tableau.isFSAL
         copy!(work.ks[1],work.ks[end])
     else
-        sol.ode.F!(step.t+state.dt, work.ynew, work.ks[1])
+        ode.F!(step.t+state.dt, work.ynew, work.ks[1])
     end
 
     # Swap bindings of y and ytrial, avoids one copy
