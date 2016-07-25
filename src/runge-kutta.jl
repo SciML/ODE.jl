@@ -128,7 +128,7 @@ function onestep!{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKSta
 
     if step.t >= s.stepper.options.tstop
         # nothing left to integrate
-        return StatusFinished
+        return finish
     end
 
     dof  = length(step.y)
@@ -145,7 +145,7 @@ function onestep!{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKSta
     end
     step.t += dt
     copy!(step.y,work.ynew)
-    return StatusContinue
+    return cont
 end
 
 
@@ -172,23 +172,25 @@ function trialstep!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state
 
     if step.t >= options.tstop
         # nothing left to integrate
-        return StatusFinished
+        return finish
     end
 
     if dt < options.minstep
         # minimum step size reached
-        return StatusFailed
+        return abort
     end
 
     # work.y and work.yerr and work.ks are updated after this step
     rk_embedded_step!(work, sol.ode, tableau, step, dt)
 
-    return StatusContinue
+    return cont
 end
 
 # computes the error for the candidate solution `y(t+dt)` with
 # `dt=state.dt` and proposes a new time step
-function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::RKState)
+function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S},
+                                                            state::RKState,
+                                                            status::Status)
     work = state.work
     step = state.step
     stepper = sol.stepper
@@ -207,7 +209,7 @@ function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, st
         state.timeout = timeout_const
     end
 
-    return err, StatusContinue
+    return err, status
 end
 
 # Here we assume that trialstep! and errorcontrol! have already been
@@ -230,7 +232,7 @@ function accept!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state::R
     # state.dt holds the size of the last successful step
     step.t += state.dt
 
-    return StatusContinue
+    return nothing
 end
 
 

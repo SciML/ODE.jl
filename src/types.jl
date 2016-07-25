@@ -237,6 +237,7 @@ Values:
 # - onestep!
 # - trialstep!, errorcontrol! and accept!
 
+# Just to make it more readable below
 const _notdone = false
 const _done = true
 
@@ -272,7 +273,7 @@ function onestep!(sol::Solver, state::AbstractState)
         elseif status==finish
             return _done
         end
-        # else: try again with smaller step
+        # else: try again with updates as done inside errorcontrol!
     end
 end
 
@@ -308,7 +309,9 @@ trialstep!{O,S}(::Solver{O,S}, ::AbstractState) =
 
 Estimates the error (such that a step is accepted if err<=1).
 Depending on the stepper it may update the state, e.g. by computing a
-new dt or a new order (but not by computing a new solution!).
+new dt or a new order (but not by computing a new solution!).  It also
+takes the `status` as input, which should probably just be passed
+through, but could be modified.
 
 Returns `(err,Status)`.
 
