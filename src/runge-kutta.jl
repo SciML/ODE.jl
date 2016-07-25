@@ -174,7 +174,7 @@ function trialstep!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state
 
     if abs(dt) < options.minstep
         # TODO: use some sort of logging system
-        println("Minimum step size reached")
+        warn("Minimum step size reached")
         return abort
     end
 
