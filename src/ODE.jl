@@ -4,6 +4,7 @@ module ODE
 
 using Polynomials
 using Compat
+import Compat.String
 using ForwardDiff
 
 import Base.convert, Base.show

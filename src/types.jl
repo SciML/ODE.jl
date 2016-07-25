@@ -154,6 +154,8 @@ end
 Base.eltype{O}(::Type{Solver{O}}) = eltype(O)
 Base.eltype{O}(::Solver{O}) = eltype(O)
 
+tdir(s::Solver) = sign(s.stepper.options.tstop - s.ode.t0)
+
 # filter the wrong combinations of ode and stepper
 solve{O,S}(ode::O, stepper::Type{S}, options...) =
     error("The $S doesn't support $O")
@@ -194,8 +196,17 @@ Base.start(sol::Solver) = init(sol)
 function Base.done(s::Solver, st)
     # Determine whether the next step can be made by calling the
     # stepping routine.  onestep! will take the step in-place.
-    finished = onestep!(s, st)
-    return finished
+    status = onestep!(s, st)
+    if status==cont
+        return false
+    elseif status==finish
+        return true
+    else #if status==abort
+        warn("aborting")
+        return true
+    # else
+    #     error("unsported Status: $status")
+    end
 end
 
 function Base.next(sol::Solver, st)
@@ -221,8 +232,16 @@ Values:
 - cont -- continue integration
 - abort -- abort integration
 - finish -- integration reached the end
+
+Statuses can be combined with &:
+- cont&cont == cont
+- finish&cont == finish
+- abort&cont == abort
+- abort&finish = abort
 """
-@enum Status cont abort finish # TODO these need better names
+@enum Status cont=1 abort=0 finish=-1
+# The values of Statuses are chose to turn & into a *:
+@compat Base.:&(s1::Status, s2::Status) = Status(Int(s1)*Int(s2))
 
 #####
 # Interface to implement by solvers to hook into iteration
@@ -236,10 +255,6 @@ Values:
 # and either
 # - onestep!
 # - trialstep!, errorcontrol! and accept!
-
-# Just to make it more readable below
-const _notdone = false
-const _done = true
 
 """
 
@@ -262,31 +277,17 @@ function onestep!(sol::Solver, state::AbstractState)
     opt = sol.stepper.options
     while true
         status = trialstep!(sol, state)
-        # This could be moved into a @check macro:
-        if status==abort
-            warn("Abort in trialstep!")
-            return _done
-        elseif status==finish
-            return _done
-        end
-
         err, status_err = errorcontrol!(sol, state)
-        if status_err==abort
-            warn("Abort in errorcontrol!")
-            return _done
-        end
-        if err<=1 && status==cont
+        status &= status_err
+        if err<=1
             # a successful step
-            status_acc = accept!(sol, state)
-            if status_acc==abort
-                warn("Abort in accept!")
-                return _done
-            else
-                return _notdone
-            end
+            status &= accept!(sol, state)
+            return status
+        elseif status==abort || status==finish
+            return status
         end
         # if we get here: try step again with updated state (step
-        # size, order) as done inside errorcontrol!
+        # size, order).
     end
 end
 

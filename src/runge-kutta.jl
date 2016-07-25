@@ -94,7 +94,7 @@ function init{O<:ExplicitODE,S<:RKStepper}(s::Solver{O,S})
     t0, dt0, y0 = s.ode.t0, stepper.options.initstep, s.ode.y0
 
     # clip the dt0 if t0+dt0 exceeds tstop
-    dt0 = min(dt0,stepper.options.tstop-t0)
+    dt0 = tdir(s)*min(abs(dt0),abs(stepper.options.tstop-t0))
 
     lk = lengthks(s.stepper.tableau)
     work = RKWorkArrays(zero(y0), # y
@@ -126,14 +126,14 @@ function onestep!{O<:ExplicitODE,S<:RKStepperFixed}(s::Solver{O,S}, state::RKSta
     step = state.step
     work = state.work
 
-    if step.t >= s.stepper.options.tstop
+    if tdir(s)*step.t >= tdir(s)*s.stepper.options.tstop
         # nothing left to integrate
         return finish
     end
 
     dof  = length(step.y)
     b    = s.stepper.tableau.b
-    dt   = min(state.dt,s.stepper.options.tstop-step.t)
+    dt   = tdir(s)*min(abs(state.dt),abs(s.stepper.options.tstop-step.t))
 
     copy!(work.ynew,step.y)
 
@@ -170,13 +170,14 @@ function trialstep!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S}, state
     state.dt = state.newdt
     dt = state.dt
 
-    if step.t >= options.tstop
+    if tdir(sol)*step.t >= tdir(sol)*options.tstop
         # nothing left to integrate
         return finish
     end
 
-    if dt < options.minstep
-        # minimum step size reached
+    if abs(dt) < options.minstep
+        # TODO: use some sort of logging system
+        println("Minimum step size reached")
         return abort
     end
 
@@ -200,7 +201,7 @@ function errorcontrol!{O<:ExplicitODE,S<:RKStepperAdaptive}(sol::Solver{O,S},
         stepsize_hw92!(work, step, tableau, state.dt, state.timeout, options)
 
     # trim in case newdt > dt
-    state.newdt = min(state.newdt, options.tstop-(state.step.t+state.dt))
+    state.newdt = tdir(sol)*min(abs(state.newdt), abs(options.tstop-(state.step.t+state.dt)))
 
     if err > 1
         # The error is too large, the step will be rejected.  We reset
@@ -321,10 +322,10 @@ function stepsize_hw92!{T}(work,
 
     # TOOD: should we use options.norm here as well?
     err   = options.norm(work.yerr) # Eq. 4.11
-    newdt = min(options.maxstep, dt*clamp(fac*(1/err)^(1/(ord+1)),facmin,facmax)) # Eq 4.13 modified
+    newdt = sign(dt)*min(options.maxstep, abs(dt)*clamp(fac*(1/err)^(1/(ord+1)),facmin,facmax)) # Eq 4.13 modified
 
     if timeout > 0
-        newdt = min(newdt, dt)
+        newdt = sign(dt)*min(abs(newdt), abs(dt))
         timeout -= 1
     end
 
