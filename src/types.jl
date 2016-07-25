@@ -105,6 +105,13 @@ Solver{::AbstractStepper}.
 """
 abstract AbstractState{T,Y}
 
+"""
+Returns variables returned during iterations.
+"""
+output(st::AbstractState) = st.step.t, st.step.y
+
+
+
 # m3:
 # - docs
 # - maybe use the typevars as defined in make_consistent_types for t,

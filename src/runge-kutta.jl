@@ -73,13 +73,10 @@ type RKState{T,Y} <: AbstractState{T,Y}
     newdt   ::T
     work    ::RKWorkArrays{Y}
     timeout ::Int
-    # This is not currently incremented with each step
-    iters   ::Int
+    iters   ::Int # iters<maxiters TODO: not implemented
 end
 
-
 output(st::RKState) = st.step.t, st.step.y, st.work.ks[1]
-
 
 function show(io::IO, state::RKState)
     show(state.step)
