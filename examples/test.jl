@@ -9,8 +9,8 @@ Y = Vector{T}
 t0 = zero(T)
 y0 = T[one(T)]
 
-steppers = [ODE.RKStepperAdaptive{:rk45},
-            ODE.RKStepperFixed{:feuler},
+steppers = [# ODE.RKStepperAdaptive{:rk45},
+            # ODE.RKStepperFixed{:feuler},
             ODE.DenseStepper]
 
 for st in steppers
@@ -25,7 +25,7 @@ for st in steppers
 
     println("Raw iterator")
     for (t,y) in sol
-        println((t,y))
+        println((t,y,norm(y-[exp(t)])))
     end
 
     println(collect(sol))

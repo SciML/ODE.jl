@@ -78,7 +78,7 @@ type RKState{T,Y} <: AbstractState{T,Y}
 end
 
 
-output(st::RKState) = st.step.t, st.step.y
+output(st::RKState) = st.step.t, st.step.y, st.work.ks[1]
 
 
 function show(io::IO, state::RKState)

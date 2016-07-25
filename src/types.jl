@@ -126,6 +126,7 @@ type Step{T,Y}
     dy::Y
 end
 
+output(s::Step) = s.t, s.y, s.dy
 
 function show(io::IO, state::Step)
     println("t  =$(state.t)")
@@ -197,6 +198,7 @@ function Base.done(s::Solver, st)
     # Determine whether the next step can be made by calling the
     # stepping routine.  onestep! will take the step in-place.
     status = onestep!(s, st)
+    # can't this be a function on a status?
     if status==cont
         return false
     elseif status==finish
@@ -272,6 +274,17 @@ Output:
 - Bool: `false`: continue iteration, `true`: terminate iteration.
 
 substeps.
+
+TODO: this effectively dispatches on the type of state, we should
+splice the Solver as IVP and Stepper and make calls as follows
+
+```
+function onestep!(ode::ExplicitODE, stepper::DenseStepper, state)
+```
+
+We always access s.stepper and s.ode anyway and the definitions would
+look more readable.
+
 """
 function onestep!(sol::Solver, state::AbstractState)
     opt = sol.stepper.options
