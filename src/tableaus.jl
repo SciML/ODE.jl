@@ -50,7 +50,7 @@ immutable TableauRKExplicit{T} <: Tableau{T}
     c::Vector{T}
     isFSAL::Bool
     s::Int
-    name :: AbstractString
+    name::String
     function TableauRKExplicit(name,order,a,b,c)
         s = length(c)
         @assert c[1]==0
