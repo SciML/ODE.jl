@@ -71,7 +71,9 @@ output(ds::DenseState) = output(ds.step_out)
 function init{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S})
     ode = s.stepper.solver.ode
     solver_state = init(s.stepper.solver)
-    step_prev = Step(ode.t0,similar(ode.y0),similar(ode.y0))
+    dy0 = similar(ode.y0)
+    ode.F!(ode.t0,ode.y0,dy0)
+    step_prev = Step(ode.t0,copy(ode.y0),dy0)
     step_out = Step(ode.t0,similar(ode.y0),similar(ode.y0))
     return DenseState(1,step_prev,step_out,solver_state)
 end
@@ -103,7 +105,7 @@ function onestep!{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseSt
     # t1,_=output(state.step_prev)
     # t2,_=output(state.solver_state)
     status = next_interval!(sol,sol_state,state.step_prev,tout)
-    if status != cont
+    if status == abort
         # we failed to get enough steps
         warn("Iterator was exhausted before the dense output could produce the output.")
         return abort
@@ -132,8 +134,17 @@ TODO: tdir
 
 """
 function next_interval!(solver,state,step_prev,tout)
-    # get the current time
+
     while true
+        # get the current time
+        t1   = step_prev.t
+        t2,_ = output(state)
+        t1, t2 = sort([t1,t2])
+        if t1 <= tout <= t2
+            # we found the enclosing times
+            return cont
+        end
+
         # save the current state of solution
         t, y, dy = output(state)
         step_prev.t = t
@@ -145,14 +156,6 @@ function next_interval!(solver,state,step_prev,tout)
 
         if status != cont
             return status
-        else
-            t1   = step_prev.t
-            t2,_ = output(state)
-            t1, t2 = sort([t1,t2])
-            if t1 <= tout <= t2
-                # we found the enclosing times
-                return cont
-            end
         end
     end
 
