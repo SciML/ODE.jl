@@ -2,7 +2,7 @@ const testsets = [
             Dict(
                  :F!    => (t,y,dy)->dy[1]=6.0,
                  :y0    => [0.],
-                 :tspan => [0:0.1:1;],
+                 :tout => [0:0.1:1;],
                  :jac   => (t,y,dy)->dy[1]=0.0,
                  :sol   => t->[6t],
                  :isscalar => true,
@@ -11,7 +11,7 @@ const testsets = [
             Dict(
                  :F!    => (t,y,dy)->dy[1]=2t,
                  :y0    => [0.],
-                 :tspan => [0:0.001:1;],
+                 :tout => [0:0.001:1;],
                  :jac   => (t,y,dy)->dy[1]=0.0,
                  :sol   => t->[t^2],
                  :isscalar => true,
@@ -20,7 +20,7 @@ const testsets = [
             Dict(
                  :F!    => (t,y,dy)->dy[1]=y[1],
                  :y0    => [1.0],
-                 :tspan => [0:0.001:1;],
+                 :tout => [0:0.001:1;],
                  :jac   => (t,y,dy)->dy[1]=1.0,
                  :sol   => t->[exp(t)],
                  :isscalar => true,
@@ -29,7 +29,7 @@ const testsets = [
             Dict(
                  :F!    => (t,y,dy)->dy[1]=y[1],
                  :y0    => [1.0],
-                 :tspan => [1:-0.001:0;],
+                 :tout => [1:-0.001:0;],
                  :jac   => (t,y,dy)->dy[1]=1.0,
                  :sol   => t->[exp(t-1)],
                  :isscalar => true,
@@ -38,7 +38,7 @@ const testsets = [
             Dict(
                  :F!    => (t,y,dy)->(dy[1]=-y[2];dy[2]=y[1]),
                  :y0    => [1.0,2.0],
-                 :tspan => [0:.1:1;],
+                 :tout => [0:.1:1;],
                  :jac   => (t,y,dy)->copy!(dy,Float64[[0,1] [-1,0]]),
                  :sol   => t->[cos(t)-2*sin(t) 2*cos(t)+sin(t)],
                  :isscalar => false,
@@ -68,7 +68,7 @@ function test_ode()
         for ts in testsets
             println("Testing problem $(ts[:name])")
 
-            tspan, h0, stepper = ts[:tspan], ts[:initstep], rks
+            tout, h0, stepper = ts[:tout], ts[:initstep], rks
 
             y0, F!, jac!, sol = ts[:y0], ts[:F!], ts[:jac], ts[:sol]
 
@@ -80,10 +80,10 @@ function test_ode()
                     Fscal = (t,y)->F(t,[y])[1]
                     y0scal = y0[1]
                     # with jacobian
-                    tj,yj = ODE.ode(Fscal,y0scal,tspan,stepper,points=points,initstep = h0,J! = jac!)
+                    tj,yj = ODE.ode(Fscal,y0scal,tout,stepper,points=points,initstep = h0,J! = jac!)
                     @test_approx_eq_eps yj map(x->sol(x)[1],tj) tol
                     # without jacobian
-                    t,y   = ODE.ode(Fscal,y0scal,tspan,stepper,points=points,initstep = h0)
+                    t,y   = ODE.ode(Fscal,y0scal,tout,stepper,points=points,initstep = h0)
                     @test_approx_eq_eps y  map(x->sol(x)[1],tj) tol
 
                     # results with and without jacobian should be exactly the same
@@ -91,32 +91,32 @@ function test_ode()
 
                     if points == :specified
                         # test if we covered the whole timespan
-                        @test length(tspan) == length(t) == length(tj)
-                        @test_approx_eq tspan t
-                        @test_approx_eq tspan tj
+                        @test length(tout) == length(t) == length(tj)
+                        @test_approx_eq tout t
+                        @test_approx_eq tout tj
                     end
                 end
 
                 # ODE.odeXX vector interface
                 # with jacobian
-                tj,yj = ODE.ode(F,y0,tspan,stepper,points=points,initstep = h0,J! = jac!)
+                tj,yj = ODE.ode(F,y0,tout,stepper,points=points,initstep = h0,J! = jac!)
                 @test_approx_eq_eps hcat(yj...) hcat(map(sol,tj)...) tol
                 # without jacobian
-                t,y   = ODE.ode(F,y0,tspan,stepper,points=points,initstep = h0)
+                t,y   = ODE.ode(F,y0,tout,stepper,points=points,initstep = h0)
                 @test_approx_eq_eps hcat(y...)  hcat(map(sol,t)...) tol
 
                 @test_approx_eq hcat(yj...) hcat(y...)
 
                 if points == :specified
                     # test if we covered the whole timespan
-                    @test length(tspan) == length(t) == length(tj)
-                    @test_approx_eq tspan t
-                    @test_approx_eq tspan tj
+                    @test length(tout) == length(t) == length(tj)
+                    @test_approx_eq tout t
+                    @test_approx_eq tout tj
                 end
 
                 # test the iterator interface
-                equation = ODE.ExplicitODE(tspan[1],y0,F!)
-                opts     = Dict(:tspan => tspan,
+                equation = ODE.ExplicitODE(tout[1],y0,F!)
+                opts     = Dict(:tout => tout,
                                 :initstep => h0,
                                 :points => points)
 

@@ -6,23 +6,23 @@ tspan[end] is the last integration time.
 """
 
 function ode{T,Y,S<:AbstractStepper}(F, y0::Y,
-                                     tspan::AbstractVector{T},
+                                     tout::AbstractVector{T},
                                      stepper::Type{S};
                                      points = :all,
                                      kargs...)
 
-    t0 = tspan[1]
+    t0 = tout[1]
 
     # construct a solver
     equation  = explicit_ineff(t0,y0,F;kargs...)
     if points == :all
         solver = solve(equation, stepper;
-                       tspan = tspan,
+                       tout = tout,
                        kargs...)
     elseif points == :specified
         solver = solve(equation, DenseStepper;
                        mehtod = stepper,
-                       tspan = tspan,
+                       tout = tout,
                        kargs...)
     else
         error("Unsupported points value (should be :all or :specified)")
@@ -31,14 +31,14 @@ function ode{T,Y,S<:AbstractStepper}(F, y0::Y,
     # determine if we have to unpack y
     extract = Y <: Number
 
-    tout = Array(T,0)
-    yout = Array(Y,0)
+    to = Array(T,0)
+    yo = Array(Y,0)
     for (t,y) in solver
-        push!(tout,t)
-        push!(yout, extract ? y[1] : copy(y))
+        push!(to,t)
+        push!(yo, extract ? y[1] : copy(y))
     end
 
-    return (tout,yout)
+    return (to,yo)
 end
 
 """

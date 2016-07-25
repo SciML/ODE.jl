@@ -31,8 +31,8 @@ immutable AdaptiveOptions{T,N<:Function,O<:Function} <: Options{T}
 end
 
 @compat function (::Type{AdaptiveOptions{T}}){T,N,O}(;
-                                                     tspan    = T[Inf],
-                                                     tstop    = tspan[end],
+                                                     tout     = T[Inf],
+                                                     tstop    = tout[end],
                                                      reltol   = eps(T)^T(1//3)/10,
                                                      abstol   = eps(T)^T(1//2)/10,
                                                      minstep  = 10*eps(T),
@@ -63,8 +63,8 @@ immutable FixedOptions{T} <: Options{T}
 end
 
 @compat function (::Type{FixedOptions{T}}){T}(;
-                                              tspan    = T[Inf],
-                                              tstop    = tspan[end],
+                                              tout     = T[Inf],
+                                              tstop    = tout[end],
                                               initstep = 10*eps(T),
                                               kargs...)
     @assert initstep>=0
