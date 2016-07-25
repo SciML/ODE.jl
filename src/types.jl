@@ -154,6 +154,8 @@ end
 Base.eltype{O}(::Type{Solver{O}}) = eltype(O)
 Base.eltype{O}(::Solver{O}) = eltype(O)
 
+tdir(s::Solver) = sign(s.stepper.options.tstop - s.ode.t0)
+
 # filter the wrong combinations of ode and stepper
 solve{O,S}(ode::O, stepper::Type{S}, options...) =
     error("The $S doesn't support $O")

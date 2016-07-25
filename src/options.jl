@@ -7,13 +7,13 @@ constructor which will fill the structure with default values.
 
 General:
 
-- initstep ::T  initial step
+- initstep ::T  initial step size (always positive)
 - tstop    ::T  end integration time
 - reltol   ::T  relative tolerance (m3: could this be a vector?)
 - abstol   ::T  absolute tolerance (m3: could this be a vector?)
-- minstep  ::T  minimal allowed step
-- maxstep  ::T  maximal allowed step
-- norm           function to calculate the norm in step control
+- minstep  ::T  minimal allowed step size (always positive)
+- maxstep  ::T  maximal allowed step size (always positive)
+- norm          function to calculate the norm in step control
 - maxiters ::T  maximum number of steps
 - isoutofdomain::Function checks if the solution is outside of the allowed domain
 
@@ -42,7 +42,7 @@ end
                                                      maxiters = T(Inf),
                                                      isoutofdomain::O = Base.isnan,
                                                      kargs...)
-
+    @assert minstep>=0 && maxstep>=0 && initstep>=0 # TODO: move to inner constructor
     AdaptiveOptions{T,N,O}(tstop,reltol,abstol,minstep,maxstep,initstep,norm,maxiters,isoutofdomain)
 end
 
@@ -53,7 +53,7 @@ constructor which will fill the structure with default values.
 
 General:
 
-- initstep ::T  initial step
+- initstep ::T  initial step (always positive)
 - tstop    ::T  end integration time
 
 """
@@ -67,7 +67,7 @@ end
                                               tstop    = tspan[end],
                                               initstep = 10*eps(T),
                                               kargs...)
-
+    @assert initstep>=0
     FixedOptions{T}(tstop,initstep)
 end
 
