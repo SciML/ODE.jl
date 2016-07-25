@@ -68,9 +68,10 @@ end
 
 output(ds::DenseState) = output(ds.step_out)
 
-function init{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S})
-    ode = s.stepper.solver.ode
-    solver_state = init(s.stepper.solver)
+function init(ode::ExplicitODE,
+              stepper::DenseStepper)
+    ode = stepper.solver.ode
+    solver_state = init(stepper.solver.ode, stepper.solver.stepper)
     dy0 = similar(ode.y0)
     ode.F!(ode.t0,ode.y0,dy0)
     step_prev = Step(ode.t0,copy(ode.y0),dy0)
@@ -88,16 +89,18 @@ wouldn't.
 
 """
 
-function onestep!{O<:ExplicitODE,S<:DenseStepper}(s::Solver{O,S}, state::DenseState)
+function onestep!(ode::ExplicitODE,
+                  stepper::DenseStepper,
+                  state::DenseState)
     i = state.tout_i
-    if i > length(s.stepper.options.tspan)
+    if i > length(stepper.options.tspan)
         return finish
     end
 
     # our next output time
-    tout = s.stepper.options.tspan[i]
+    tout = stepper.options.tspan[i]
 
-    sol = s.stepper.solver # this looks weird
+    sol = stepper.solver # this looks weird
     sol_state = state.solver_state
 
     # try to get a new set of steps enclosing `tout`, if all goes
@@ -152,7 +155,7 @@ function next_interval!(solver,state,step_prev,tout)
         copy!(step_prev.dy,dy)
 
         # try to perform a single step with the solver
-        status = onestep!(solver, state)
+        status = onestep!(solver.ode, solver.stepper, state)
 
         if status != cont
             return status

@@ -5,15 +5,21 @@
 
 immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
     options::AdaptiveOptions{T}
+    const_d::T
+    const_e::T
 end
 
 @compat function (::Type{ModifiedRosenbrockStepper{T}}){T}(;options...)
-    ModifiedRosenbrockStepper( AdaptiveOptions{T}(;options...) )
+    const_d = 1/(2+sqrt(T(2)))
+    const_e = 6+sqrt(T(2))
+
+    ModifiedRosenbrockStepper( AdaptiveOptions{T}(;options...), const_d, const_e )
 end
 
 order(::ModifiedRosenbrockStepper) = 2
 name(::ModifiedRosenbrockStepper) = "Modified Rosenbrock Stepper"
 isadaptive(::ModifiedRosenbrockStepper) = true
+tdir(ode::ExplicitODE, stepper::ModifiedRosenbrockStepper) = sign(stepper.options.tstop - ode.t0)
 
 # define the set of ODE problems with which this stepper can work
 solve{T,S<:ModifiedRosenbrockStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
@@ -53,10 +59,11 @@ function show(io::IO, state::RosenbrockState)
 end
 
 
-function init{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S})
-    t  = s.ode.t0
-    dt = s.stepper.options.initstep
-    y  = s.ode.y0
+function init{T}(ode::ExplicitODE{T},
+                 stepper::ModifiedRosenbrockStepper)
+    t  = ode.t0
+    dt = stepper.options.initstep
+    y  = ode.y0
     dy = zero(y)
 
     J  = Array(eltype(y),length(y),length(y))
@@ -73,32 +80,31 @@ function init{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S})
                             dt*0,    # dtnew
                             J,       # J
                             0)       # iters
+
     # initialize the derivative and the Jacobian
-    s.ode.F!(t,y,step.dy)
-    s.ode.J!(t,y,state.J)
+    ode.F!(t,y,step.dy)
+    ode.J!(t,y,state.J)
 
     return state
 end
 
-# two irrational constants
-Base.@irrational const_d 0.2928932188134525 (1/(2 + sqrt(BigFloat(2))))
-Base.@irrational const_e 7.414213562373095 (6 + sqrt(BigFloat(2)))
 
-
-function trialstep!{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state::RosenbrockState)
+function trialstep!(ode::ExplicitODE,
+                    stepper::ModifiedRosenbrockStepper,
+                    state::RosenbrockState)
     # unpack
-    stepper = s.stepper
-    ode     = s.ode
     step    = state.step
-    opts    = s.stepper.options
+    opts    = stepper.options
     F1, F2, J = state.F1, state.F2, state.J
     k1,k2,k3,ynew =  state.k1, state.k2, state.k3, state.ynew
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
     F! = ode.F!
     F0 = dy
 
+    td = tdir(ode,stepper)
+
     # see whether we're done
-    if tdir(s)*t >= tdir(s)*opts.tstop
+    if td*t >= td*opts.tstop
         # nothing left to integrate
         return finish
     end
@@ -110,12 +116,12 @@ function trialstep!{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S},
         return abort
     end
 
-    W = lufact!( eye(J) - dt*const_d*J )
+    W = lufact!( eye(J) - dt*stepper.const_d*J )
 
     # Approximate time-derivative of F, we are using F1 as a
     # temporary array
     F!(t+dt/100,y,F1)
-    tder = 100*const_d*(F1-F0)
+    tder = 100*stepper.const_d*(F1-F0)
 
     # modified Rosenbrock formula
     # TODO: update k1,k2,k3 in-place
@@ -126,45 +132,49 @@ function trialstep!{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S},
         ynew[i] = y[i] + dt*k2[i]
     end
     F!(t+dt,   ynew,      F2)
-    k3[:] = W \ (F2 - const_e*(k2 - F1) - 2*(k1 - F0) + tder )
+    k3[:] = W \ (F2 - stepper.const_e*(k2 - F1) - 2*(k1 - F0) + tder )
 
     return cont
 end
 
-function errorcontrol!{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state::RosenbrockState)
+function errorcontrol!(ode::ExplicitODE,
+                       stepper::ModifiedRosenbrockStepper,
+                       state::RosenbrockState)
 
-    stepper = s.stepper
-    ode     = s.ode
     step    = state.step
-    opts    = s.stepper.options
+    opts    = stepper.options
     k1,k2,k3 =  state.k1, state.k2, state.k3
     k1,k2,k3,ynew =  state.k1, state.k2, state.k3, state.ynew
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
 
-     # allowable error
+    td = tdir(ode,stepper)
+
+    # allowable error
     delta = max(opts.reltol*max(opts.norm(y), opts.norm(ynew)),opts.abstol)
 
     # error estimate
     err = (abs(dt)/6)*(opts.norm(k1 - 2*k2 + k3))/delta
 
     # new step-size
-    dtnew = tdir(s)*min(opts.maxstep, abs(dt)*0.8*err^(-1/3) )
+    dtnew = td*min(opts.maxstep, abs(dt)*0.8*err^(-1/3) )
 
     # trim in case newdt > dt
-    dtnew = tdir(s)*min(abs(dtnew), abs(opts.tstop-(t+dt)))
+    dtnew = td*min(abs(dtnew), abs(opts.tstop-(t+dt)))
 
     state.dtold = dt
     state.dt = dtnew
     return err, cont
 end
 
-function accept!{O<:ExplicitODE,S<:ModifiedRosenbrockStepper}(s::Solver{O,S}, state::RosenbrockState)
+function accept!(ode::ExplicitODE,
+                 stepper::ModifiedRosenbrockStepper,
+                 state::RosenbrockState)
     step = state.step
     # update the state
     step.t     = step.t+state.dtold
     copy!(step.y, state.ynew)
     copy!(step.dy, state.F2)
-    s.ode.J!(step.t,step.y,state.J)
+    ode.J!(step.t,step.y,state.J)
 
     return cont
 end
