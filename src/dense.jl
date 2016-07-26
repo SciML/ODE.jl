@@ -121,7 +121,7 @@ function onestep!(ivp::IVP,
         # the dstate.step_out with y(ti) and y'(ti) according to an
         # interpolation algorithm specific for a method (defaults to
         # hermite O(3)).
-        interpolate!(istate, dstate.step_prev, ti, dstate.step_out)
+        interpolate!(dstate, ti, dstate.step_out)
 
         # increase the counter
         dstate.tout_i += 1
@@ -167,26 +167,38 @@ function next_interval!(ivp, integ, istate, step_prev, tout)
     return abort
 end
 
-"""
 
-Make dense output using Hermite interpolation of order O(3). Updates
-yout in-place.  Only needs y and dy at t1 and t2.
-Input
-- istate::AbstractState -- istate of the integrator at time t2
-- step_prev::Step -- solution at time t1 respectively
+"""
+Makes dense output
+
+interpolate!{ST}(dstate::DenseState{ST}, tout, step_out)
+
+Input:
+
+- `dstate::DenseState{ST}`
+  - `ST` is the `AbstractIntegrator` state which can be used for dispatch
 - tout -- time of requested output
-- yout -- inplace y output
-Ref: Hairer & Wanner p.190
+- step_out::Step -- inplace output step
 
-TODO: tdir (I think this works for any order of t1 and t2 but needs
-verifying.
+Output: nothing
 
-TODO: fill dy
+TODO: output dy too
 
-TODO: arbitrary order method (change step_prev::Step to step_prevs::Tuple{Step,N})
+TOOD: provide arbitrary order dense output. Maybe use work of @obiajulu on A-B-M methods.
+"""
+function interpolate! end
 
 """
-function interpolate!{T,Y}(istate::AbstractState,step_prev::Step{T,Y},tout::T,step_out::Step{T,Y})
+Make dense output using Hermite interpolation of order O(3), should
+work for most integrators and is used as default.  This only needs y
+and dy at t1 and t2.
+
+Ref: Hairer & Wanner p.190
+"""
+function interpolate!(dstate::DenseState, tout, step_out::Step)
+    step_prev = dstate.step_prev
+    istate = dstate.integrator_state
+
     t1,y1,dy1 = output(step_prev)
     t2,y2,dy2 = output(istate)
     if tout==t1
