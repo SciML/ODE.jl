@@ -48,27 +48,27 @@ const testsets = [
 
 
 # Testing function ode
-const steppers = [ODE.RKStepperFixed{:feuler},
-                  ODE.RKStepperFixed{:midpoint},
-                  ODE.RKStepperFixed{:heun},
-                  ODE.RKStepperFixed{:rk4},
-                  ODE.RKStepperAdaptive{:rk21},
-                  ODE.RKStepperAdaptive{:rk23},
-                  ODE.RKStepperAdaptive{:rk45},
-                  ODE.RKStepperAdaptive{:dopri5},
-                  ODE.RKStepperAdaptive{:feh78},
-                  ODE.ModifiedRosenbrockStepper
+const integrators = [ODE.RKIntegratorFixed{:feuler},
+                  ODE.RKIntegratorFixed{:midpoint},
+                  ODE.RKIntegratorFixed{:heun},
+                  ODE.RKIntegratorFixed{:rk4},
+                  ODE.RKIntegratorAdaptive{:rk21},
+                  ODE.RKIntegratorAdaptive{:rk23},
+                  ODE.RKIntegratorAdaptive{:rk45},
+                  ODE.RKIntegratorAdaptive{:dopri5},
+                  ODE.RKIntegratorAdaptive{:feh78},
+                  ODE.ModifiedRosenbrockIntegrator
                   ]
 
 function test_ode()
     tol = 0.002
 
-    for rks in steppers
-        println("Testing $rks")
+    for integ in integrators
+        println("Testing $integ")
         for ts in testsets
             println("Testing problem $(ts[:name])")
 
-            tout, h0, stepper = ts[:tout], ts[:initstep], rks
+            tout, h0, stepper = ts[:tout], ts[:initstep], integ
 
             y0, F!, jac!, sol = ts[:y0], ts[:F!], ts[:jac], ts[:sol]
 
@@ -126,7 +126,7 @@ function test_ode()
                     @test_approx_eq_eps y sol(t) tol
                 end
 
-                for (t,y) in ODE.solve(equation,ODE.DenseStepper;
+                for (t,y) in ODE.solve(equation,ODE.DenseOutput;
                                        method = stepper, opts...)
                     @test_approx_eq_eps y sol(t) tol
                 end

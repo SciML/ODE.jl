@@ -4,26 +4,25 @@ We assume that the initial data y0 is given at tspan[1], and that
 tspan[end] is the last integration time.
 
 """
-
-function ode{T,Y,S<:AbstractStepper}(F, y0::Y,
+function ode{T,Y,I<:AbstractIntegrator}(F, y0::Y,
                                      tout::AbstractVector{T},
-                                     stepper::Type{S};
+                                     integ::Type{I};
                                      points = :all,
                                      kargs...)
 
     t0 = tout[1]
 
-    # construct a solver
+    # construct a Problem
     equation  = explicit_ineff(t0,y0,F;kargs...)
     if points == :all
-        solver = solve(equation, stepper;
-                       tout = tout,
-                       kargs...)
+        prob = solve(equation, integ;
+                     tout = tout,
+                     kargs...)
     elseif points == :specified
-        solver = solve(equation, DenseStepper;
-                       mehtod = stepper,
-                       tout = tout,
-                       kargs...)
+        prob = solve(equation, DenseOutput;
+                     method = integ,
+                     tout = tout,
+                     kargs...)
     else
         error("Unsupported points value (should be :all or :specified)")
     end
@@ -33,7 +32,7 @@ function ode{T,Y,S<:AbstractStepper}(F, y0::Y,
 
     to = Array(T,0)
     yo = Array(Y,0)
-    for (t,y) in solver
+    for (t,y) in prob
         push!(to,t)
         push!(yo, extract ? y[1] : copy(y))
     end
@@ -47,20 +46,20 @@ end
 Solves an ODE `y'=F(t,y)` with initial conditions `y0` and `t0`.
 """
 
-ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0,ModifiedRosenbrockStepper; kargs...)
-ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:feuler}; kargs...)
-ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0,RKStepperFixed{:midpoint}; kargs...)
-ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0,RKStepperFixed{:heun}; kargs...)
-ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKStepperFixed{:rk4}; kargs...)
-ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:rk21}; kargs...)
-ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:rk23}; kargs...)
-ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:rk45}; kargs...)
-ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKStepperAdaptive{:dopri5}; kargs...)
+ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0,ModifiedRosenbrockIntegrator; kargs...)
+ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKIntegratorFixed{:feuler}; kargs...)
+ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0,RKIntegratorFixed{:midpoint}; kargs...)
+ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0,RKIntegratorFixed{:heun}; kargs...)
+ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKIntegratorFixed{:rk4}; kargs...)
+ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKIntegratorAdaptive{:rk21}; kargs...)
+ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKIntegratorAdaptive{:rk23}; kargs...)
+ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKIntegratorAdaptive{:rk45}; kargs...)
+ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKIntegratorAdaptive{:dopri5}; kargs...)
 const ode45 = ode45_dp
-ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKStepperAdaptive{:feh78}; kargs...)
+ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKIntegratorAdaptive{:feh78}; kargs...)
 
 
-function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},stepper;kargs...)
+function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},integ;kargs...)
 
     if !isleaftype(T)
         error("The output times have to be of a concrete type.")
@@ -72,7 +71,7 @@ function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},stepper;kargs...)
         error("The initial data has to be of a concrete type (or an array)")
     end
 
-    ode(F,y0,t0,stepper;kargs...)
+    ode(F,y0,t0,integ;kargs...)
 
 end
 

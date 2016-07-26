@@ -11,20 +11,20 @@ opts = Dict(:initstep=>0.1,
             :reltol=>1e-5,
             :abstol=>1e-5)
 # pick your solver
-stepper = [ODE.RKStepperAdaptive{:rk45},
-           ODE.ModifiedRosenbrockStepper][2]
+integ = [ODE.RKIntegratorAdaptive{:rk45},
+           ODE.ModifiedRosenbrockIntegrator][2]
 
-# create a Solver instance
-sol = ODE.solve(ode,stepper;opts...)
+# create a Problem instance
+prob = ODE.solve(ode,integ;opts...)
 
  # iterate over the solution
 println("t, y, err")
-for (t,y) in sol
+for (t,y) in prob
     println((t,y[1],abs(y[1]-e.^t)))
 end
 
 # or collect it
-println(collect(sol))
+println(collect(prob))
 
 ### Reverse time integration, rest as above
 t0 = 1.0
@@ -35,11 +35,11 @@ opts = Dict(:initstep=>0.1,
             :reltol=>1e-5,
             :abstol=>1e-5)
 
-sol = ODE.solve(ode,stepper;opts...)
+prob = ODE.solve(ode,integ;opts...)
 
 println("t, y, err")
-for (t,y) in sol # iterate over the solution
+for (t,y) in prob # iterate over the solution
     println((t,y[1],abs(y[1]-e.^(t-1))))
 end
 
-println(collect(sol))
+println(collect(prob))

@@ -1,7 +1,7 @@
 # The main types:
 # - IVP -- holds the mathematical aspects of a IVP
-# - AbstractStepper -- an integrator/solver  (maybe AbstractIntegrator?)
-# - Solver -- holds IVP + Stepper (maybe ProblemSpec, Problem, Spec?)
+# - AbstractIntegrator -- an integrator/solver  (maybe AbstractIntegrator?)
+# - Problem -- holds IVP + Integrator (maybe ProblemSpec, Problem, Spec?)
 # - AbstractState -- holds the iterator state
 #   - Step -- holds the state at one time
 # -
@@ -91,16 +91,24 @@ end
 
 """
 
-The abstract type of the actual algorithm to solve an ODE.
+The supertype of anything which can get you to a solution of a IVP.
+Subtypes include: `AbstractIntegrator`s but also `DenseOutput`
 
 """
-abstract AbstractStepper{T}
+abstract AbstractSolver
+
+"""
+
+The abstract type of the actual algorithm to solve an IVP.
+
+"""
+abstract AbstractIntegrator{T} <: AbstractSolver
 
 
 """
 
 AbstractState keeps the temporary data (state) for the iterator
-Solver{::AbstractStepper}.
+Problem{::AbstractIntegrator}.
 
 """
 abstract AbstractState{T,Y}
@@ -121,12 +129,12 @@ output(st::AbstractState) = st.step.t, st.step.y, st.step.dy
 #   (or something else consistent throughout, maybe nicer would be all
 #   uppercase: ET, EFY, TT, TY).
 # - if find `Step` a bit confusing name, in particular combined with
-#   AbstractStepper, but not sure what's better.
+#   AbstractIntegrator, but not sure what's better.
 
 """
 
 Holds a value of a function and its derivative at time t.  This is
-usually used to store the solution of an ODE at particular times.
+usually used to store the solution of an IVP at particular times.
 
 """
 type Step{T,Y}
@@ -147,40 +155,37 @@ end
 """
 
 This is an iterable type, each call to next(...) produces a next step
-of a numerical solution to an ODE.
+of a numerical solution to an IVP.
 
-- ode: is the prescrived ode, along with the initial data
-- stepper: the algorithm used to produce subsequent steps
-
+- ivp: is the prescrived ivp, along with the initial data
+- solver: the algorithm used to produce subsequent values from the ivp
 
 """
-immutable Solver{O<:AbstractIVP,S<:AbstractStepper}
-    ode     ::O
-    stepper ::S
+immutable Problem{O<:AbstractIVP,S<:AbstractSolver}
+    ivp   ::O
+    solver ::S
 end
-#m3:
-# - calling this `Solver` still trips me up
 
-Base.eltype{O}(::Type{Solver{O}}) = eltype(O)
-Base.eltype{O}(::Solver{O}) = eltype(O)
+Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
+Base.eltype{O}(::Problem{O}) = eltype(O)
 
-# filter the wrong combinations of ode and stepper
-solve{O,S}(ode::O, stepper::Type{S}, options...) =
-    error("The $S doesn't support $O")
+# filter the wrong combinations of ivp and stepper
+solve{O,S}(ivp::O, solver::Type{S}, opts...) =
+    error("The solver $S doesn't support IVP of form $O")
 
 # In Julia 0.5 the collect needs length to be defined, we cannot do
-# that for a solver but we can implement our own collect
-function collect(s::Solver)
-    T,Y = eltype(s)
+# that for a Problem but we can implement our own collect
+function collect(prob::Problem)
+    T,Y = eltype(prob)
     pairs = Array(Tuple{T,Y},0)
-    for (t,y) in s
+    for (t,y) in prob
         push!(pairs,(t,copy(y)))
     end
     return pairs
 end
 
 
-# Iteration: take one step on a ODE/DAE `Problem`
+# Iteration: take one step on a IVP `Problem`
 #
 # Defines:
 # start(iter) -> state
@@ -197,15 +202,13 @@ end
 # TODO: this implementation fails to return the zeroth step (t0,y0)
 #
 # TODO: store the current Step outside of the actual state
-# Base.start(sol::Solver) = (init(sol), Step(ode.sol))
 
-Base.start(sol::Solver) = init(sol.ode,sol.stepper)
+Base.start(prob::Problem) = init(prob.ivp, prob.solver)
 
-function Base.done(s::Solver, st)
+function Base.done(prob::Problem, st)
     # Determine whether the next step can be made by calling the
     # stepping routine.  onestep! will take the step in-place.
-    status = onestep!(s.ode, s.stepper, st)
-    # can't this be a function on a status?
+    status = onestep!(prob.ivp, prob.solver, st)
     if status==cont
         return false
     elseif status==finish
@@ -218,21 +221,12 @@ function Base.done(s::Solver, st)
     end
 end
 
-function Base.next(sol::Solver, st)
+function Base.next(prob::Problem, st)
     # Output the step (we know that `done` allowed it, so we are safe
     # to do it)
     return output(st), st
 end
 
-#m3: I don't think it makes sense to type-fy this.  TODO: delete
-# """
-# TODO: Holds the solver status after onestep.
-# """
-# type Status{T} end
-# successful(status::Status) = status == StatusContinue
-# const StatusContinue = Status{:cont}()
-# const StatusFailed = Status{:failed}()
-# const StatusFinished = Status{:finished}()
 """
 Holds the solver status, used inside of `onestep!`.
 
@@ -274,7 +268,7 @@ to implement the sub-step functions `trialstep!`, `errorcontrol!` and
 
 Input:
 
-- sol::Solver, state::AbstractState
+- prob::Problem, state::AbstractState
 
 Output:
 
@@ -282,15 +276,15 @@ Output:
 
 substeps.
 """
-function onestep!(ode::IVP, stepper::AbstractStepper, state::AbstractState)
-    opt = stepper.options
+function onestep!(ivp::IVP, integ::AbstractIntegrator, state::AbstractState)
+    opt = integ.opts
     while true
-        status = trialstep!(ode, stepper, state)
-        err, status_err = errorcontrol!(ode, stepper, state)
+        status = trialstep!(ivp, integ, state)
+        err, status_err = errorcontrol!(ivp, integ, state)
         status &= status_err
         if err<=1
             # a successful step
-            status &= accept!(ode, stepper, state)
+            status &= accept!(ivp, integ, state)
             return status
         elseif status==abort || status==finish
             return status
@@ -325,8 +319,8 @@ compute the magnitude of its error.  If the error is small enough
 Returns `Status`.
 
 """
-trialstep!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
-    error("Function `trialstep!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
+trialstep!{I<:AbstractIntegrator}(::IVP, ::I, ::AbstractState) =
+    error("Function `trialstep!` and companions (or alternatively `onestep!`) need to be implemented for adaptive integrator $I")
 
 """
 
@@ -340,8 +334,8 @@ If the `status==abort` then the integration is aborted, status values
 of `cont` and `finish` are ignored.
 
 """
-errorcontrol!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
-    error("Function `errorcontrol!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
+errorcontrol!{I<:AbstractIntegrator}(::IVP, ::I, ::AbstractState) =
+    error("Function `errorcontrol!` and companions (or alternatively `onestep!`) need to be implemented for adaptive integrator $I")
 
 """
 
@@ -351,5 +345,5 @@ a small enough error.
 Returns `Status`.
 
 """
-accept!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
-    error("Function `accept!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
+accept!{I<:AbstractIntegrator}(::IVP, ::I, ::AbstractState) =
+    error("Function `accept!` and companions (or alternatively `onestep!`) need to be implemented for adaptive integrator $I")

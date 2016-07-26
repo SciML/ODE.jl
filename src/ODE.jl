@@ -1,5 +1,21 @@
 # Ordinary Differential Equation Solvers
 
+"""
+Coding conventions:
+
+- use `t,y,dy`, use type/function parameters `T` and `Y`
+- `p::Problem`, use parameter `P`
+- `ivp::IVP`, use parameter `O`
+  - if referring to a ODE or DAE, use `ode` or `dae` instead
+- `integ::AbstractIntegrator`, use parameter `I`
+- `opts::AbstactOptions`, , use parameter `OP`
+
+Variables and Type variables:
+- T -> t::T
+- Y -> y::Y  TODO: or Vector{Y}?
+
+
+"""
 module ODE
 
 using Polynomials
@@ -7,8 +23,7 @@ using Compat
 import Compat.String
 using ForwardDiff
 
-import Base.convert, Base.show
-import Base: start, next, done, call, collect
+import Base: start, next, done, collect, show, convert
 
 # Core infrastructure
 #
