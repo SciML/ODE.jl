@@ -1,35 +1,36 @@
-"""
+## TODO: reactivate when introducing events/rootfinding
+# """
 
-A simple bisection algorithm for finding a root of a solution f(x)=0
-starting within the range x∈rng, the result is a point x₀ which is
-located within the distance eps from the true root of f(x)=0.  For
-this algorithm to work we need f(rng[1]) to have a different sign then
-f(rng[2]).
+# A simple bisection algorithm for finding a root of a solution f(x)=0
+# starting within the range x∈rng, the result is a point x₀ which is
+# located within the distance eps from the true root of f(x)=0.  For
+# this algorithm to work we need f(rng[1]) to have a different sign then
+# f(rng[2]).
 
-"""
-function findroot(f,rng,eps)
-    xl, xr = rng
-    fl, fr = f(xl), f(xr)
+# """
+# function findroot(f,rng,eps)
+#     xl, xr = rng
+#     fl, fr = f(xl), f(xr)
 
-    if fl*fr > 0 || xl > xr
-        error("Inconsistent bracket")
-    end
+#     if fl*fr > 0 || xl > xr
+#         error("Inconsistent bracket")
+#     end
 
-    while xr-xl > eps
-        xm = (xl+xr)/2
-        fm = f(xm)
+#     while xr-xl > eps
+#         xm = (xl+xr)/2
+#         fm = f(xm)
 
-        if fm*fr > 0
-            xr = xm
-            fr = fm
-        else
-            xl = xm
-            fl = fm
-        end
-    end
+#         if fm*fr > 0
+#             xr = xm
+#             fr = fm
+#         else
+#             xl = xm
+#             fl = fm
+#         end
+#     end
 
-    return (xr+xl)/2
-end
+#     return (xr+xl)/2
+# end
 
 # generate a jacobian using ForwardDiff
 function forward_jacobian(F,y0::AbstractArray)
