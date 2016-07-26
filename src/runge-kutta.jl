@@ -77,10 +77,10 @@ order(stepper::RKIntegrator) = minimum(order(stepper.tableau))
 
 name(stepper::RKIntegrator) = stepper.tableau.name
 
-tdir(ode::ExplicitODE, stepper::RKIntegrator) = sign(stepper.options.tstop - ode.t0)
+tdir(ivp::ExplicitODE, stepper::RKIntegrator) = sign(stepper.options.tstop - ivp.t0)
 
-solve{T,S<:RKIntegrator}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
-    Problem(ode,stepper{T}(;options...))
+solve{T,S<:RKIntegrator}(ivp::ExplicitODE{T}, stepper::Type{S}; options...) =
+    Problem(ivp,stepper{T}(;options...))
 
 # lower level interface
 
@@ -122,11 +122,11 @@ function show(io::IO, state::RKState)
 end
 
 
-function init(ode::ExplicitODE,stepper::RKIntegrator)
-    t0, dt0, y0 = ode.t0, stepper.options.initstep, ode.y0
+function init(ivp::ExplicitODE,stepper::RKIntegrator)
+    t0, dt0, y0 = ivp.t0, stepper.options.initstep, ivp.y0
 
     # clip the dt0 if t0+dt0 exceeds tstop
-    dt0 = tdir(ode,stepper)*min(abs(dt0),abs(stepper.options.tstop-t0))
+    dt0 = tdir(ivp,stepper)*min(abs(dt0),abs(stepper.options.tstop-t0))
 
     lk = lengthks(stepper.tableau)
     work = RKWorkArrays(zero(y0), # y
@@ -140,7 +140,7 @@ function init(ode::ExplicitODE,stepper::RKIntegrator)
     end
 
     # pre-initialize work.ks[1]
-    ode.F!(t0,y0,work.ks[1])
+    ivp.F!(t0,y0,work.ks[1])
 
     step = Step(t0,copy(y0),copy(work.ks[1]))
 
@@ -154,11 +154,11 @@ end
 #####################
 
 
-function onestep!(ode::ExplicitODE, stepper::RKIntegratorFixed, state::RKState)
+function onestep!(ivp::ExplicitODE, stepper::RKIntegratorFixed, state::RKState)
     step = state.step
     work = state.work
 
-    td = tdir(ode,stepper)
+    td = tdir(ivp,stepper)
 
     if td*step.t >= td*stepper.options.tstop
         # nothing left to integrate
@@ -172,7 +172,7 @@ function onestep!(ode::ExplicitODE, stepper::RKIntegratorFixed, state::RKState)
     copy!(work.ynew,step.y)
 
     for k=1:length(b)
-        calc_next_k!(work, k, ode, stepper.tableau, step, dt)
+        calc_next_k!(work, k, ivp, stepper.tableau, step, dt)
         for d=1:dof
             work.ynew[d] += dt * b[k]*work.ks[k][d]
         end
@@ -193,13 +193,13 @@ const timeout_const = 5
 # `trialstep!` ends with a step computed for the stepsize `state.dt`
 # and stores it in `work.y`, so `work.y` contains a candidate for
 # `y(t+dt)` with `dt=state.dt`.
-function trialstep!(ode::ExplicitODE, stepper::RKIntegratorAdaptive, state::RKState)
+function trialstep!(ivp::ExplicitODE, stepper::RKIntegratorAdaptive, state::RKState)
     work    = state.work
     step    = state.step
     tableau = stepper.tableau
     options = stepper.options
 
-    td = tdir(ode,stepper)
+    td = tdir(ivp,stepper)
 
     # use the proposed step size to perform the computations
     state.dt = state.newdt
@@ -217,14 +217,14 @@ function trialstep!(ode::ExplicitODE, stepper::RKIntegratorAdaptive, state::RKSt
     end
 
     # work.y and work.yerr and work.ks are updated after this step
-    rk_embedded_step!(work, ode, tableau, step, dt)
+    rk_embedded_step!(work, ivp, tableau, step, dt)
 
     return cont
 end
 
 # computes the error for the candidate solution `y(t+dt)` with
 # `dt=state.dt` and proposes a new time step
-function errorcontrol!(ode::ExplicitODE,
+function errorcontrol!(ivp::ExplicitODE,
                        stepper::RKIntegratorAdaptive,
                        state::RKState)
     work = state.work
@@ -235,7 +235,7 @@ function errorcontrol!(ode::ExplicitODE,
     err, state.newdt, state.timeout =
         stepsize_hw92!(work, step, tableau, state.dt, state.timeout, options)
 
-    td = tdir(ode,stepper)
+    td = tdir(ivp,stepper)
 
     # trim in case newdt > dt
     state.newdt = td*min(abs(state.newdt), abs(options.tstop-(state.step.t+state.dt)))
@@ -252,7 +252,7 @@ end
 # Here we assume that trialstep! and errorcontrol! have already been
 # called, that is `work.y` holds `y(t+dt)` with `dt=state.dt`, and
 # error was small enough for us to keep `y(t+dt)` as the next step.
-function accept!(ode::ExplicitODE,
+function accept!(ivp::ExplicitODE,
                  stepper::RKIntegratorAdaptive,
                  state::RKState)
     work    = state.work
@@ -263,7 +263,7 @@ function accept!(ode::ExplicitODE,
     if tableau.isFSAL
         copy!(work.ks[1],work.ks[end])
     else
-        ode.F!(step.t+state.dt, work.ynew, work.ks[1])
+        ivp.F!(step.t+state.dt, work.ynew, work.ks[1])
     end
 
     # Swap bindings of y and ytrial, avoids one copy
@@ -280,7 +280,7 @@ end
 ##########################
 
 function rk_embedded_step!(work      ::RKWorkArrays,
-                           ode       ::ExplicitODE,
+                           ivp       ::ExplicitODE,
                            tableau   ::Tableau,
                            last_step ::Step,
                            dt)
@@ -299,7 +299,7 @@ function rk_embedded_step!(work      ::RKWorkArrays,
         # we skip the first step beacause we assume that work.ks[1] is
         # already computed
         if s > 1
-            calc_next_k!(work, s, ode, tableau, last_step, dt)
+            calc_next_k!(work, s, ivp, tableau, last_step, dt)
         end
         for d=1:dof
             work.ynew[d] += b[1,s]*work.ks[s][d]
@@ -376,7 +376,7 @@ end
 # this is the only part of state that can be changed here
 function calc_next_k!(work      ::RKWorkArrays,
                       i         ::Int,
-                      ode       ::ExplicitODE,
+                      ivp       ::ExplicitODE,
                       tableau   ::Tableau,
                       last_step ::Step,
                       dt)
@@ -389,7 +389,7 @@ function calc_next_k!(work      ::RKWorkArrays,
             work.y[d] += dt * work.ks[j][d] * a[i,j]
         end
     end
-    ode.F!(t + c[i]*dt, work.y, work.ks[i])
+    ivp.F!(t + c[i]*dt, work.y, work.ks[i])
     return nothing
 end
 

@@ -38,19 +38,20 @@ interpolates the results on request (currently this means at the
 output times stored in `options.tout`).
 
 """
-immutable DenseOutput{S<:Problem,O<:DenseOptions} <: AbstractIntegrator  #TODO: <: is needed at the moment after all. Remove
-    solver::S
-    options::O
+immutable DenseOutput{P<:Problem,OP<:DenseOptions} <: AbstractSolver
+    prob::P
+    options::OP
 end
 
-function solve{T,S<:DenseOutput}(ode::ExplicitODE{T},
-                                  ::Type{S};
-                                  method = RKIntegratorAdaptive{:rk45},
-                                  options...)
-    sol_orig = Problem(ode,method{T}(; options...))
+function solve{S<:DenseOutput}(ivp::IVP,
+                               ::Type{S};
+                               method = RKIntegratorAdaptive{:rk45},
+                               options...)
+    T = eltype(ivp)[1]
+    sol_orig = Problem(ivp,method{T}(; options...))
     dense_options = DenseOptions{T}(; options...)
     dense_stepper = S(sol_orig,dense_options)
-    return Problem(ode,dense_stepper) # TODO: this is where it is needed.
+    return Problem(ivp,dense_stepper) # TODO: this is where it is needed.
 end
 
 """
@@ -62,20 +63,20 @@ type DenseState{St<:AbstractState,T,Y} <: AbstractState{T,Y}
     tout_i::Int
     step_prev::Step{T,Y}
     step_out::Step{T,Y}
-    solver_state::St
+    integrator_state::St
 end
 
 output(ds::DenseState) = output(ds.step_out)
 
-function init(ode::ExplicitODE,
+function init(ivp::IVP,
               stepper::DenseOutput)
-    ode = stepper.solver.ode
-    solver_state = init(stepper.solver.ode, stepper.solver.stepper)
-    dy0 = similar(ode.y0)
-    ode.F!(ode.t0,ode.y0,dy0)
-    step_prev = Step(ode.t0,copy(ode.y0),dy0)
-    step_out = Step(ode.t0,similar(ode.y0),similar(ode.y0))
-    return DenseState(1,step_prev,step_out,solver_state)
+    ivp = stepper.prob.ivp
+    integrator_state = init(stepper.prob.ivp, stepper.prob.stepper)
+    dy0 = similar(ivp.y0)
+    ivp.F!(ivp.t0,ivp.y0,dy0)
+    step_prev = Step(ivp.t0,copy(ivp.y0),dy0)
+    step_out = Step(ivp.t0,similar(ivp.y0),similar(ivp.y0))
+    return DenseState(1,step_prev,step_out,integrator_state)
 end
 
 
@@ -88,7 +89,7 @@ wouldn't.
 
 """
 
-function onestep!(ode::ExplicitODE,
+function onestep!(ivp::IVP,
                   stepper::DenseOutput,
                   state::DenseState)
     i = state.tout_i
@@ -99,13 +100,13 @@ function onestep!(ode::ExplicitODE,
     # our next output time
     ti = stepper.options.tout[i]
 
-    sol = stepper.solver # this looks weird
-    sol_state = state.solver_state
+    sol = stepper.prob # this looks weird
+    sol_state = state.integrator_state
 
     # try to get a new set of steps enclosing `ti`, if all goes
     # right we end up with t∈[t1,t2] with
     # t1,_=output(state.step_prev)
-    # t2,_=output(state.solver_state)
+    # t2,_=output(state.integrator_state)
     status = next_interval!(sol,sol_state,state.step_prev,ti)
     if status == abort
         # we failed to get enough steps
@@ -116,7 +117,7 @@ function onestep!(ode::ExplicitODE,
         # the state.step_out with y(ti) and y'(ti) according to an
         # interpolation algorithm specific for a method (defaults to
         # hermite O(3)).
-        interpolate!(state.solver_state,state.step_prev,ti,state.step_out)
+        interpolate!(state.integrator_state,state.step_prev,ti,state.step_out)
 
         # increase the counter
         state.tout_i += 1
@@ -126,7 +127,7 @@ end
 
 """
 
-Pulls the results from the (solver,state) pair using `onestep!` until
+Pulls the results from the (prob,state) pair using `onestep!` until
 we reach a first step such that `t>=tout`.  It fills the `steps`
 variable with (Step(t1,y(t1),dy(t1)),Step(t2,y(t2),dy(t2))), where
 `t1` is is the step before `tout` and `t2` is `>=tout`.  In
@@ -135,7 +136,7 @@ other words `tout∈[t1,t2]`.
 TODO: tdir
 
 """
-function next_interval!(solver,state,step_prev,tout)
+function next_interval!(prob,state,step_prev,tout)
 
     while true
         # get the current time
@@ -153,8 +154,8 @@ function next_interval!(solver,state,step_prev,tout)
         copy!(step_prev.y,y)
         copy!(step_prev.dy,dy)
 
-        # try to perform a single step with the solver
-        status = onestep!(solver.ode, solver.stepper, state)
+        # try to perform a single step with the prob
+        status = onestep!(prob.ivp, prob.stepper, state)
 
         if status != cont
             return status

@@ -19,11 +19,11 @@ end
 order(::ModifiedRosenbrockIntegrator) = 2
 name(::ModifiedRosenbrockIntegrator) = "Modified Rosenbrock Integrator"
 isadaptive(::ModifiedRosenbrockIntegrator) = true
-tdir(ode::ExplicitODE, stepper::ModifiedRosenbrockIntegrator) = sign(stepper.options.tstop - ode.t0)
+tdir(ivp::ExplicitODE, stepper::ModifiedRosenbrockIntegrator) = sign(stepper.options.tstop - ivp.t0)
 
 # define the set of ODE problems with which this stepper can work
-solve{T,S<:ModifiedRosenbrockIntegrator}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
-    Problem(ode,stepper{T}(;options...))
+solve{T,S<:ModifiedRosenbrockIntegrator}(ivp::ExplicitODE{T}, stepper::Type{S}; options...) =
+    Problem(ivp,stepper{T}(;options...))
 
 """
 The state for the Rosenbrock stepper
@@ -59,11 +59,11 @@ function show(io::IO, state::RosenbrockState)
 end
 
 
-function init{T}(ode::ExplicitODE{T},
+function init{T}(ivp::ExplicitODE{T},
                  stepper::ModifiedRosenbrockIntegrator)
-    t  = ode.t0
+    t  = ivp.t0
     dt = stepper.options.initstep
-    y  = ode.y0
+    y  = ivp.y0
     dy = zero(y)
 
     J  = Array(eltype(y),length(y),length(y))
@@ -82,14 +82,14 @@ function init{T}(ode::ExplicitODE{T},
                             0)       # iters
 
     # initialize the derivative and the Jacobian
-    ode.F!(t,y,step.dy)
-    ode.J!(t,y,state.J)
+    ivp.F!(t,y,step.dy)
+    ivp.J!(t,y,state.J)
 
     return state
 end
 
 
-function trialstep!(ode::ExplicitODE,
+function trialstep!(ivp::ExplicitODE,
                     stepper::ModifiedRosenbrockIntegrator,
                     state::RosenbrockState)
     # unpack
@@ -98,10 +98,10 @@ function trialstep!(ode::ExplicitODE,
     F1, F2, J = state.F1, state.F2, state.J
     k1,k2,k3,ynew =  state.k1, state.k2, state.k3, state.ynew
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
-    F! = ode.F!
+    F! = ivp.F!
     F0 = dy
 
-    td = tdir(ode,stepper)
+    td = tdir(ivp,stepper)
 
     # see whether we're done
     if td*t >= td*opts.tstop
@@ -137,7 +137,7 @@ function trialstep!(ode::ExplicitODE,
     return cont
 end
 
-function errorcontrol!(ode::ExplicitODE,
+function errorcontrol!(ivp::ExplicitODE,
                        stepper::ModifiedRosenbrockIntegrator,
                        state::RosenbrockState)
 
@@ -147,7 +147,7 @@ function errorcontrol!(ode::ExplicitODE,
     k1,k2,k3,ynew =  state.k1, state.k2, state.k3, state.ynew
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
 
-    td = tdir(ode,stepper)
+    td = tdir(ivp,stepper)
 
     # allowable error
     delta = max(opts.reltol*max(opts.norm(y), opts.norm(ynew)),opts.abstol)
@@ -166,7 +166,7 @@ function errorcontrol!(ode::ExplicitODE,
     return err, cont
 end
 
-function accept!(ode::ExplicitODE,
+function accept!(ivp::ExplicitODE,
                  stepper::ModifiedRosenbrockIntegrator,
                  state::RosenbrockState)
     step = state.step
@@ -174,7 +174,7 @@ function accept!(ode::ExplicitODE,
     step.t     = step.t+state.dtold
     copy!(step.y, state.ynew)
     copy!(step.dy, state.F2)
-    ode.J!(step.t,step.y,state.J)
+    ivp.J!(step.t,step.y,state.J)
 
     return cont
 end

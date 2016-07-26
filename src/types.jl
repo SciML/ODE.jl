@@ -91,10 +91,18 @@ end
 
 """
 
-The abstract type of the actual algorithm to solve an ODE.
+The supertype of anything which can get you to a solution of a IVP.
+Subtypes include: `AbstractIntegrator`s but also `DenseOutput`
 
 """
-abstract AbstractIntegrator{T}
+abstract AbstractSolver
+
+"""
+
+The abstract type of the actual algorithm to solve an IVP.
+
+"""
+abstract AbstractIntegrator{T} <: AbstractSolver
 
 
 """
@@ -126,7 +134,7 @@ output(st::AbstractState) = st.step.t, st.step.y, st.step.dy
 """
 
 Holds a value of a function and its derivative at time t.  This is
-usually used to store the solution of an ODE at particular times.
+usually used to store the solution of an IVP at particular times.
 
 """
 type Step{T,Y}
@@ -147,23 +155,23 @@ end
 """
 
 This is an iterable type, each call to next(...) produces a next step
-of a numerical solution to an ODE.
+of a numerical solution to an IVP.
 
-- ode: is the prescrived ode, along with the initial data
+- ivp: is the prescrived ivp, along with the initial data
 - stepper: the algorithm used to produce subsequent steps
 
 
 """
-immutable Problem{O<:AbstractIVP,S<:AbstractIntegrator}
-    ode     ::O
+immutable Problem{O<:AbstractIVP,S<:AbstractSolver}
+    ivp     ::O
     stepper ::S
 end
 
 Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
 Base.eltype{O}(::Problem{O}) = eltype(O)
 
-# filter the wrong combinations of ode and stepper
-solve{O,S}(ode::O, stepper::Type{S}, options...) =
+# filter the wrong combinations of ivp and stepper
+solve{O,S}(ivp::O, stepper::Type{S}, options...) =
     error("The $S doesn't support $O")
 
 # In Julia 0.5 the collect needs length to be defined, we cannot do
@@ -178,7 +186,7 @@ function collect(s::Problem)
 end
 
 
-# Iteration: take one step on a ODE/DAE `Problem`
+# Iteration: take one step on a IVP `Problem`
 #
 # Defines:
 # start(iter) -> state
@@ -195,14 +203,14 @@ end
 # TODO: this implementation fails to return the zeroth step (t0,y0)
 #
 # TODO: store the current Step outside of the actual state
-# Base.start(sol::Problem) = (init(sol), Step(ode.sol))
+# Base.start(sol::Problem) = (init(sol), Step(ivp.sol))
 
-Base.start(sol::Problem) = init(sol.ode,sol.stepper)
+Base.start(sol::Problem) = init(sol.ivp,sol.stepper)
 
 function Base.done(s::Problem, st)
     # Determine whether the next step can be made by calling the
     # stepping routine.  onestep! will take the step in-place.
-    status = onestep!(s.ode, s.stepper, st)
+    status = onestep!(s.ivp, s.stepper, st)
     # can't this be a function on a status?
     if status==cont
         return false
@@ -280,15 +288,15 @@ Output:
 
 substeps.
 """
-function onestep!(ode::IVP, stepper::AbstractIntegrator, state::AbstractState)
+function onestep!(ivp::IVP, stepper::AbstractIntegrator, state::AbstractState)
     opt = stepper.options
     while true
-        status = trialstep!(ode, stepper, state)
-        err, status_err = errorcontrol!(ode, stepper, state)
+        status = trialstep!(ivp, stepper, state)
+        err, status_err = errorcontrol!(ivp, stepper, state)
         status &= status_err
         if err<=1
             # a successful step
-            status &= accept!(ode, stepper, state)
+            status &= accept!(ivp, stepper, state)
             return status
         elseif status==abort || status==finish
             return status
