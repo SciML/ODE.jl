@@ -11,10 +11,10 @@ opts = Dict(:initstep=>0.1,
             :reltol=>1e-5,
             :abstol=>1e-5)
 # pick your solver
-stepper = [ODE.RKStepperAdaptive{:rk45},
-           ODE.ModifiedRosenbrockStepper][2]
+stepper = [ODE.RKIntegratorAdaptive{:rk45},
+           ODE.ModifiedRosenbrockIntegrator][2]
 
-# create a Solver instance
+# create a Problem instance
 sol = ODE.solve(ode,stepper;opts...)
 
  # iterate over the solution

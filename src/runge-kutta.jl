@@ -40,24 +40,23 @@ isadaptive(b::TableauRKExplicit) = size(b.b, 1)==2
 #######################
 # Solver implementation
 #######################
-
 """
 
 A general Runge-Kutta stepper (it can represent either, a fixed step
 or an adaptive step algorithm).
 
 """
-immutable RKStepper{Kind,Name,T,O<:Options} <: AbstractStepper{T}
+immutable RKIntegrator{Kind,Name,T,O<:Options} <: AbstractIntegrator{T}
     tableau::TableauRKExplicit{T}
     options::O
 end
 
 
-typealias RKStepperFixed    RKStepper{:fixed}
-typealias RKStepperAdaptive RKStepper{:adaptive}
+typealias RKIntegratorFixed    RKIntegrator{:fixed}
+typealias RKIntegratorAdaptive RKIntegrator{:adaptive}
 
 
-@compat function (::Type{RKStepper{Kind,Name,T}}){Kind,Name,T}(;options...)
+@compat function (::Type{RKIntegrator{Kind,Name,T}}){Kind,Name,T}(;options...)
     tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
     if Kind == :fixed
         opts = FixedOptions{T}(;options...)
@@ -70,18 +69,18 @@ typealias RKStepperAdaptive RKStepper{:adaptive}
             error("Cannot construct an adaptive step method from an fixed step tableau")
         end
     end
-    RKStepper{Kind,Name,T,typeof(opts)}(tab,opts)
+    RKIntegrator{Kind,Name,T,typeof(opts)}(tab,opts)
 end
 
 
-order(stepper::RKStepper) = minimum(order(stepper.tableau))
+order(stepper::RKIntegrator) = minimum(order(stepper.tableau))
 
-name(stepper::RKStepper) = stepper.tableau.name
+name(stepper::RKIntegrator) = stepper.tableau.name
 
-tdir(ode::ExplicitODE, stepper::RKStepper) = sign(stepper.options.tstop - ode.t0)
+tdir(ode::ExplicitODE, stepper::RKIntegrator) = sign(stepper.options.tstop - ode.t0)
 
-solve{T,S<:RKStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
-    Solver(ode,stepper{T}(;options...))
+solve{T,S<:RKIntegrator}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
+    Problem(ode,stepper{T}(;options...))
 
 # lower level interface
 
@@ -123,7 +122,7 @@ function show(io::IO, state::RKState)
 end
 
 
-function init(ode::ExplicitODE,stepper::RKStepper)
+function init(ode::ExplicitODE,stepper::RKIntegrator)
     t0, dt0, y0 = ode.t0, stepper.options.initstep, ode.y0
 
     # clip the dt0 if t0+dt0 exceeds tstop
@@ -155,7 +154,7 @@ end
 #####################
 
 
-function onestep!(ode::ExplicitODE, stepper::RKStepperFixed, state::RKState)
+function onestep!(ode::ExplicitODE, stepper::RKIntegratorFixed, state::RKState)
     step = state.step
     work = state.work
 
@@ -194,7 +193,7 @@ const timeout_const = 5
 # `trialstep!` ends with a step computed for the stepsize `state.dt`
 # and stores it in `work.y`, so `work.y` contains a candidate for
 # `y(t+dt)` with `dt=state.dt`.
-function trialstep!(ode::ExplicitODE, stepper::RKStepperAdaptive, state::RKState)
+function trialstep!(ode::ExplicitODE, stepper::RKIntegratorAdaptive, state::RKState)
     work    = state.work
     step    = state.step
     tableau = stepper.tableau
@@ -226,7 +225,7 @@ end
 # computes the error for the candidate solution `y(t+dt)` with
 # `dt=state.dt` and proposes a new time step
 function errorcontrol!(ode::ExplicitODE,
-                       stepper::RKStepperAdaptive,
+                       stepper::RKIntegratorAdaptive,
                        state::RKState)
     work = state.work
     step = state.step
@@ -254,7 +253,7 @@ end
 # called, that is `work.y` holds `y(t+dt)` with `dt=state.dt`, and
 # error was small enough for us to keep `y(t+dt)` as the next step.
 function accept!(ode::ExplicitODE,
-                 stepper::RKStepperAdaptive,
+                 stepper::RKIntegratorAdaptive,
                  state::RKState)
     work    = state.work
     step    = state.step

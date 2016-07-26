@@ -1,7 +1,7 @@
 # The main types:
 # - IVP -- holds the mathematical aspects of a IVP
-# - AbstractStepper -- an integrator/solver  (maybe AbstractIntegrator?)
-# - Solver -- holds IVP + Stepper (maybe ProblemSpec, Problem, Spec?)
+# - AbstractIntegrator -- an integrator/solver  (maybe AbstractIntegrator?)
+# - Problem -- holds IVP + Integrator (maybe ProblemSpec, Problem, Spec?)
 # - AbstractState -- holds the iterator state
 #   - Step -- holds the state at one time
 # -
@@ -94,13 +94,13 @@ end
 The abstract type of the actual algorithm to solve an ODE.
 
 """
-abstract AbstractStepper{T}
+abstract AbstractIntegrator{T}
 
 
 """
 
 AbstractState keeps the temporary data (state) for the iterator
-Solver{::AbstractStepper}.
+Problem{::AbstractIntegrator}.
 
 """
 abstract AbstractState{T,Y}
@@ -121,7 +121,7 @@ output(st::AbstractState) = st.step.t, st.step.y, st.step.dy
 #   (or something else consistent throughout, maybe nicer would be all
 #   uppercase: ET, EFY, TT, TY).
 # - if find `Step` a bit confusing name, in particular combined with
-#   AbstractStepper, but not sure what's better.
+#   AbstractIntegrator, but not sure what's better.
 
 """
 
@@ -154,15 +154,13 @@ of a numerical solution to an ODE.
 
 
 """
-immutable Solver{O<:AbstractIVP,S<:AbstractStepper}
+immutable Problem{O<:AbstractIVP,S<:AbstractIntegrator}
     ode     ::O
     stepper ::S
 end
-#m3:
-# - calling this `Solver` still trips me up
 
-Base.eltype{O}(::Type{Solver{O}}) = eltype(O)
-Base.eltype{O}(::Solver{O}) = eltype(O)
+Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
+Base.eltype{O}(::Problem{O}) = eltype(O)
 
 # filter the wrong combinations of ode and stepper
 solve{O,S}(ode::O, stepper::Type{S}, options...) =
@@ -170,7 +168,7 @@ solve{O,S}(ode::O, stepper::Type{S}, options...) =
 
 # In Julia 0.5 the collect needs length to be defined, we cannot do
 # that for a solver but we can implement our own collect
-function collect(s::Solver)
+function collect(s::Problem)
     T,Y = eltype(s)
     pairs = Array(Tuple{T,Y},0)
     for (t,y) in s
@@ -197,11 +195,11 @@ end
 # TODO: this implementation fails to return the zeroth step (t0,y0)
 #
 # TODO: store the current Step outside of the actual state
-# Base.start(sol::Solver) = (init(sol), Step(ode.sol))
+# Base.start(sol::Problem) = (init(sol), Step(ode.sol))
 
-Base.start(sol::Solver) = init(sol.ode,sol.stepper)
+Base.start(sol::Problem) = init(sol.ode,sol.stepper)
 
-function Base.done(s::Solver, st)
+function Base.done(s::Problem, st)
     # Determine whether the next step can be made by calling the
     # stepping routine.  onestep! will take the step in-place.
     status = onestep!(s.ode, s.stepper, st)
@@ -218,7 +216,7 @@ function Base.done(s::Solver, st)
     end
 end
 
-function Base.next(sol::Solver, st)
+function Base.next(sol::Problem, st)
     # Output the step (we know that `done` allowed it, so we are safe
     # to do it)
     return output(st), st
@@ -274,7 +272,7 @@ to implement the sub-step functions `trialstep!`, `errorcontrol!` and
 
 Input:
 
-- sol::Solver, state::AbstractState
+- sol::Problem, state::AbstractState
 
 Output:
 
@@ -282,7 +280,7 @@ Output:
 
 substeps.
 """
-function onestep!(ode::IVP, stepper::AbstractStepper, state::AbstractState)
+function onestep!(ode::IVP, stepper::AbstractIntegrator, state::AbstractState)
     opt = stepper.options
     while true
         status = trialstep!(ode, stepper, state)
@@ -325,7 +323,7 @@ compute the magnitude of its error.  If the error is small enough
 Returns `Status`.
 
 """
-trialstep!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
+trialstep!{S<:AbstractIntegrator}(::IVP, ::S, ::AbstractState) =
     error("Function `trialstep!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
 
 """
@@ -340,7 +338,7 @@ If the `status==abort` then the integration is aborted, status values
 of `cont` and `finish` are ignored.
 
 """
-errorcontrol!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
+errorcontrol!{S<:AbstractIntegrator}(::IVP, ::S, ::AbstractState) =
     error("Function `errorcontrol!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")
 
 """
@@ -351,5 +349,5 @@ a small enough error.
 Returns `Status`.
 
 """
-accept!{S<:AbstractStepper}(::IVP, ::S, ::AbstractState) =
+accept!{S<:AbstractIntegrator}(::IVP, ::S, ::AbstractState) =
     error("Function `accept!` and companions (or alternatively `onestep!`) need to be implemented for adaptive solver $S")

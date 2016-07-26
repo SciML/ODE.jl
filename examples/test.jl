@@ -9,9 +9,9 @@ Y = Vector{T}
 t0 = zero(T)
 y0 = T[one(T)]
 
-steppers = [# ODE.RKStepperAdaptive{:rk45},
-            # ODE.RKStepperFixed{:feuler},
-            ODE.DenseStepper]
+steppers = [# ODE.RKIntegratorAdaptive{:rk45},
+            # ODE.RKIntegratorFixed{:feuler},
+            ODE.DenseOutput]
 
 for st in steppers
     ode  = ODE.ExplicitODE(t0,y0,(t,y,dy)->dy[1]=y[1])

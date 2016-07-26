@@ -3,27 +3,27 @@
 #
 # [SR97] L.F. Shampine and M.W. Reichelt: "The MATLAB ODE Suite," SIAM Journal on Scientific Computing, Vol. 18, 1997, pp. 1–22
 
-immutable ModifiedRosenbrockStepper{T<:Number} <: AbstractStepper
+immutable ModifiedRosenbrockIntegrator{T<:Number} <: AbstractIntegrator
     options::AdaptiveOptions{T}
     const_d::T
     const_e::T
 end
 
-@compat function (::Type{ModifiedRosenbrockStepper{T}}){T}(;options...)
+@compat function (::Type{ModifiedRosenbrockIntegrator{T}}){T}(;options...)
     const_d = 1/(2+sqrt(T(2)))
     const_e = 6+sqrt(T(2))
 
-    ModifiedRosenbrockStepper( AdaptiveOptions{T}(;options...), const_d, const_e )
+    ModifiedRosenbrockIntegrator( AdaptiveOptions{T}(;options...), const_d, const_e )
 end
 
-order(::ModifiedRosenbrockStepper) = 2
-name(::ModifiedRosenbrockStepper) = "Modified Rosenbrock Stepper"
-isadaptive(::ModifiedRosenbrockStepper) = true
-tdir(ode::ExplicitODE, stepper::ModifiedRosenbrockStepper) = sign(stepper.options.tstop - ode.t0)
+order(::ModifiedRosenbrockIntegrator) = 2
+name(::ModifiedRosenbrockIntegrator) = "Modified Rosenbrock Integrator"
+isadaptive(::ModifiedRosenbrockIntegrator) = true
+tdir(ode::ExplicitODE, stepper::ModifiedRosenbrockIntegrator) = sign(stepper.options.tstop - ode.t0)
 
 # define the set of ODE problems with which this stepper can work
-solve{T,S<:ModifiedRosenbrockStepper}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
-    Solver(ode,stepper{T}(;options...))
+solve{T,S<:ModifiedRosenbrockIntegrator}(ode::ExplicitODE{T}, stepper::Type{S}; options...) =
+    Problem(ode,stepper{T}(;options...))
 
 """
 The state for the Rosenbrock stepper
@@ -60,7 +60,7 @@ end
 
 
 function init{T}(ode::ExplicitODE{T},
-                 stepper::ModifiedRosenbrockStepper)
+                 stepper::ModifiedRosenbrockIntegrator)
     t  = ode.t0
     dt = stepper.options.initstep
     y  = ode.y0
@@ -90,7 +90,7 @@ end
 
 
 function trialstep!(ode::ExplicitODE,
-                    stepper::ModifiedRosenbrockStepper,
+                    stepper::ModifiedRosenbrockIntegrator,
                     state::RosenbrockState)
     # unpack
     step    = state.step
@@ -138,7 +138,7 @@ function trialstep!(ode::ExplicitODE,
 end
 
 function errorcontrol!(ode::ExplicitODE,
-                       stepper::ModifiedRosenbrockStepper,
+                       stepper::ModifiedRosenbrockIntegrator,
                        state::RosenbrockState)
 
     step    = state.step
@@ -167,7 +167,7 @@ function errorcontrol!(ode::ExplicitODE,
 end
 
 function accept!(ode::ExplicitODE,
-                 stepper::ModifiedRosenbrockStepper,
+                 stepper::ModifiedRosenbrockIntegrator,
                  state::RosenbrockState)
     step = state.step
     # update the state
