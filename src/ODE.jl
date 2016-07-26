@@ -3,11 +3,12 @@
 """
 Coding conventions:
 
-- use t::T, y::Y, dy::Y
-- p::Problem, ::P
-- ivp::IVP, ::O
-- integrator::AbstractIntegrator, ::I
-- opts::AbstactOptions
+- use `t,y,dy`, use type/function parameters `T` and `Y`
+- `p::Problem`, use parameter `P`
+- `ivp::IVP`, use parameter `O`
+  - if referring to a ODE or DAE, use `ode` or `dae` instead
+- `integ::AbstractIntegrator`, use parameter `I`
+- `opts::AbstactOptions`, , use parameter `OP`
 
 Variables and Type variables:
 - T -> t::T

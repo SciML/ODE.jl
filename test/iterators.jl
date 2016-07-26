@@ -48,7 +48,7 @@ const testsets = [
 
 
 # Testing function ode
-const steppers = [ODE.RKIntegratorFixed{:feuler},
+const integrators = [ODE.RKIntegratorFixed{:feuler},
                   ODE.RKIntegratorFixed{:midpoint},
                   ODE.RKIntegratorFixed{:heun},
                   ODE.RKIntegratorFixed{:rk4},
@@ -63,12 +63,12 @@ const steppers = [ODE.RKIntegratorFixed{:feuler},
 function test_ode()
     tol = 0.002
 
-    for rks in steppers
-        println("Testing $rks")
+    for integ in integrators
+        println("Testing $integ")
         for ts in testsets
             println("Testing problem $(ts[:name])")
 
-            tout, h0, stepper = ts[:tout], ts[:initstep], rks
+            tout, h0, stepper = ts[:tout], ts[:initstep], integ
 
             y0, F!, jac!, sol = ts[:y0], ts[:F!], ts[:jac], ts[:sol]
 

@@ -4,29 +4,29 @@
 # [SR97] L.F. Shampine and M.W. Reichelt: "The MATLAB ODE Suite," SIAM Journal on Scientific Computing, Vol. 18, 1997, pp. 1–22
 
 immutable ModifiedRosenbrockIntegrator{T<:Number} <: AbstractIntegrator
-    options::AdaptiveOptions{T}
+    opts::AdaptiveOptions{T}
     const_d::T
     const_e::T
 end
 
-@compat function (::Type{ModifiedRosenbrockIntegrator{T}}){T}(;options...)
+@compat function (::Type{ModifiedRosenbrockIntegrator{T}}){T}(;opts...)
     const_d = 1/(2+sqrt(T(2)))
     const_e = 6+sqrt(T(2))
 
-    ModifiedRosenbrockIntegrator( AdaptiveOptions{T}(;options...), const_d, const_e )
+    ModifiedRosenbrockIntegrator( AdaptiveOptions{T}(;opts...), const_d, const_e )
 end
 
 order(::ModifiedRosenbrockIntegrator) = 2
 name(::ModifiedRosenbrockIntegrator) = "Modified Rosenbrock Integrator"
 isadaptive(::ModifiedRosenbrockIntegrator) = true
-tdir(ivp::ExplicitODE, stepper::ModifiedRosenbrockIntegrator) = sign(stepper.options.tstop - ivp.t0)
+tdir(ode::ExplicitODE, integ::ModifiedRosenbrockIntegrator) = sign(integ.opts.tstop - ode.t0)
 
-# define the set of ODE problems with which this stepper can work
-solve{T,S<:ModifiedRosenbrockIntegrator}(ivp::ExplicitODE{T}, stepper::Type{S}; options...) =
-    Problem(ivp,stepper{T}(;options...))
+# define the set of ODE problems with which this integrator can work
+solve{T,I<:ModifiedRosenbrockIntegrator}(ode::ExplicitODE{T}, integ::Type{I}; opts...) =
+    Problem(ode, integ{T}(;opts...))
 
 """
-The state for the Rosenbrock stepper
+The state for the Rosenbrock integrator
 
 - step:  Last successful step
 - F1,F2: Work arrays for storing the intermediate values of y'
@@ -59,11 +59,11 @@ function show(io::IO, state::RosenbrockState)
 end
 
 
-function init{T}(ivp::ExplicitODE{T},
-                 stepper::ModifiedRosenbrockIntegrator)
-    t  = ivp.t0
-    dt = stepper.options.initstep
-    y  = ivp.y0
+function init{T}(ode::ExplicitODE{T},
+                 integ::ModifiedRosenbrockIntegrator)
+    t  = ode.t0
+    dt = integ.opts.initstep
+    y  = ode.y0
     dy = zero(y)
 
     J  = Array(eltype(y),length(y),length(y))
@@ -82,26 +82,26 @@ function init{T}(ivp::ExplicitODE{T},
                             0)       # iters
 
     # initialize the derivative and the Jacobian
-    ivp.F!(t,y,step.dy)
-    ivp.J!(t,y,state.J)
+    ode.F!(t,y,step.dy)
+    ode.J!(t,y,state.J)
 
     return state
 end
 
 
-function trialstep!(ivp::ExplicitODE,
-                    stepper::ModifiedRosenbrockIntegrator,
+function trialstep!(ode::ExplicitODE,
+                    integ::ModifiedRosenbrockIntegrator,
                     state::RosenbrockState)
     # unpack
     step    = state.step
-    opts    = stepper.options
+    opts    = integ.opts
     F1, F2, J = state.F1, state.F2, state.J
     k1,k2,k3,ynew =  state.k1, state.k2, state.k3, state.ynew
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
-    F! = ivp.F!
+    F! = ode.F!
     F0 = dy
 
-    td = tdir(ivp,stepper)
+    td = tdir(ode,integ)
 
     # see whether we're done
     if td*t >= td*opts.tstop
@@ -116,12 +116,12 @@ function trialstep!(ivp::ExplicitODE,
         return abort
     end
 
-    W = lufact!( eye(J) - dt*stepper.const_d*J )
+    W = lufact!( eye(J) - dt*integ.const_d*J )
 
     # Approximate time-derivative of F, we are using F1 as a
     # temporary array
     F!(t+dt/100,y,F1)
-    tder = 100*stepper.const_d*(F1-F0)
+    tder = 100*integ.const_d*(F1-F0)
 
     # modified Rosenbrock formula
     # TODO: update k1,k2,k3 in-place
@@ -132,22 +132,22 @@ function trialstep!(ivp::ExplicitODE,
         ynew[i] = y[i] + dt*k2[i]
     end
     F!(t+dt,   ynew,      F2)
-    k3[:] = W \ (F2 - stepper.const_e*(k2 - F1) - 2*(k1 - F0) + tder )
+    k3[:] = W \ (F2 - integ.const_e*(k2 - F1) - 2*(k1 - F0) + tder )
 
     return cont
 end
 
-function errorcontrol!(ivp::ExplicitODE,
-                       stepper::ModifiedRosenbrockIntegrator,
+function errorcontrol!(ode::ExplicitODE,
+                       integ::ModifiedRosenbrockIntegrator,
                        state::RosenbrockState)
 
     step    = state.step
-    opts    = stepper.options
+    opts    = integ.opts
     k1,k2,k3 =  state.k1, state.k2, state.k3
     k1,k2,k3,ynew =  state.k1, state.k2, state.k3, state.ynew
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
 
-    td = tdir(ivp,stepper)
+    td = tdir(ode,integ)
 
     # allowable error
     delta = max(opts.reltol*max(opts.norm(y), opts.norm(ynew)),opts.abstol)
@@ -166,15 +166,15 @@ function errorcontrol!(ivp::ExplicitODE,
     return err, cont
 end
 
-function accept!(ivp::ExplicitODE,
-                 stepper::ModifiedRosenbrockIntegrator,
+function accept!(ode::ExplicitODE,
+                 integ::ModifiedRosenbrockIntegrator,
                  state::RosenbrockState)
     step = state.step
     # update the state
     step.t     = step.t+state.dtold
     copy!(step.y, state.ynew)
     copy!(step.dy, state.F2)
-    ivp.J!(step.t,step.y,state.J)
+    ode.J!(step.t,step.y,state.J)
 
     return cont
 end
