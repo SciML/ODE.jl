@@ -126,8 +126,7 @@ function test_ode()
                     @test_approx_eq_eps y sol(t) tol
                 end
 
-                for (t,y) in ODE.solve(equation,ODE.DenseOutput;
-                                       method = stepper, opts...)
+                for (t,y) in ODE.solve(equation,ODE.DenseOutput{stepper}; opts...)
                     @test_approx_eq_eps y sol(t) tol
                 end
 

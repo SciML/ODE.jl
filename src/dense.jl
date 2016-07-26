@@ -13,7 +13,7 @@ Dense output options:
 """
 
 immutable DenseOptions{T<:Number} <: Options{T}
-    tout::Vector{T}
+    tout::Vector{T} # TODO: this should an AbstractVector
     # points   ::Symbol
     # stopevent::S
     # roottol  ::T
@@ -38,20 +38,22 @@ interpolates the results on request (currently this means at the
 output times stored in `opts.tout`).
 
 """
-immutable DenseOutput{P<:Problem,OP<:DenseOptions} <: AbstractSolver
-    prob::P
+immutable DenseOutput{I<:AbstractIntegrator,OP<:DenseOptions} <: AbstractSolver
+    integ::I  # TODO: Maybe this should be relaxed to a AbstractSolver?
+              #       Then we could have a DenseOutput{DenseOutput{RK}}, say!
     opts::OP
-end
+End
 
-function solve{S<:DenseOutput}(ivp::IVP,
-                               ::Type{S};
-                               method = RKIntegratorAdaptive{:rk45},
-                               opts...)
+function solve{I}(ivp::IVP,
+                  ::Type{DenseOutput{I}};
+                  opts...)
     T = eltype(ivp)[1]
-    sol_orig = Problem(ivp,method{T}(; opts...))
+    # create integrator
+    integ = I{T}(; opts...)
+    # create dense solver
     dense_opts = DenseOptions{T}(; opts...)
-    dense_solver = S(sol_orig,dense_opts)
-    return Problem(ivp,dense_solver) # TODO: this is where it is needed.
+    dense_solver = DenseOutput(integ, dense_opts)
+    return Problem(ivp, dense_solver)
 end
 
 """
@@ -70,8 +72,7 @@ output(ds::DenseState) = output(ds.step_out)
 
 function init(ivp::IVP,
               solver::DenseOutput)
-    ivp = solver.prob.ivp
-    integrator_state = init(solver.prob.ivp, solver.prob.solver)
+    integrator_state = init(ivp, solver.integ)
     dy0 = similar(ivp.y0)
     ivp.F!(ivp.t0,ivp.y0,dy0)
     step_prev = Step(ivp.t0,copy(ivp.y0),dy0)
@@ -97,17 +98,20 @@ function onestep!(ivp::IVP,
         return finish
     end
 
+    # the underlying integrator
+    integ = solver.integ
+
     # our next output time
     ti = solver.opts.tout[i]
 
-    prob = solver.prob # this looks weird
     istate = dstate.integrator_state
+
 
     # try to get a new set of steps enclosing `ti`, if all goes
     # right we end up with t∈[t1,t2] with
     # t1,_=output(dstate.step_prev)
     # t2,_=output(dstate.integrator_state)
-    status = next_interval!(prob, istate, dstate.step_prev, ti)
+    status = next_interval!(ivp, integ, istate, dstate.step_prev, ti)
     if status == abort
         # we failed to get enough steps
         warn("Iterator was exhausted before the dense output could produce the output.")
@@ -136,7 +140,7 @@ other words `tout∈[t1,t2]`.
 TODO: tdir
 
 """
-function next_interval!(prob, istate, step_prev, tout)
+function next_interval!(ivp, integ, istate, step_prev, tout)
 
     while true
         # get the current time
@@ -154,8 +158,8 @@ function next_interval!(prob, istate, step_prev, tout)
         copy!(step_prev.y,y)
         copy!(step_prev.dy,dy)
 
-        # try to perform a single step with the prob
-        status = onestep!(prob.ivp, prob.solver, istate)
+        # try to perform a single step:
+        status = onestep!(ivp, integ, istate)
 
         if status != cont
             return status

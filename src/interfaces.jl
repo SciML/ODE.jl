@@ -19,8 +19,8 @@ function ode{T,Y,I<:AbstractIntegrator}(F, y0::Y,
                      tout = tout,
                      kargs...)
     elseif points == :specified
-        prob = solve(equation, DenseOutput;
-                     method = integ,
+        prob = solve(equation,
+                     DenseOutput{integ};
                      tout = tout,
                      kargs...)
     else
