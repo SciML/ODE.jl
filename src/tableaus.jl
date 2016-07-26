@@ -32,4 +32,4 @@ Base.eltype{T}(b::Tableau{T}) = T
 order(b::Tableau) = b.order
 # Subtypes need to define a convert method to convert to a different
 # eltype with signature:
-Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert method for concrete Tableau types")
+Base.convert{T<:Tableau}(::Type{T}, tab::Tableau) = error("Define convert method for concrete Tableau types")
