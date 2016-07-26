@@ -170,7 +170,31 @@ Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
 Base.eltype{O}(::Problem{O}) = eltype(O)
 
 # filter the wrong combinations of ivp and stepper
-solve{O,S}(ivp::O, solver::Type{S}, opts...) =
+"""
+
+Solve creates an iterable `Problem` instance from an `IVP` instance
+(specifying the math) and from a `Type{AbstractSolver}` (the numerical
+integrator).
+
+Notes:
+
+- usually a solvers requires the ivp to be in a certain form, say an
+ `ExplicitODE`.
+- the second argument it the *Type* of the solver and not an instance.
+  The instance of the solve can only be created together with the
+  `ivp` as their type parameters need to match.
+
+Input:
+
+- `ivp::IVP`
+- `S::Type{AbstractSolver}`
+
+Output:
+
+- `::Problem`
+
+"""
+solve{O,S}(ivp::O, ::Type{S}, opts...) =
     error("The solver $S doesn't support IVP of form $O")
 
 # In Julia 0.5 the collect needs length to be defined, we cannot do
