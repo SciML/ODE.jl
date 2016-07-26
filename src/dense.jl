@@ -42,7 +42,7 @@ immutable DenseOutput{I<:AbstractIntegrator,OP<:DenseOptions} <: AbstractSolver
     integ::I  # TODO: Maybe this should be relaxed to a AbstractSolver?
               #       Then we could have a DenseOutput{DenseOutput{RK}}, say!
     opts::OP
-End
+end
 
 function solve{I}(ivp::IVP,
                   ::Type{DenseOutput{I}};
@@ -131,23 +131,20 @@ end
 
 """
 
-Pulls the results from the `(prob,istate)` pair using `onestep!` until
-we reach a first step such that `t>=tout`.  It fills the `steps`
-variable with (Step(t1,y(t1),dy(t1)),Step(t2,y(t2),dy(t2))), where
-`t1` is is the step before `tout` and `t2` is `>=tout`.  In
-other words `tout∈[t1,t2]`.
-
-TODO: tdir
-
+Takes steps using the underlying integrator until it reaches a first
+step such that `t>=tout`.  It fills the `steps` variable with
+(Step(t1,y(t1),dy(t1)),Step(t2,y(t2),dy(t2))), where `t1` is is the
+step before `tout` and `t2` is `>=tout`.  In other words
+`tout∈[t1,t2]`.
 """
 function next_interval!(ivp, integ, istate, step_prev, tout)
-
+    td = tdir(ivp, integ)
     while true
         # get the current time
         t1   = step_prev.t
         t2,_ = output(istate)
-        t1, t2 = sort([t1,t2])
-        if t1 <= tout <= t2
+
+        if td*t1 <= td*tout <= td*t2
             # we found the enclosing times
             return cont
         end
