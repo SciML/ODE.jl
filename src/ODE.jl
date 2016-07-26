@@ -32,7 +32,7 @@ import Base: start, next, done, collect, show, convert
 #
 # Note, if we go the MathProgBase.jl route, then these files would go
 # into ODEBase.jl.
-include("types.jl")
+include("base.jl")
 include("tableaus.jl")
 include("options.jl")
 include("helpers.jl")
@@ -41,12 +41,12 @@ include("helpers.jl")
 include("dense.jl")
 
 # Particular solvers
-include("ode23s.jl")
-include("runge-kutta.jl")
-include("adams-bashford-moulton.jl")
-include("rosenbrock.jl")
+include("integrators/ode23s.jl")
+include("integrators/runge-kutta.jl")
+include("integrators/adams-bashford-moulton.jl")
+include("integrators/rosenbrock.jl")
 
 # User interface to solvers
-include("interfaces.jl")
+include("top-interface.jl")
 
 end # module ODE
