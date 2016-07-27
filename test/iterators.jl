@@ -80,10 +80,17 @@ function test_ode()
                     Fscal = (t,y)->F(t,[y])[1]
                     y0scal = y0[1]
                     # with jacobian
-                    tj,yj = ODE.ode(Fscal,y0scal,tout,stepper,points=points,initstep = h0,J! = jac!)
+                    tj,yj = ODE.ode(Fscal,y0scal,tout,
+                                    integ = stepper,
+                                    points = points,
+                                    initstep = h0,
+                                    J! = jac!)
                     @test_approx_eq_eps yj map(x->sol(x)[1],tj) tol
                     # without jacobian
-                    t,y   = ODE.ode(Fscal,y0scal,tout,stepper,points=points,initstep = h0)
+                    t,y   = ODE.ode(Fscal,y0scal,tout,
+                                    integ = stepper,
+                                    points = points,
+                                    initstep = h0)
                     @test_approx_eq_eps y  map(x->sol(x)[1],tj) tol
 
                     # results with and without jacobian should be exactly the same
@@ -99,10 +106,17 @@ function test_ode()
 
                 # ODE.odeXX vector interface
                 # with jacobian
-                tj,yj = ODE.ode(F,y0,tout,stepper,points=points,initstep = h0,J! = jac!)
+                tj,yj = ODE.ode(F,y0,tout,
+                                integ = stepper,
+                                points = points,
+                                initstep = h0,
+                                J! = jac!)
                 @test_approx_eq_eps hcat(yj...) hcat(map(sol,tj)...) tol
                 # without jacobian
-                t,y   = ODE.ode(F,y0,tout,stepper,points=points,initstep = h0)
+                t,y   = ODE.ode(F,y0,tout,
+                                integ = stepper,
+                                points = points,
+                                initstep = h0)
                 @test_approx_eq_eps hcat(y...)  hcat(map(sol,t)...) tol
 
                 @test_approx_eq hcat(yj...) hcat(y...)

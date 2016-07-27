@@ -44,9 +44,14 @@ the results (currently this means at the output times stored in
 immutable DenseOutput{I<:AbstractIntegrator,OP<:DenseOptions} <: AbstractSolver
     integ::I  # TODO: Maybe this should be relaxed to a AbstractSolver?
               #       Then we could have a DenseOutput{DenseOutput{RK}}, say!
+              #  pwl: Or DenseOutput{StiffnessSwitching{whatever}}
     opts::OP
 end
 
+# TODO: this is confusing, firs you call `solve` with `DenseOutput{I}`
+# and then you call construct it as `DenseOutput{T}`.  Also this goes
+# against the convention that we pass as much as possible as
+# options.  What if a Solver takes more than one parameter?
 function solve{I}(ivp::IVP,
                   ::Type{DenseOutput{I}};
                   opts...)

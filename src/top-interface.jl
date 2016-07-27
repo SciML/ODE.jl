@@ -5,10 +5,10 @@ tspan[end] is the last integration time.
 
 """
 function ode{T,Y,I<:AbstractIntegrator}(F, y0::Y,
-                                     tout::AbstractVector{T},
-                                     integ::Type{I};
-                                     points = :all,
-                                     kargs...)
+                                        tout::AbstractVector{T};
+                                        integ::Type{I} = RKIntegratorAdaptive{:rk45},
+                                        points = :all,
+                                        kargs...)
 
     t0 = tout[1]
 
@@ -46,20 +46,20 @@ end
 Solves an ODE `y'=F(t,y)` with initial conditions `y0` and `t0`.
 """
 
-ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0,ModifiedRosenbrockIntegrator; kargs...)
-ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKIntegratorFixed{:feuler}; kargs...)
-ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0,RKIntegratorFixed{:midpoint}; kargs...)
-ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0,RKIntegratorFixed{:heun}; kargs...)
-ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0,RKIntegratorFixed{:rk4}; kargs...)
-ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKIntegratorAdaptive{:rk21}; kargs...)
-ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKIntegratorAdaptive{:rk23}; kargs...)
-ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKIntegratorAdaptive{:rk45}; kargs...)
-ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0,RKIntegratorAdaptive{:dopri5}; kargs...)
+ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0;integ = ModifiedRosenbrockIntegrator, kargs...)
+ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:feuler}, kargs...)
+ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:midpoint}, kargs...)
+ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:heun}, kargs...)
+ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:rk4}, kargs...)
+ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:rk21}, kargs...)
+ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:rk23}, kargs...)
+ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:rk45}, kargs...)
+ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:dopri5}, kargs...)
 const ode45 = ode45_dp
-ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0,RKIntegratorAdaptive{:feh78}; kargs...)
+ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:feh78}, kargs...)
 
 
-function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},integ;kargs...)
+function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T};kargs...)
 
     if !isleaftype(T)
         error("The output times have to be of a concrete type.")
@@ -71,7 +71,7 @@ function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T},integ;kargs...)
         error("The initial data has to be of a concrete type (or an array)")
     end
 
-    ode(F,y0,t0,integ;kargs...)
+    ode(F,y0,t0;kargs...)
 
 end
 

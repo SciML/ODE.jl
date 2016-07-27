@@ -8,7 +8,7 @@
 
 
 abstract AbstractIVP{T,Y}
-Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = T,Y
+Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = T,Y,Y
 
 """
 
@@ -169,12 +169,24 @@ end
 Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
 Base.eltype{O}(::Problem{O}) = eltype(O)
 
-# filter the wrong combinations of ivp and stepper
 """
+    solve(ivp::IVP, solver::Type{AbstractSolver}, opts...)
+    solve(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
 
 Solve creates an iterable `Problem` instance from an `IVP` instance
 (specifying the math) and from a `Type{AbstractSolver}` (the numerical
-integrator).
+integrator).  The simplest use case is
+
+```julia
+for (t,y,dy) in solver(...)
+    # do something with t, y an dy
+end
+```
+
+If the integration interval, defined by the keyword argument `tstop`,
+is finite you can request all the results at once by calling
+```
+collect(solver(...)) # => Vector{Tuple{T,Y,Y}}
 
 Notes:
 
@@ -194,16 +206,22 @@ Output:
 - `::Problem`
 
 """
-solve{O,S}(ivp::O, ::Type{S}, opts...) =
-    error("The solver $S doesn't support IVP of form $O")
+solve(ivp::IVP, solver; opts...) =
+    error("The solver $(typeof(solver)) doesn't support IVP of form $(typeof(ivp))")
+
+function solve{S<:AbstractSolver}(ivp::IVP;
+                                  solver::Type{S} = RKIntegratorAdaptive{:rk45},
+                                  opts...)
+    solve(ivp, solver; opts...)
+end
 
 # In Julia 0.5 the collect needs length to be defined, we cannot do
 # that for a Problem but we can implement our own collect
 function collect(prob::Problem)
     T,Y = eltype(prob)
-    pairs = Array(Tuple{T,Y},0)
-    for (t,y) in prob
-        push!(pairs,(t,copy(y)))
+    pairs = Array(Tuple{T,Y,Y},0)
+    for (t,y,dy) in prob
+        push!(pairs,(t,copy(y),copy(dy)))
     end
     return pairs
 end
