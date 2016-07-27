@@ -1,0 +1,31 @@
+site_name:        ODE.jl
+repo_url:         https://github.com/JuliaODE/ODE.jl
+site_description: Julia package for solving differential equations
+
+extra_css:
+  - assets/Documenter.css
+
+markdown_extensions:
+  - codehilite
+  - extra
+  - tables
+  - fenced_code
+  - admonition
+
+extra_javascript:
+  - https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML
+  - assets/mathjaxhelper.js
+
+docs_dir: 'build'
+
+pages:
+- Home: index.md
+- Manual:
+  - Basics: man/basics.md
+  - Base: man/base.md
+  # - Integrators:
+  # - Solvers:
+  # - Options:
+- Tutorials:
+  - Fixed step integrator: tutorials/euler_integrator.md
+  # - Adaptive step integrator:
