@@ -2,18 +2,19 @@ site_name:        ODE.jl
 repo_url:         https://github.com/JuliaODE/ODE.jl
 site_description: Julia package for solving differential equations
 
+theme: readthedocs
+
 extra_css:
   - assets/Documenter.css
 
 markdown_extensions:
-  - codehilite
   - extra
   - tables
   - fenced_code
-  - admonition
+  - mdx_math
 
 extra_javascript:
-  - https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML
+  - https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML
   - assets/mathjaxhelper.js
 
 docs_dir: 'build'
