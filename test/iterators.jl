@@ -81,14 +81,14 @@ function test_ode()
                     y0scal = y0[1]
                     # with jacobian
                     tj,yj = ODE.ode(Fscal,y0scal,tout,
-                                    integ = stepper,
+                                    solver = stepper,
                                     points = points,
                                     initstep = h0,
                                     J! = jac!)
                     @test_approx_eq_eps yj map(x->sol(x)[1],tj) tol
                     # without jacobian
                     t,y   = ODE.ode(Fscal,y0scal,tout,
-                                    integ = stepper,
+                                    solver = stepper,
                                     points = points,
                                     initstep = h0)
                     @test_approx_eq_eps y  map(x->sol(x)[1],tj) tol
@@ -107,19 +107,37 @@ function test_ode()
                 # ODE.odeXX vector interface
                 # with jacobian
                 tj,yj = ODE.ode(F,y0,tout,
-                                integ = stepper,
+                                solver = stepper,
                                 points = points,
                                 initstep = h0,
                                 J! = jac!)
                 @test_approx_eq_eps hcat(yj...) hcat(map(sol,tj)...) tol
                 # without jacobian
                 t,y   = ODE.ode(F,y0,tout,
-                                integ = stepper,
+                                solver = stepper,
                                 points = points,
                                 initstep = h0)
                 @test_approx_eq_eps hcat(y...)  hcat(map(sol,t)...) tol
 
                 @test_approx_eq hcat(yj...) hcat(y...)
+
+                # TODO: tests for `y::AbstractArray`
+                # # ODE.odeXX array interface for arrays
+                # # with jacobian
+                # tj,yj = ODE.ode(F,reshape(y0,length(y0),1,1),tout,
+                #                 solver = stepper,
+                #                 points = points,
+                #                 initstep = h0,
+                #                 J! = jac!)
+                # @test_approx_eq_eps hcat(yj...) hcat(map(sol,tj)...) tol
+                # # without jacobian
+                # t,y   = ODE.ode(F,reshape(y0,length(y0),1,1),tout,
+                #                 solver = stepper,
+                #                 points = points,
+                #                 initstep = h0)
+                # @test_approx_eq_eps hcat(y...)  hcat(map(sol,t)...) tol
+
+                # @test_approx_eq hcat(yj...) hcat(y...)
 
                 if points == :specified
                     # test if we covered the whole timespan

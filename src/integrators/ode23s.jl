@@ -22,8 +22,10 @@ isadaptive(::ModifiedRosenbrockIntegrator) = true
 tdir(ode::ExplicitODE, integ::ModifiedRosenbrockIntegrator) = sign(integ.opts.tstop - ode.t0)
 
 # define the set of ODE problems with which this integrator can work
-solve{T,I<:ModifiedRosenbrockIntegrator}(ode::ExplicitODE{T}, integ::Type{I}; opts...) =
-    Problem(ode, integ{T}(;opts...))
+solve{T,Y<:AbstractVector,I<:ModifiedRosenbrockIntegrator}(ode::ExplicitODE{T,Y},
+                                                           integ::Type{I};
+                                                           opts...) =
+                                                               Problem(ode, integ{T}(;opts...))
 
 """
 The state for the Rosenbrock integrator
@@ -34,17 +36,17 @@ The state for the Rosenbrock integrator
 - iters: Number of successful steps made
 
 """
-type RosenbrockState{T,Y} <: AbstractState
-    step ::Step{T,Vector{Y}}
+type RosenbrockState{T,Y,J<:AbstractMatrix} <: AbstractState
+    step ::Step{T,Y}
     dt   ::T
-    F1   ::Vector{Y}
-    F2   ::Vector{Y}
-    k1   ::Vector{Y}
-    k2   ::Vector{Y}
-    k3   ::Vector{Y}
-    ynew ::Vector{Y}
+    F1   ::Y
+    F2   ::Y
+    k1   ::Y
+    k2   ::Y
+    k3   ::Y
+    ynew ::Y
     dtold::T
-    J    ::Matrix{Y}
+    jac  ::J
     iters::Int
 end
 
@@ -55,7 +57,7 @@ function show(io::IO, state::RosenbrockState)
     println("dt =$(state.dt)")
     println("F1 =$(state.F1)")
     println("F2 =$(state.F2)")
-    println("J  =$(state.J)")
+    println("jac  =$(state.jac)")
 end
 
 
@@ -66,7 +68,7 @@ function init{T}(ode::ExplicitODE{T},
     y  = ode.y0
     dy = zero(y)
 
-    J  = Array(eltype(y),length(y),length(y))
+    jac  = Array(eltype(y),length(y),length(y))
 
     step  = Step(t,copy(y),copy(dy))
     state = RosenbrockState(step,
@@ -78,12 +80,12 @@ function init{T}(ode::ExplicitODE{T},
                             zero(y), # k3
                             zero(y), # ynew
                             dt*0,    # dtnew
-                            J,       # J
+                            jac,       # jac
                             0)       # iters
 
     # initialize the derivative and the Jacobian
     ode.F!(t,y,step.dy)
-    ode.J!(t,y,state.J)
+    ode.J!(t,y,state.jac)
 
     return state
 end
@@ -95,7 +97,7 @@ function trialstep!(ode::ExplicitODE,
     # unpack
     step    = state.step
     opts    = integ.opts
-    F1, F2, J = state.F1, state.F2, state.J
+    F1, F2, jac = state.F1, state.F2, state.jac
     k1,k2,k3,ynew =  state.k1, state.k2, state.k3, state.ynew
     t, dt, y, dy = step.t, state.dt, step.y, step.dy
     F! = ode.F!
@@ -116,7 +118,7 @@ function trialstep!(ode::ExplicitODE,
         return abort
     end
 
-    W = lufact!( eye(J) - dt*integ.const_d*J )
+    W = lufact!( eye(jac) - dt*integ.const_d*jac )
 
     # Approximate time-derivative of F, we are using F1 as a
     # temporary array
@@ -174,7 +176,7 @@ function accept!(ode::ExplicitODE,
     step.t     = step.t+state.dtold
     copy!(step.y, state.ynew)
     copy!(step.dy, state.F2)
-    ode.J!(step.t,step.y,state.J)
+    ode.J!(step.t,step.y,state.jac)
 
     return cont
 end

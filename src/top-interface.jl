@@ -4,23 +4,23 @@ We assume that the initial data y0 is given at tspan[1], and that
 tspan[end] is the last integration time.
 
 """
-function ode{T,Y,I<:AbstractIntegrator}(F, y0::Y,
-                                        tout::AbstractVector{T};
-                                        integ::Type{I} = RKIntegratorAdaptive{:rk45},
-                                        points = :all,
-                                        kargs...)
+function ode{T,Y,M<:AbstractSolver}(F, y0::Y,
+                                    tout::AbstractVector{T};
+                                    solver::Type{M} = RKIntegratorAdaptive{:rk45},
+                                    points = :all,
+                                    kargs...)
 
     t0 = tout[1]
 
     # construct a Problem
     equation  = explicit_ineff(t0,y0,F;kargs...)
     if points == :all
-        prob = solve(equation, integ;
+        prob = solve(equation, solver;
                      tout = tout,
                      kargs...)
     elseif points == :specified
         prob = solve(equation,
-                     DenseOutput{integ};
+                     DenseOutput{solver};
                      tout = tout,
                      kargs...)
     else
@@ -46,17 +46,17 @@ end
 Solves an ODE `y'=F(t,y)` with initial conditions `y0` and `t0`.
 """
 
-ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0;integ = ModifiedRosenbrockIntegrator, kargs...)
-ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:feuler}, kargs...)
-ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:midpoint}, kargs...)
-ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:heun}, kargs...)
-ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0;integ = RKIntegratorFixed{:rk4}, kargs...)
-ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:rk21}, kargs...)
-ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:rk23}, kargs...)
-ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:rk45}, kargs...)
-ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:dopri5}, kargs...)
+ode23s(F,y0,t0;kargs...)        = ode_conv(F,y0,t0;solver = ModifiedRosenbrockIntegrator, kargs...)
+ode1(F,y0,t0;kargs...)          = ode_conv(F,y0,t0;solver = RKIntegratorFixed{:feuler}, kargs...)
+ode2_midpoint(F,y0,t0;kargs...) = ode_conv(F,y0,t0;solver = RKIntegratorFixed{:midpoint}, kargs...)
+ode2_heun(F,y0,t0;kargs...)     = ode_conv(F,y0,t0;solver = RKIntegratorFixed{:heun}, kargs...)
+ode4(F,y0,t0;kargs...)          = ode_conv(F,y0,t0;solver = RKIntegratorFixed{:rk4}, kargs...)
+ode21(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;solver = RKIntegratorAdaptive{:rk21}, kargs...)
+ode23(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;solver = RKIntegratorAdaptive{:rk23}, kargs...)
+ode45_fe(F,y0,t0;kargs...)      = ode_conv(F,y0,t0;solver = RKIntegratorAdaptive{:rk45}, kargs...)
+ode45_dp(F,y0,t0;kargs...)      = ode_conv(F,y0,t0;solver = RKIntegratorAdaptive{:dopri5}, kargs...)
 const ode45 = ode45_dp
-ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;integ = RKIntegratorAdaptive{:feh78}, kargs...)
+ode78(F,y0,t0;kargs...)         = ode_conv(F,y0,t0;solver = RKIntegratorAdaptive{:feh78}, kargs...)
 
 
 function ode_conv{Ty,T}(F,y0::Ty,t0::AbstractVector{T};kargs...)
@@ -84,7 +84,7 @@ ExplicitODE.  As the name suggests, the result is not going to be very
 efficient.
 
 """
-function explicit_ineff{T,Y}(t0::T, y0::AbstractVector{Y}, F::Function; kargs...)
+function explicit_ineff{T,Y}(t0::T, y0::AbstractArray{Y}, F::Function; kargs...)
     F!(t,y,dy) =copy!(dy,F(t,y))
     return ExplicitODE(t0,y0,F!; kargs...)
 end
@@ -97,5 +97,7 @@ end
 # conversion is necessary.
 function explicit_ineff{T,Y}(t0::T, y0::Y, F::Function; kargs...)
     F!(t,y,dy) =(dy[1]=F(t,y[1]))
-    return ExplicitODE(t0,[y0],F!; kargs...)
+    new_y0 = Array(Y,1)
+    new_y0[1] = y0
+    return ExplicitODE(t0,new_y0,F!; kargs...)
 end

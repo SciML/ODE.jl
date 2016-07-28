@@ -48,6 +48,8 @@ Base.eltype(t::IVP) = eltype(typeof(t))
 
 """
 
+    ODE.ExplicitODE(t0,y0,F!;J!=jacobian))
+
 Explicit ODE representing the problem
 
 `dy = F(t,y)` with `y(t0)=y0`

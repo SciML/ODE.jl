@@ -38,7 +38,7 @@ end
                                                      minstep  = 10*eps(T),
                                                      maxstep  = 1/minstep,
                                                      initstep = eps(T)^T(1//3),
-                                                     norm::N  = y->Base.norm(y,Inf),
+                                                     norm::N  = y->vecnorm(y,Inf),
                                                      maxiters = T(Inf),
                                                      isoutofdomain::O = Base.isnan,
                                                      kargs...)

@@ -15,21 +15,21 @@ TODO options:
 
 """
 
-immutable DenseOptions{T<:Number} <: Options{T}
-    tout::Vector{T} # TODO: this should an AbstractVector
+immutable DenseOptions{T<:Number,TO<:AbstractVector} <: Options{T}
+    tout::TO
     # points   ::Symbol
     # stopevent::S
     # roottol  ::T
 end
 
 @compat function (::Type{DenseOptions{T}}){T}(;
-                                              tstop        = T(Inf),
-                                              tout::Vector = T[tstop],
+                                              tstop                   = T(Inf),
+                                              tout::AbstractVector{T} = T[tstop],
                                               # points::Symbol= :all,
                                               # stopevent::S  = (t,y)->false,
                                               # roottol       = eps(T)^T(1//3),
                                               kargs...)
-    DenseOptions{T}(tout)
+    DenseOptions{T,typeof(tout)}(tout)
 end
 
 
@@ -41,23 +41,23 @@ the results (currently this means at the output times stored in
 `opts.tout`).
 
 """
-immutable DenseOutput{I<:AbstractIntegrator,OP<:DenseOptions} <: AbstractSolver
-    integ::I  # TODO: Maybe this should be relaxed to a AbstractSolver?
-              #       Then we could have a DenseOutput{DenseOutput{RK}}, say!
-              #  pwl: Or DenseOutput{StiffnessSwitching{whatever}}
+immutable DenseOutput{I<:AbstractSolver,OP<:DenseOptions} <: AbstractSolver
+    integ::I
     opts::OP
 end
 
 # TODO: this is confusing, firs you call `solve` with `DenseOutput{I}`
-# and then you call construct it as `DenseOutput{T}`.  Also this goes
+# and then you call construct it as `DenseOutput{T,OP}`.  Also this goes
 # against the convention that we pass as much as possible as
 # options.  What if a Solver takes more than one parameter?
-function solve{I}(ivp::IVP,
-                  ::Type{DenseOutput{I}};
-                  opts...)
-    T = eltype(ivp)[1]
+function solve{I,T}(ivp::IVP{T},
+                    ::Type{DenseOutput{I}};
+                    opts...)
     # create integrator
     integ = I{T}(; opts...)
+    # TODO: a nasty workaround: this triggers an error if the method
+    # is not registered supported, we ignore the output
+    solver = solve(ivp,I;opts...)
     # create dense solver
     dense_opts = DenseOptions{T}(; opts...)
     dense_solver = DenseOutput(integ, dense_opts)

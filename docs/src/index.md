@@ -129,7 +129,7 @@ can be cotrolled with
   `abstol=eps(T)^(1/2)/10`.
 
 - `norm`: The norm used to measure error in the formula above,
-  defaults to `y->Base.norm(y,Inf)`.  You can specify it to assign
+  defaults to `y->Base.vecnorm(y,Inf)`.  You can specify it to assign
   different weights to different components of `y`.
 
 - `minstep`, `maxstep`: Minimal and maximal stepsize for the
