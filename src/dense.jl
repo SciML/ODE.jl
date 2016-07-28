@@ -50,18 +50,17 @@ end
 # and then you call construct it as `DenseOutput{T,OP}`.  Also this goes
 # against the convention that we pass as much as possible as
 # options.  What if a Solver takes more than one parameter?
-function solve{I,T}(ivp::IVP{T},
-                    ::Type{DenseOutput{I}};
-                    opts...)
+@compat function (::Type{DenseOutput{I}}){T,I}(ivp::IVP{T};
+                                               opts...)
     # create integrator
-    integ = I{T}(; opts...)
+    integ = I(ivp; opts...)
     # TODO: a nasty workaround: this triggers an error if the method
     # is not registered supported, we ignore the output
     solver = solve(ivp,I;opts...)
     # create dense solver
     dense_opts = DenseOptions{T}(; opts...)
     dense_solver = DenseOutput(integ, dense_opts)
-    return Problem(ivp, dense_solver)
+    return dense_solver
 end
 
 """

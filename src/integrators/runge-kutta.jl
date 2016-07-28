@@ -56,7 +56,7 @@ typealias RKIntegratorFixed    RKIntegrator{:fixed}
 typealias RKIntegratorAdaptive RKIntegrator{:adaptive}
 
 
-@compat function (::Type{RKIntegrator{Kind,Name,T}}){Kind,Name,T}(;opts...)
+@compat function (::Type{RKIntegrator{Kind,Name}}){Kind,Name,T}(ode::ExplicitODE{T};opts...)
     tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
     if Kind == :fixed
         opts = FixedOptions{T}(;opts...)
@@ -78,9 +78,6 @@ order(integ::RKIntegrator) = minimum(order(integ.tableau))
 name(integ::RKIntegrator) = integ.tableau.name
 
 tdir(ode::ExplicitODE, integ::RKIntegrator) = sign(integ.opts.tstop - ode.t0)
-
-solve{T,I<:RKIntegrator}(ode::ExplicitODE{T}, integ::Type{I}; opts...) =
-    Problem(ode,integ{T}(;opts...))
 
 # lower level interface
 
