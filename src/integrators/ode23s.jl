@@ -9,7 +9,7 @@ immutable ModifiedRosenbrockIntegrator{T<:Number} <: AbstractIntegrator
     const_e::T
 end
 
-@compat function (::Type{ModifiedRosenbrockIntegrator{T}}){T}(;opts...)
+function ModifiedRosenbrockIntegrator{T}(ode::ExplicitODE{T};opts...)
     const_d = 1/(2+sqrt(T(2)))
     const_e = 6+sqrt(T(2))
 
@@ -20,12 +20,6 @@ order(::ModifiedRosenbrockIntegrator) = 2
 name(::ModifiedRosenbrockIntegrator) = "Modified Rosenbrock Integrator"
 isadaptive(::ModifiedRosenbrockIntegrator) = true
 tdir(ode::ExplicitODE, integ::ModifiedRosenbrockIntegrator) = sign(integ.opts.tstop - ode.t0)
-
-# define the set of ODE problems with which this integrator can work
-solve{T,Y<:AbstractVector,I<:ModifiedRosenbrockIntegrator}(ode::ExplicitODE{T,Y},
-                                                           integ::Type{I};
-                                                           opts...) =
-                                                               Problem(ode, integ{T}(;opts...))
 
 """
 The state for the Rosenbrock integrator

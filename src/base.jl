@@ -99,6 +99,10 @@ Subtypes include: `AbstractIntegrator`s but also `DenseOutput`
 """
 abstract AbstractSolver
 
+@compat (::Type{S}){S<:AbstractSolver}(ivp;opts...) =
+    error("The solver $S doesn't support IVP of form $(typeof(ivp))")
+
+
 """
 
 The abstract type of the actual algorithm to solve an IVP.
@@ -208,8 +212,9 @@ Output:
 - `::Problem`
 
 """
-solve(ivp::IVP, solver; opts...) =
-    error("The solver $(typeof(solver)) doesn't support IVP of form $(typeof(ivp))")
+function solve(ivp::IVP, solver; opts...)
+    Problem(ivp,solver(ivp;opts...))
+end
 
 function solve{S<:AbstractSolver}(ivp::IVP;
                                   solver::Type{S} = RKIntegratorAdaptive{:rk45},
