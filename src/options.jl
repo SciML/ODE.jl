@@ -37,8 +37,8 @@ end
                                                      abstol   = eps(T)^T(1//2)/10,
                                                      minstep  = 10*eps(T),
                                                      maxstep  = 1/minstep,
-                                                     initstep = minstep,
-                                                     norm::N  = Base.norm,
+                                                     initstep = eps(T)^T(1//3),
+                                                     norm::N  = y->vecnorm(y,Inf),
                                                      maxiters = T(Inf),
                                                      isoutofdomain::O = Base.isnan,
                                                      kargs...)
