@@ -116,3 +116,6 @@ ode   =ODE.ExplicitODE(0.0,[1.0],(t,y,dy)->copy!(dy,y))
 sol   =ODE.solve(ode,EulerIntegrator;tstop=1.0,initstep=0.001)
 # print the last step of the solution
 collect(sol)[end]
+
+# test the integrator
+ODE.test_integrator(EulerIntegrator)

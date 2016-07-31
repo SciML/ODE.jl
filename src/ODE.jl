@@ -49,4 +49,7 @@ include("integrators/rosenbrock.jl")
 # User interface to solvers
 include("top-interface.jl")
 
+# Test function for the iterator interface
+include("test_solver.jl")
+
 end # module ODE
