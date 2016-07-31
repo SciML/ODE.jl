@@ -8,7 +8,7 @@
 
 
 abstract AbstractIVP{T,Y}
-Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = T,Y,Y
+Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = Tuple{T,Y,Y}
 
 """
 
@@ -42,8 +42,6 @@ type IVP{T,Y,F,G,J} <: AbstractIVP{T,Y}
     G!  ::G
     J!  ::J
 end
-@compat Base.eltype(t::Type{IVP}) = eltype(supertype(t))
-Base.eltype(t::IVP) = eltype(typeof(t))
 
 
 """
@@ -176,8 +174,7 @@ end
 
 Base.length(prob::Problem) = length(prob.solver)
 
-Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
-Base.eltype{O}(::Problem{O}) = eltype(O)
+Base.eltype{O,S}(::Type{Problem{O,S}}) = eltype(O)
 
 """
     solve(ivp::IVP, solver::Type{AbstractSolver}, opts...)
@@ -227,8 +224,7 @@ end
 # In Julia 0.5 the collect needs length to be defined, we cannot do
 # that for a Problem but we can implement our own collect
 function collect(prob::Problem)
-    T,Y = eltype(prob)
-    pairs = Array(Tuple{T,Y,Y},0)
+    pairs = Array(eltype(prob),0)
     for (t,y,dy) in prob
         push!(pairs,(t,copy(y),copy(dy)))
     end

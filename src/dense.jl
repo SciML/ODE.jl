@@ -48,12 +48,28 @@ end
 
 Base.length(dense::DenseOutput) = length(dense.opts.tout)
 
+tdir(ivp, solver::DenseOutput) = sign(solver.opts.tstop - ivp.t0)
+
 @compat function (::Type{DenseOutput{I}}){T,I}(ivp::IVP{T};
+                                               tstop = T(Inf),
+                                               tout::AbstractVector{T} = T[tstop],
                                                opts...)
+    if all(tout.>=ivp.t0)
+        tout = sort(tout)
+    elseif all(tout.<=ivp.t0)
+        tout = reverse(sort(tout))
+    else
+        error("Elements of tout should all be either to the right or to the left of `t0`.")
+    end
+
+    # normalize `tstop` to the last element of `tout`
+    tstop = tout[end]
+
     # create integrator
-    integ = I(ivp; opts...)
+    integ = I(ivp; tstop=tstop, opts...)
+
     # create dense solver
-    dense_opts = DenseOptions{T}(; opts...)
+    dense_opts = DenseOptions{T}(; tout=tout, opts...)
     dense_solver = DenseOutput(integ, dense_opts)
     return dense_solver
 end
@@ -133,13 +149,18 @@ step before `tout` and `t2` is `>=tout`.  In other words
 `tout∈[t1,t2]`.
 """
 function next_interval!(ivp, integ, istate, step_prev, tout)
-    td = tdir(ivp, integ)
     while true
         # get the current time
         t1   = step_prev.t
         t2,_ = output(istate)
 
-        if td*t1 <= td*tout <= td*t2
+        # in case we are integrating backwards in time reverse the
+        # time interval
+        if t2 < t1
+            t1, t2 = t2, t1
+        end
+
+        if t1 <= tout <= t2
             # we found the enclosing times
             return cont
         end
