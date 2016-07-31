@@ -51,11 +51,36 @@ immutable RKIntegrator{Kind,Name,T,OP<:Options} <: AbstractIntegrator{T}
     opts::OP
 end
 
-
 typealias RKIntegratorFixed    RKIntegrator{:fixed}
 typealias RKIntegratorAdaptive RKIntegrator{:adaptive}
 
+"""
 
+A constructor for an explicit Runge-Kutta method.  Works only for
+explicit differential equations.
+
+Notes:
+
+- `Kind` is either `:adaptive` or `:fixed`, corresponding to adaptive
+  step size method or a fixed step size method
+
+- `Name` is the name of a Butcher tableau based on which the method is
+  constructed.  The kind (adaptive or fixed) of the Butcher tableau
+  has to correspond to `Kind` (`:adaptive` or `:fixed`).
+
+Input:
+
+- `ode::ExplicitODE`
+
+- `opts` options for the method, supports the same basic options as
+  other adaptive steppers (see `AdaptiveOptions` for the complete
+  list).
+
+Output:
+
+- `::RKIntegrator{Kind,Name}`
+
+"""
 @compat function (::Type{RKIntegrator{Kind,Name}}){Kind,Name,T}(ode::ExplicitODE{T};opts...)
     tab = convert(TableauRKExplicit{T},tableaus_rk_explicit[Name])
     if Kind == :fixed

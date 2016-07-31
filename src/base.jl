@@ -99,6 +99,8 @@ Subtypes include: `AbstractIntegrator`s but also `DenseOutput`
 """
 abstract AbstractSolver
 
+legnth(s::AbstractSolver) = error("`length` is not defined for $(typeof(s)).")
+
 @compat (::Type{S}){S<:AbstractSolver}(ivp;opts...) =
     error("The solver $S doesn't support IVP of form $(typeof(ivp))")
 
@@ -172,6 +174,8 @@ immutable Problem{O<:AbstractIVP,S<:AbstractSolver}
     solver ::S
 end
 
+Base.length(prob::Problem) = length(prob.solver)
+
 Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
 Base.eltype{O}(::Problem{O}) = eltype(O)
 
@@ -183,16 +187,14 @@ Solve creates an iterable `Problem` instance from an `IVP` instance
 (specifying the math) and from a `Type{AbstractSolver}` (the numerical
 integrator).  The simplest use case is
 
-```julia
-for (t,y,dy) in solver(...)
-    # do something with t, y an dy
-end
-```
+    for (t,y,dy) in solver(...)
+        # do something with t, y an dy
+    end
 
 If the integration interval, defined by the keyword argument `tstop`,
 is finite you can request all the results at once by calling
-```
-collect(solver(...)) # => Vector{Tuple{T,Y,Y}}
+
+    collect(solver(...)) # => Vector{Tuple{T,Y,Y}}
 
 Notes:
 
@@ -232,6 +234,39 @@ function collect(prob::Problem)
     end
     return pairs
 end
+
+
+"""
+
+    collect_vectors(prob::Problem)
+
+Input:
+
+- iterator constructed by `solve`
+
+Output:
+
+- `(tout,yout,dyout)` with `tout::Array{T}` containing subsequent
+  times, `yout::Vector{Y}` and `dyout::Vector{Y}` containig the vector
+  of solution and derivative respectively at corresponding `tout`
+  times.  In other words `yout[i]` approximates `y(tout[i])` where `y`
+  is the true solution to an ODE.  It could be interpreted as a
+  transpose of "`collect(prob)`".
+
+"""
+function collect_vectors(prob::Problem)
+    T,Y   = eltype(prob)
+    tout  = Array(T,0)
+    yout  = Array(Y,0)
+    dyout = Array(Y,0)
+    for (t,y,dy) in prob
+        push!(tout,t)
+        push!(yout,copy(y))
+        push!(dyout,copy(dy))
+    end
+    return (tout,yout,dyout)
+end
+
 
 
 # Iteration: take one step on a IVP `Problem`
@@ -277,6 +312,7 @@ function Base.next(prob::Problem, st)
 end
 
 """
+
 Holds the solver status, used inside of `onestep!`.
 
 Values:
@@ -290,6 +326,7 @@ Statuses can be combined with &:
 - finish&cont == finish
 - abort&cont == abort
 - abort&finish = abort
+
 """
 @enum Status cont=1 abort=0 finish=-1
 # The values of Statuses are chose to turn & into a *:
@@ -324,6 +361,7 @@ Output:
 - Bool: `false`: continue iteration, `true`: terminate iteration.
 
 substeps.
+
 """
 function onestep!(ivp::IVP, integ::AbstractIntegrator, state::AbstractState)
     opt = integ.opts
