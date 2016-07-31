@@ -52,8 +52,8 @@ end
 # it for `ExplicitODE` as the type of an ODE is already filtered by
 # the specialized the construtor, but we do it here for clarity.
 function init(ode::ExplicitODE, integ::EulerIntegrator)
-    t0, y0 = ode.t0, ode.y0
-    dy0 = similar(ode.dy0)
+    t0, y0 = ode.t0, copy(ode.y0)
+    dy0 = similar(y0)
     ode.F!(t0,y0,dy0)           # fill in the values of the derivative
     EulerState(ODE.Step(t0,y0,dy0))
 end
@@ -84,6 +84,15 @@ function onestep!(ode::ExplicitODE, integ::EulerIntegrator, state::EulerState)
     end
 end
 
+# OPTIONAL:
+# Define properties of this integrator: order, name and
+# whether it is adaptive or not.  At this point the information
+# supplied here is not used.
+order{T}(::Type{EulerIntegrator{T}}) = 1
+name{T}(::Type{EulerIntegrator{T}}) = "My own Euler integrator"
+isadaptive{T}(::Type{EulerIntegrator{T}}) = false
+
+# OPTIONAL:
 # Another possiblity to implement state would be to declare
 type EulerState2{T,Y} <: ODE.AbstractState{T,Y}
     t::T
