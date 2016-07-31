@@ -46,17 +46,12 @@ immutable DenseOutput{I<:AbstractSolver,OP<:DenseOptions} <: AbstractSolver
     opts::OP
 end
 
-# TODO: this is confusing, firs you call `solve` with `DenseOutput{I}`
-# and then you call construct it as `DenseOutput{T,OP}`.  Also this goes
-# against the convention that we pass as much as possible as
-# options.  What if a Solver takes more than one parameter?
+Base.length(dense::DenseOutput) = length(dense.opts.tout)
+
 @compat function (::Type{DenseOutput{I}}){T,I}(ivp::IVP{T};
                                                opts...)
     # create integrator
     integ = I(ivp; opts...)
-    # TODO: a nasty workaround: this triggers an error if the method
-    # is not registered supported, we ignore the output
-    solver = solve(ivp,I;opts...)
     # create dense solver
     dense_opts = DenseOptions{T}(; opts...)
     dense_solver = DenseOutput(integ, dense_opts)
@@ -75,7 +70,9 @@ type DenseState{St<:AbstractState,T,Y} <: AbstractState{T,Y}
     integrator_state::St
 end
 
+
 output(ds::DenseState) = output(ds.step_out)
+
 
 function init(ivp::IVP,
               solver::DenseOutput)
@@ -87,15 +84,6 @@ function init(ivp::IVP,
     return DenseState(1,step_prev,step_out,integrator_state)
 end
 
-
-"""
-
-TODO: rename `tout` to `tout` and drop the support for
-`points=:all` outside of the `odeXX`?  Maybe even
-`odeXX(;tout=[...])` would use dense output while `odeXX(;)`
-wouldn't.
-
-"""
 
 function onestep!(ivp::IVP,
                   solver::DenseOutput,
