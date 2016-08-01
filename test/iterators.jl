@@ -40,7 +40,7 @@ const testsets = [
                  :y0    => [1.0,2.0],
                  :tout => [0:.1:1;],
                  :jac   => (t,y,dy)->copy!(dy,Float64[[0,1] [-1,0]]),
-                 :sol   => t->[cos(t)-2*sin(t) 2*cos(t)+sin(t)],
+                 :sol   => t->[cos(t)-2*sin(t), 2*cos(t)+sin(t)],
                  :isscalar => false,
                  :name  => "pendulum",
                  :initstep => 0.001)
@@ -152,16 +152,20 @@ function test_ode()
                                 :initstep => h0,
                                 :points => points)
 
-                solver   = ODE.solve(equation,stepper;opts...)
-
-                for (t,y) in solver
+                iterator = ODE.solve(equation,stepper;opts...)
+                for (t,y) in iterator
                     @test_approx_eq_eps y sol(t) tol
                 end
 
+                dense = ODE.solve(equation,ODE.DenseOutput{stepper}; opts...)
                 for (t,y) in ODE.solve(equation,ODE.DenseOutput{stepper}; opts...)
                     @test_approx_eq_eps y sol(t) tol
                 end
 
+                # generator comprehension
+                @test all(collect((norm(y-sol(t),Inf)<=tol for (t,y) in iterator)))
+                @test all(collect((norm(y-sol(t),Inf)<=tol for (t,y) in dense)))
+                @test collect((t for (t,y) in dense))==tout
             end
         end
     end

@@ -176,6 +176,21 @@ Base.length(prob::Problem) = length(prob.solver)
 
 Base.eltype{O,S}(::Type{Problem{O,S}}) = eltype(O)
 
+if VERSION >= v"0.5.0-rc0"
+    """
+    Makes some generic operations on iterators work, like
+    generator comprehensions:
+        tgen=(t for (t,y) in sol)
+        tout=collect(tgen)
+    or
+        errgen=(y-[exp(t)] for (t,y) in sol)
+        errout=collect(errgen)
+
+    TODO: doesn't work for 0.4 and might have show issues due to non-copying output
+    """
+    Base.iteratorsize{O,S}(::Type{Problem{O,S}}) = Base.SizeUnknown()
+end
+
 """
     solve(ivp::IVP, solver::Type{AbstractSolver}, opts...)
     solve(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
