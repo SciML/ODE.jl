@@ -7,10 +7,20 @@
 # -
 
 
+"""
+    AbstractIVP{T,Y}
+
+A progenitor of types representing an IVP (initial value
+problem).  The type parameters `T` and `Y` correspond to the types of
+time and state variable respectively.
+
+"""
 abstract AbstractIVP{T,Y}
 Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = Tuple{T,Y,Y}
 
 """
+
+    IVP{T,Y,F,G,J} <: AbstractIVP{T,Y}
 
 Defines the mathematical part of an IVP (initial value problem)
 specified in the general form:
@@ -45,6 +55,10 @@ end
 
 
 """
+
+    typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
+
+Can be constructed by calling
 
     ODE.ExplicitODE(t0,y0,F!;J!=jacobian))
 
@@ -91,14 +105,22 @@ end
 
 """
 
+    AbstractSolver
+
 The supertype of anything which can get you to a solution of a IVP.
 Subtypes include: `AbstractIntegrator`s but also `DenseOutput`
 
 """
 abstract AbstractSolver
 
-legnth(s::AbstractSolver) = error("`length` is not defined for $(typeof(s)).")
+Base.length(s::AbstractSolver) = error("`length` is not defined for $(typeof(s)).")
 
+"""
+
+The fallback generator of an abstract solver, throws an error if the
+solver cannot be generated for the given initial value problem type.
+
+"""
 @compat (::Type{S}){S<:AbstractSolver}(ivp;opts...) =
     error("The solver $S doesn't support IVP of form $(typeof(ivp))")
 
