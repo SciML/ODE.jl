@@ -93,10 +93,10 @@ output(ds::DenseState) = output(ds.step_out)
 function init(ivp::IVP,
               solver::DenseOutput)
     integrator_state = init(ivp, solver.integ)
-    dy0 = similar(ivp.y0)
+    dy0 = copy(ivp.y0)
     ivp.F!(ivp.t0,ivp.y0,dy0)
     step_prev = Step(ivp.t0,copy(ivp.y0),dy0)
-    step_out = Step(ivp.t0,similar(ivp.y0),similar(ivp.y0))
+    step_out = Step(ivp.t0,copy(ivp.y0),copy(ivp.y0))
     return DenseState(1,step_prev,step_out,integrator_state)
 end
 

@@ -20,7 +20,7 @@ immutable TableauRKExplicit{T} <: Tableau{T}
         @assert istril(a)
         @assert s==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<T(1e-10) # consistency.
+        @assert maxabs(sum(a,2)-c'')<T(1//10^10) # consistency.
         isFSAL = (a[end,:]==b[1,:] && c[end]==1)
         new(order,a,b,c,isFSAL,s,name)
     end
@@ -356,12 +356,12 @@ function stepsize_hw92!{T}(work,
     # - allow component-wise reltol and abstol?
     # - allow other norms
 
-    ord = minimum(order(tableau))
+    ord = T(minimum(order(tableau)))
     timout_after_nan = 5
     # fac = T[0.8, 0.9, (0.25)^(1/(ord+1)), (0.38)^(1/(ord+1))][1]
     fac = T(8//10)
     facmax = T(5) # maximal step size increase. 1.5-5
-    facmin = 1./facmax  # maximal step size decrease. ?
+    facmin = 1/facmax  # maximal step size decrease. ?
     dof = length(last_step.y)
 
     # in-place calculate yerr./tol

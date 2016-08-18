@@ -72,12 +72,17 @@ Explicit ODE representing the problem
 
 """
 typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
+# TODO:
+# typealias ExplicitODE{T,Y,F,J} IVP{T,Y,F,Void,J}
 @compat function (::Type{ExplicitODE}){T,Y}(t0::T,
                                             y0::Y,
                                             F!::Function;
-                                            J!::Function = forward_jacobian!(F!,similar(y0)),
+                                            J!::Function = forward_jacobian!(F!,copy(y0)),
                                             kargs...)
-    ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
+    # precompute y'
+    dy0 = copy(y0)
+    F!(t0,y0,dy0)
+    ExplicitODE{T,Y}(t0,y0,dy0,F!,nothing,J!)
 end
 
 """

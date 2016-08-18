@@ -9,7 +9,7 @@ immutable ModifiedRosenbrockIntegrator{T<:Number} <: AbstractIntegrator
     const_e::T
 end
 
-function ModifiedRosenbrockIntegrator{T}(ode::ExplicitODE{T};opts...)
+function ModifiedRosenbrockIntegrator{T,Y<:AbstractVector}(ode::ExplicitODE{T,Y};opts...)
     const_d = 1/(2+sqrt(T(2)))
     const_e = 6+sqrt(T(2))
 
