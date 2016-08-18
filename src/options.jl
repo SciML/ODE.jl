@@ -63,7 +63,7 @@ immutable FixedOptions{T} <: Options{T}
 end
 
 @compat function (::Type{FixedOptions{T}}){T}(;
-                                              tout     = T[Inf],
+                                              tout     = [T(Inf)],
                                               tstop    = tout[end],
                                               initstep = T(10)*eps(T),
                                               kargs...)

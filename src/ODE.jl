@@ -69,6 +69,7 @@ using ODE
 import ODE: AbstractIntegrator, AbstractState, ExplicitODE
 
 include("tests/minimal_types.jl")
+include("tests/test_cases.jl")
 
 # Test function for the iterator interface
 include("tests/integrators.jl")

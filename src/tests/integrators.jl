@@ -1,22 +1,15 @@
 using Base.Test
 
-const case_vector = Dict(:ivp      => ExplicitODE(0.0,
-                                                  [0.0],
-                                                  (t,y,dy)->dy[:]=6.0,
-                                                  J! =(t,y,dy)->dy[1]=0.0),
-                         :sol      => t->[6t],
-                         :name     => "y'=6 (vector)",
-                         :options  => Dict(:initstep => 0.1,
-                                           :tstop => 1.0),
-                         )
-
 function test_integrator(integrator,test)
 
     ivp, sol, name, opts = test[:ivp], test[:sol], test[:name], test[:options]
 
+    println("Integrator $integrator)")
+    print("   Test case $name   ")
+
     T,Y = eltype(ivp).parameters
 
-    tol = 2//10
+    tol = 1//500
 
     # 1) test the constructor
     @test integrator <: AbstractIntegrator
@@ -36,15 +29,29 @@ function test_integrator(integrator,test)
 
     # 3) test the iterator interface
     # pure integrator
-    for (t,y,dy) in ODE.solve(ivp,integrator;opts...)
-        @test maxabs(y-sol(t)) < tol
-    end
-    # with dense output
-    for (t,y) in ODE.solve(ivp,ODE.DenseOutput{integrator}; opts...)
-        @test maxabs(y-sol(t)) < tol
-        # TODO: make this work
+    iterator = ODE.solve(ivp,integrator; opts...)
+    dense    = ODE.solve(ivp,ODE.DenseOutput{integrator}; opts...)
+    niters=0
+    for (t,y,dy) in iterator
+        niters+=1
+        @test maxabs(y-sol(t)) < niters*tol
+        # TODO: replace with
         # @test_approx_eq_eps y sol(t) tol
     end
+
+    # with dense output
+    for (t,y,dy) in dense
+        @test maxabs(y-sol(t)) < tol
+    end
+
+    # generator comprehension
+    @test all(collect((maxabs(y-sol(t))<=tol for (t,y) in iterator)))
+    @test all(collect((maxabs(y-sol(t))<=tol for (t,y) in dense)))
+
+    tout = opts[:tout]
+    @test collect((t for (t,y) in dense))==tout
+
+    println("OK!")
 end
 
 function aaaa()
