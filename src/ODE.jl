@@ -49,7 +49,28 @@ include("integrators/rosenbrock.jl")
 # User interface to solvers
 include("top-interface.jl")
 
-# Test function for the iterator interface
-include("test_solver.jl")
-
 end # module ODE
+
+
+"""
+
+This module contains simple test functions for solvers/integrators
+compatible with ODE.jl.  You can use it to test your custom solvers,
+for examples of how to use these functions see our tests in `test/`
+directory.
+
+"""
+module ODETests
+
+import Base.Test: @test, @test_approx_eq_eps
+
+using ODE
+
+import ODE: AbstractIntegrator, AbstractState, ExplicitODE
+
+include("tests/minimal_types.jl")
+
+# Test function for the iterator interface
+include("tests/integrators.jl")
+
+end

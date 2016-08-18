@@ -1,3 +1,5 @@
+include("../src/ODE.jl")
+
 """
 
 Here we demonstrate how to implement an integrator so that it is
@@ -34,7 +36,7 @@ function EulerIntegrator{T}(ode::ExplicitODE{T};
                             tstop = T(Inf),
                             initstep = T(1//10),
                             opts...)
-    EulerIntegrator(tstop,initstep)
+    EulerIntegrator{T}(tstop,initstep)
 end
 
 # The state of the integrator, it stores the current values for time
@@ -46,16 +48,14 @@ end
 type EulerState{T,Y} <: AbstractState{T,Y}
     step::ODE.Step{T,Y}
 end
+output(state::EulerState) = output(state.step)
 
 # Generates the state given an ODE and an integrator, this method has
 # to be specialized for `EulerIntegrator`, we don't have to specialize
 # it for `ExplicitODE` as the type of an ODE is already filtered by
 # the specialized the construtor, but we do it here for clarity.
 function init(ode::ExplicitODE, integ::EulerIntegrator)
-    t0, y0 = ode.t0, copy(ode.y0)
-    dy0 = similar(y0)
-    ode.F!(t0,y0,dy0)           # fill in the values of the derivative
-    EulerState(ODE.Step(t0,y0,dy0))
+    EulerState(ODE.Step(ode.t0,copy(ode.y0),copy(ode.dy0)))
 end
 
 function onestep!(ode::ExplicitODE, integ::EulerIntegrator, state::EulerState)
@@ -74,9 +74,9 @@ function onestep!(ode::ExplicitODE, integ::EulerIntegrator, state::EulerState)
         dt  = min(integ.initstep,integ.tstop-t)
 
         # update the time,
-        state.step.t  += dt
+        state.step.t += dt
         # the function (this is the `dy` from the previous step)
-        state.step.y .+= dt*dy
+        state.step.y += dt*dy
         # and its derivative
         ode.F!(t,y,dy)
         # return a flag to continue the integration
@@ -101,21 +101,24 @@ type EulerState2{T,Y} <: ODE.AbstractState{T,Y}
 end
 # but then we have to define the method `output`
 output(state::EulerState2) = (state.t, state.y, state.dy)
-# normally `output` falls back to `output(state)=output(state.step)`
-# with `output(step)=step.t,step.y,step.dy`.
 
 end
 
 # Usage example
 using ODE
-import MyIntegrator: EulerIntegrator
+# import ODETests: test_integrator
+using ODETests
+using MyIntegrator
+
+integ = MyIntegrator.EulerIntegrator
 
 # declare the ODE as usual
 ode   =ODE.ExplicitODE(0.0,[1.0],(t,y,dy)->copy!(dy,y))
 # solve the `ode` with our integrator, note that we can pass options to `solve`
-sol   =ODE.solve(ode,EulerIntegrator;tstop=1.0,initstep=0.001)
-# print the last step of the solution
+sol   =ODE.solve(ode,integ;tstop=1.0,initstep=0.001)
+# # print the last step of the solution
 collect(sol)[end]
 
 # test the integrator
-ODE.test_integrator(EulerIntegrator)
+ODETests.test_integrator(integ,ODETests.case_vector)
+ODETests.test_integrator(integ,ODETests.case_minimal_type)
