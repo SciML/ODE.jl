@@ -15,14 +15,15 @@ function ode{T,Y,M<:AbstractSolver}(F, y0::Y,
     # construct a Problem
     equation  = explicit_ineff(t0,y0,F;kargs...)
     if points == :all
-        prob = solve(equation, solver;
-                     tout = tout,
-                     kargs...)
+        prob = iterate(equation;
+                       solver = solver,
+                       tout = tout,
+                       kargs...)
     elseif points == :specified
-        prob = solve(equation,
-                     DenseOutput{solver};
-                     tout = tout,
-                     kargs...)
+        prob = iterate(equation;
+                       solver = DenseOutput{solver},
+                       tout = tout,
+                       kargs...)
     else
         error("Unsupported points value (should be :all or :specified)")
     end

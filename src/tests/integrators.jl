@@ -36,13 +36,13 @@ function test_integrator(integrator,test)
 
         # 3) test the iterator interface
         # pure integrator
-        iterator = ODE.solve(ivp,integrator; opts...)
-        dense    = ODE.solve(ivp,ODE.DenseOutput{integrator}; opts...)
+        iterator       = ODE.iterate(ivp; solver=integrator, opts...)
+        iterator_dense = ODE.iterate(ivp; solver=ODE.DenseOutput{integrator}, opts...)
 
         tdir = sign(opts[:tstop]-ivp.t0)
 
-        for iter in (iterator,dense)
-            for (t,y,dy) in dense
+        for iter in (iterator,iterator_dense)
+            for (t,y,dy) in iter
                 # TODO: is there a better way of doing this?  We need
                 # a single @test statement in case of a failure for
                 # @testset to work properly.
@@ -55,15 +55,21 @@ function test_integrator(integrator,test)
                     break
                 end
             end
+
+            # generator comprehension
+            @test all(collect((maxabs(y-sol(t))<=tol for (t,y) in iter)))
         end
 
-        # generator comprehension
-        @test all(collect((maxabs(y-sol(t))<=tol for (t,y) in iterator)))
-        @test all(collect((maxabs(y-sol(t))<=tol for (t,y) in dense)))
-
         tout = opts[:tout]
-        @test collect((t for (t,y) in dense))==tout
+        @test collect((t for (t,y) in iterator_dense))==tout
 
+        # Solution type
+        solution       = ODE.solve(ivp; solver=integrator, opts...)
+        solution_dense = ODE.solve(ivp; solver=ODE.DenseOutput{integrator}, opts...)
+
+        for s in (solution,solution_dense)
+            @test all(map((t,y)->maxabs(y-sol(t))<=tol,solution.t,solution.y))
+        end
     end
 end
 

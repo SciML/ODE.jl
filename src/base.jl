@@ -219,27 +219,26 @@ if VERSION >= v"0.5.0-rc0"
 end
 
 """
-    solve(ivp::IVP, solver::Type{AbstractSolver}, opts...)
-    solve(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
+    iterate(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
 
-Solve creates an iterable `Problem` instance from an `IVP` instance
+Iterate creates an iterable `Problem` instance from an `IVP` instance
 (specifying the math) and from a `Type{AbstractSolver}` (the numerical
 integrator).  The simplest use case is
 
-    for (t,y,dy) in solver(...)
+    for (t,y,dy) in iterate(...)
         # do something with t, y an dy
     end
 
 If the integration interval, defined by the keyword argument `tstop`,
 is finite you can request all the results at once by calling
 
-    collect(solver(...)) # => Vector{Tuple{T,Y,Y}}
+    collect(iterate(...)) # => Vector{Tuple{T,Y,Y}}
 
 Notes:
 
-- usually a solvers requires the ivp to be in a certain form, say an
+- usually solvers require the ivp to be in a certain form, say an
  `ExplicitODE`.
-- the second argument it the *Type* of the solver and not an instance.
+- the second argument is the *Type* of the solver and not an instance.
   The instance of the solve can only be created together with the
   `ivp` as their type parameters need to match.
 
@@ -253,15 +252,48 @@ Output:
 - `::Problem`
 
 """
-function solve(ivp::IVP, solver; opts...)
-    Problem(ivp,solver(ivp;opts...))
+function iterate{S<:AbstractSolver}(ivp::IVP;
+                                    solver::Type{S} = RKIntegratorAdaptive{:rk45},
+                                    opts...)
+    Problem(ivp, solver(ivp; opts...))
 end
 
-function solve{S<:AbstractSolver}(ivp::IVP;
-                                  solver::Type{S} = RKIntegratorAdaptive{:rk45},
-                                  opts...)
-    solve(ivp, solver; opts...)
+"""
+    solve(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
+
+Solve the initial value problem `ivp` using an algorithm `solver`
+(defaults to Runge-Kutta (4,5) integrator).  One can pass additional
+options to the `solver` via keyword arguments to `solve` (here denoted
+as `options`).  The output is a `Solution` type (currently simply a
+tuple of vectors `(Vector{T},Vector{Y})`, where `T,Y=eltype(ivp)`).
+
+"""
+
+function solve(ivp::IVP; opts...)
+    prob = iterate(ivp; opts...)
+    T,Y=eltype(prob).parameters
+    tout = Array(T,0)
+    yout = Array(Y,0)
+    dyout = Array(Y,0)
+    for (t,y,dy) in prob
+        push!(tout,t)
+        push!(yout,copy(y))
+        push!(dyout,copy(dy))
+    end
+    return Solution{T,Y}(tout,yout,dyout)
 end
+
+"""
+
+Stores a solution to the `ivp`
+
+"""
+immutable Solution{T,Y}
+    t::Vector{T}
+    y::Vector{Y}
+    dy::Vector{Y}
+end
+
 
 # In Julia 0.5 the collect needs length to be defined, we cannot do
 # that for a Problem but we can implement our own collect
@@ -272,39 +304,6 @@ function collect(prob::Problem)
     end
     return pairs
 end
-
-
-"""
-
-    collect_vectors(prob::Problem)
-
-Input:
-
-- iterator constructed by `solve`
-
-Output:
-
-- `(tout,yout,dyout)` with `tout::Array{T}` containing subsequent
-  times, `yout::Vector{Y}` and `dyout::Vector{Y}` containig the vector
-  of solution and derivative respectively at corresponding `tout`
-  times.  In other words `yout[i]` approximates `y(tout[i])` where `y`
-  is the true solution to an ODE.  It could be interpreted as a
-  transpose of "`collect(prob)`".
-
-"""
-function collect_vectors(prob::Problem)
-    T,Y   = eltype(prob)
-    tout  = Array(T,0)
-    yout  = Array(Y,0)
-    dyout = Array(Y,0)
-    for (t,y,dy) in prob
-        push!(tout,t)
-        push!(yout,copy(y))
-        push!(dyout,copy(dy))
-    end
-    return (tout,yout,dyout)
-end
-
 
 
 # Iteration: take one step on a IVP `Problem`
