@@ -48,8 +48,6 @@ end
 
 Base.length(dense::DenseOutput) = length(dense.opts.tout)
 
-tdir(ivp, solver::DenseOutput) = sign(solver.opts.tstop - ivp.t0)
-
 @compat function (::Type{DenseOutput{I}}){T,I}(ivp::IVP{T};
                                                tstop = T(Inf),
                                                tout::AbstractVector{T} = T[tstop],
