@@ -14,9 +14,9 @@ const integrators = [ODE.RKIntegratorFixed{:feuler},
 using ODETests
 
 function test_integrators()
-    for integ in integrators
-        for case in values(ODETests.test_cases)
-            ODETests.test_integrator(integ,case)
+    @testset "Iterator interfaces" begin
+        for integ in integrators
+            ODETests.test_integrator(integ)
         end
     end
 end

@@ -18,6 +18,7 @@ const test_cases =
               :sol    => t->[t^2],
               :name   => "y'=2t",
               :options=> Dict(:tout => [0:0.001:1;],
+                              :tstop => 1.0,
                               :initstep => 0.001)
               ),
 
@@ -28,6 +29,7 @@ const test_cases =
               :sol    => t->[exp(t)],
               :name   => "y'=y",
               :options=> Dict(:tout => [0:0.001:1;],
+                              :tstop => 1.0,
                               :initstep => 0.001)
               ),
 
@@ -38,6 +40,7 @@ const test_cases =
               :sol    => t->[exp(t-1)],
               :name   => "y'=y backwards",
               :options=> Dict(:tout => [1:-0.001:0;],
+                              :tstop => 0.0,
                               :initstep => 0.001)
               ),
 
@@ -73,6 +76,8 @@ const test_cases =
                                 :tstop => MyFloat(1.0),
                                 :tout  => [MyFloat(0.0),MyFloat(0.1),MyFloat(1.0)])
               ),
+
+         # TODO: ForwardDiff Jacobian doesn't seem to work with custom AbstractVector type
 
          # :harmonic_minimal_types_no_jac=>
          # Dict(:ivp      => ExplicitODE(MyFloat(0.0),

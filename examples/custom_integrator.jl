@@ -64,14 +64,17 @@ function onestep!(ode::ExplicitODE, integ::EulerIntegrator, state::EulerState)
     # access the fields directly but we use it here for convenience.
     t, y, dy = ODE.output(state)
 
-    # the only stop condition our solver has
-    if t >= integ.tstop
+    tdir = sign(integ.tstop-ode.t0)
+
+    # the only stop condition our solver has.  Note the use of `abs`,
+    # which enables integration backward in time.
+    if tdir*t >= tdir*integ.tstop
         # this flag finalizes the iterator
         return ODE.finish
     else
         # trim the stepsize to match the `tstop`, prevents
         # overshooting
-        dt  = min(integ.initstep,integ.tstop-t)
+        dt  = tdir*min(integ.initstep,abs(integ.tstop-t))
 
         # update the time,
         state.step.t += dt
@@ -84,10 +87,10 @@ function onestep!(ode::ExplicitODE, integ::EulerIntegrator, state::EulerState)
     end
 end
 
-# OPTIONAL:
-# Define properties of this integrator: order, name and
+# OPTIONAL: Define properties of this integrator: order, name and
 # whether it is adaptive or not.  At this point the information
-# supplied here is not used.
+# supplied here is not used but it might be a good idea to implement
+# these methods for future use.
 order{T}(::Type{EulerIntegrator{T}}) = 1
 name{T}(::Type{EulerIntegrator{T}}) = "My own Euler integrator"
 isadaptive{T}(::Type{EulerIntegrator{T}}) = false
@@ -120,5 +123,5 @@ sol   =ODE.solve(ode,integ;tstop=1.0,initstep=0.001)
 collect(sol)[end]
 
 # test the integrator
-ODETests.test_integrator(integ,ODETests.case_vector)
-ODETests.test_integrator(integ,ODETests.case_minimal_type)
+# TODO: for now I can't figure out why it fails.
+ODETests.test_integrator(integ)
