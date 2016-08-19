@@ -29,7 +29,52 @@ F(t,y) = y
 The vectors `t` and `y` store the time and solution values at the
 corresponding times.
 
-You might find the basic interface limiting.  First of all, it stores
+## Solve interface
+
+`ODE.ode` only supports explicit differential equations defined as
+`y'=F(t,y)`, for more advenced uses consider using `ODE.solve`, which
+was designed to work with a variety of other types of initial value
+problems and is optimized for better performance.  First we have to
+define an initial value problem, in our case this is an explicit
+differential equation `y'=y` with inital data `y0=[1.0]` given at the
+time `t0=0.0`.
+
+```@example solve
+using ODE
+t0  = 0.0
+y0  = [1.0]
+F!(t,y,dy) = dy[1]=y[1]
+ode = ODE.ExplicitODE(t0,y0,F!)
+```
+
+Note that unlike in `ODE.ode` we now have to supply an in place
+function `F!` instead of an explicit function `F`.  We can solve the
+ODE problem `ode` by simply calling
+
+```@example solve
+sol = ODE.solve(ode, tstop = 1)
+```
+
+This returns a `Solution` type, which stores the solution.  You
+probably noticed that we passed a keyword argument `tstop`, this is
+the final time of integration which we have to specify because `tstop`
+defaults to `Inf` and the integration would carry on forever.  You can
+access the solution with
+
+```@example solve
+(t,y) = sol.t, sol.y
+```
+
+You can change the default algorithm (Runge-Kutta (4,5)) by passing an
+optional argument `solver`
+
+```@example solve
+sol = ODE.solve(ode, tstop = 1, solver = ODE.RKIntegratorAdaptive{:dopri5})
+```
+
+For other options accepted by `solve` see [Options](/Options/) below.
+
+You might still find this interface limiting.  First of all, it stores
 all the results, so if you are only interested in the final value of
 `y` it still stores all the intermediate steps.  Secondly, you cannot
 process the results on the fly (e.g. plot the current state of a
@@ -39,11 +84,9 @@ iterator interface.
 ## Iterator interface
 
 To offeset the limitations of the `ODE.ode` interface we implemented a
-general.  First we define an initial value problem, in our case this is
-an explicit differential equation `y'=y` with inital data `y0=[1.0]`
-given at the time `t0=0.0`.
+general.  We use the same problem as before as an example
 
-```@example iterator
+```@example iterate
 using ODE
 t0  = 0.0
 y0  = [1.0]
@@ -51,13 +94,12 @@ F!(t,y,dy) = dy[1]=y[1]
 ode = ODE.ExplicitODE(t0,y0,F!)
 ```
 
-Note that unlike in `ODE.ode` we now have to supply an in place
-function `F!` instead of an explicit function `F`.  Now we are ready
-to produce the iterator that solvese to our problem.
+Now we have full flow control over the solver, we can analyze the
+intermediate results or interrupt the integration at any point.
 
-```@example iterator
-sol = ODE.solve(ode)
-for (t,y) in sol
+```@example iterate
+iter = ODE.iterate(ode)
+for (t,y) in iter
     @show (t,y)
     if t > 1
         break
@@ -65,42 +107,62 @@ for (t,y) in sol
 end
 ```
 
-Note that we had to interrupt the loop because `sol` would be
-producing solutions ad infinitum (in theory, in practice we will get
-to the point where the solver won't be able to produce reasonable
-solution anymore).  To set the final integration time and other
-parameters of the integrator `integ` we can pass optional arguments to
+Note that we had to break the loop because `sol` would keep producing
+the results.  To set the final integration time and other parameters
+of the integrator `integ` we can pass optional arguments to
 `ODE.solver`.
 
-```@example iterator
-sol = ODE.solve(ode; tstop = 1)
-for (t,y) in sol
+```@example iterate
+iter = ODE.iterate(ode; tstop = 1)
+for (t,y) in iter
     @show (t,y)
 end
 ```
 
 This approach has the added benefit of the solution never exceeding
-the final time.  Apart from the time and value `(t,y)` the `ODE.solve`
-returns also the derivative, you can retrive it as the third argument
-in the returned tuple.  In the following example we use it compute the
-absolute error.
+the final time.  Both `ODE.iterate` and `ODE.solve` support the same
+options, so you can easily change the method of integration with the
+keyword `solver`.
 
-```@example iterator
-sol = ODE.solve(ode; tstop = 1)
-for (t,y,dy) in sol
+Apart from the time and value `(t,y)` the `ODE.solve` also returns the
+derivative, you can retrive it as the third argument in the returned
+tuple.  In the following example we use it compute the absolute
+residual error (zero in this case).
+
+```@example iterate
+iter = ODE.iterate(ode; tstop = 1)
+for (t,y,dy) in iter
     err = norm(y-dy)
     @show err
 end
 ```
 
 With `tstop` specified we can also get all results at once using
-`collect`.
+`collect` and other constructs working on iterators
+(e.g. generators).  For example
 
-```@example iterator
-res = collect(sol)
+```@example iterate
+solution = collect(iter)
 ```
 
-Note that `collect` returns a vector of triples `(t,y,dy)`.
+returns a vector of triples `(t,y,dy)`.  Or if you only wan the first
+component of a solution you could simply use
+
+```@example iterate
+y1 = collect(y[1] for (t,y) in iter)
+```
+
+There are, however, several caveats that you should take into account:
+
+1. Each time the iterator is collected the differential equation is
+   actually solved, which has potentially high computational cost and
+   might be inefficient.
+
+2. The `length` is undefined for the result of `ODE.iterate`, because
+   we don't know a priori how many steps the integration will require
+   (especially in the case of adaptive solvers).  This means that the
+   functions requireing `length` might not work.  For the same reason
+   there are no `getindex` methods.
 
 ## Options
 

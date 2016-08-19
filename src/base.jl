@@ -16,6 +16,10 @@ time and state variable respectively.
 
 """
 abstract AbstractIVP{T,Y}
+
+"""
+The "elements" of AbstractIVP are `t,y,dy` so the `eltype` returns `Tuple{T,Y,Y}`
+"""
 Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = Tuple{T,Y,Y}
 
 """
@@ -285,13 +289,26 @@ end
 
 """
 
-Stores a solution to the `ivp`
+Stores a solution to the `ivp`.
 
 """
 immutable Solution{T,Y}
     t::Vector{T}
     y::Vector{Y}
     dy::Vector{Y}
+end
+
+"""
+Experimental support for the interpolation
+"""
+function interpolate(sol::Solution, t)
+    if (t>sol.t[end]) | (t<sol.t[1])
+        error("Out of range")
+    else
+        i = findfirst(ti -> t>ti, sol.t)
+        theta = (t-sol.t[i])/(sol.t[i+1]-sol.t[i])
+        return sol.y[i]+theta*(sol.y[i+1]-sol.y[i])
+    end
 end
 
 

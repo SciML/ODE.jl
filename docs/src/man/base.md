@@ -8,6 +8,13 @@ The file `base.jl` implements the most basic iterator infrastructure
 for solvers and the definitions of the types representing general IVP
 (initial value problem) and solvers.
 
+## General functions for solving initial value problems
+
+```@docs
+solve
+iterate
+```
+
 ## Predefined types of initial value problems
 
 ```@docs
@@ -16,12 +23,14 @@ IVP
 ExplicitODE
 ImplicitODE
 ```
+
 ## Solver architecture
 
 ```@docs
 AbstractSolver
 AbstractIntegrator
 AbstractState
+Solution
 ```
 
 The fallback constructor for `AbstractSolver(ivp::IVP;opts...)` ensures
