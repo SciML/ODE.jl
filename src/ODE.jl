@@ -49,12 +49,10 @@ include("integrators/rosenbrock.jl")
 # User interface to solvers
 include("top-interface.jl")
 
-end # module ODE
-
 
 """
 
-This module contains simple test functions for solvers/integrators
+This submodule contains simple test functions for solvers/integrators
 compatible with ODE.jl.  You can use it to test your custom solvers,
 for examples of how to use these functions see our tests in `test/`
 directory.
@@ -75,3 +73,6 @@ include("tests/test_cases.jl")
 include("tests/integrators.jl")
 
 end
+
+
+end # module ODE
