@@ -60,7 +60,7 @@ end
 
 """
 
-    typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
+    typealias ExplicitODE{T,Y,F,J} IVP{T,Y,F,Void,J}
 
 Can be constructed by calling
 
@@ -75,9 +75,7 @@ Explicit ODE representing the problem
 - J!: (optional) computes `J=dF/dy` in place, called with `J!(t,y,J)`
 
 """
-typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
-# TODO:
-# typealias ExplicitODE{T,Y,F,J} IVP{T,Y,F,Void,J}
+typealias ExplicitODE{T,Y,F,J} IVP{T,Y,F,Void,J}
 @compat function (::Type{ExplicitODE}){T,Y}(t0::T,
                                             y0::Y,
                                             F!::Function;
@@ -86,7 +84,7 @@ typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
     # precompute y'
     dy0 = copy(y0)
     F!(t0,y0,dy0)
-    ExplicitODE{T,Y}(t0,y0,dy0,F!,nothing,J!)
+    IVP(t0,y0,dy0,F!,nothing,J!)
 end
 
 """
@@ -102,14 +100,14 @@ Implicit ODE representing the problem
       Returns Jacobian in-place in `out`.
 
 """
-typealias ImplicitODE{T,Y} IVP{T,Y,Void,Function,Function}
+typealias ImplicitODE{T,Y,G,J} IVP{T,Y,Void,G,J}
 @compat function (::Type{ImplicitODE}){T,Y}(t0::T,
                                             y0::Y,
                                             G!::Function;
                                             J!::Function = forward_jacobian_implicit!(G!,similar(y0)),
                                             dy0::Y = zero(y0),
                                             kargs...)
-    ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
+    IVP(t0,y0,dy0,nothing,G!,J!)
 end
 
 """
