@@ -6,20 +6,16 @@ Dense output options:
 
 - tout    ::Vector{T}  output times
 
-TODO options:
-
-- points   ::Symbol which points are returned: `:specified` only the
-  ones in tspan or `:all` which includes also the step-points of the solver.
-- stopevent   Stop integration at a zero of this function
-- roottol
-
 """
 
 immutable DenseOptions{T<:Number,TO<:AbstractVector} <: Options{T}
     tout::TO
-    # points   ::Symbol
-    # stopevent::S
-    # roottol  ::T
+
+    # Planned options:
+    # - points   ::Symbol which points are returned: `:specified` only the
+    #   ones in tspan or `:all` which includes also the step-points of the solver.
+    # - stopevent   Stop integration at a zero of this function
+    # - roottol
 end
 
 @compat function (::Type{DenseOptions{T}}){T}(;

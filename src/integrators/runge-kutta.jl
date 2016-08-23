@@ -233,7 +233,6 @@ function trialstep!(ode::ExplicitODE, integ::RKIntegratorAdaptive, state::RKStat
     end
 
     if abs(dt) < opts.minstep
-        # TODO: use some sort of logging system
         warn("Minimum step size reached")
         return abort
     end
@@ -354,7 +353,6 @@ function stepsize_hw92!{T}(work,
     #
     # TODO:
     # - allow component-wise reltol and abstol?
-    # - allow other norms
 
     ord = T(minimum(order(tableau)))
     timout_after_nan = 5
@@ -375,13 +373,12 @@ function stepsize_hw92!{T}(work,
             return T(10), dt*facmin, timout_after_nan
         end
 
-        y0 = last_step.y[d] # TODO: is this supposed to be the last successful step?
+        y0 = last_step.y[d]
         y1 = work.ynew[d]    # the approximation to the next step
         sci = (opts.abstol + opts.reltol*max(norm(y0),norm(y1)))
         work.yerr[d] ./= sci # Eq 4.10
     end
 
-    # TOOD: should we use opts.norm here as well?
     err   = opts.norm(work.yerr) # Eq. 4.11
     newdt = sign(dt)*min(opts.maxstep, abs(dt)*clamp(fac*(1/err)^(1/(ord+1)),facmin,facmax)) # Eq 4.13 modified
 

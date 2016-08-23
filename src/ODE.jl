@@ -12,7 +12,7 @@ Coding conventions:
 
 Variables and Type variables:
 - T -> t::T
-- Y -> y::Y  TODO: or Vector{Y}?
+- Y -> y::Y
 
 
 """

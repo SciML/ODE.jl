@@ -156,16 +156,6 @@ output(st::AbstractState) = t,y,dy
 output(st::AbstractState) = st.step.t, st.step.y, st.step.dy
 
 
-
-# m3:
-# - docs
-# - maybe use the typevars as defined in make_consistent_types for t,
-#   y, dy?  T->Et, S->Ty
-#   (or something else consistent throughout, maybe nicer would be all
-#   uppercase: ET, EFY, TT, TY).
-# - if find `Step` a bit confusing name, in particular combined with
-#   AbstractIntegrator, but not sure what's better.
-
 """
 
 Holds a value of a function and its derivative at time t.  This is
@@ -215,8 +205,6 @@ generator comprehensions:
 or
     errgen=(y-[exp(t)] for (t,y) in sol)
     errout=collect(errgen)
-
-TODO: doesn't work for 0.4 and might have issues with `show` due to non-copying output
 """
 Base.iteratorsize{O,S}(::Type{Problem{O,S}}) = Base.SizeUnknown()
 
@@ -432,7 +420,7 @@ Input:
 
 Output:
 
-- Bool: `false`: continue iteration, `true`: terminate iteration.
+- Status
 
 substeps.
 
