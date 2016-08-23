@@ -23,7 +23,7 @@ immutable DenseOptions{T<:Number,TO<:AbstractVector} <: Options{T}
 end
 
 @compat function (::Type{DenseOptions{T}}){T}(;
-                                              tstop                   = T(Inf),
+                                              tstop                   = T(1//0),
                                               tout::AbstractVector{T} = T[tstop],
                                               # points::Symbol= :all,
                                               # stopevent::S  = (t,y)->false,
@@ -49,7 +49,7 @@ end
 Base.length(dense::DenseOutput) = length(dense.opts.tout)
 
 @compat function (::Type{DenseOutput{I}}){T,I}(ivp::IVP{T};
-                                               tstop = T(Inf),
+                                               tstop = T(1//0),
                                                tout::AbstractVector{T} = T[tstop],
                                                opts...)
     if all(tout.>=ivp.t0)

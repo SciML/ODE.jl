@@ -70,6 +70,16 @@ function test_integrator(integrator,test)
         for s in (solution,solution_dense)
             @test all(map((t,y)->maxabs(y-sol(t))<=tol,solution.t,solution.y))
         end
+
+        # TODO: The following is not a test for a particular
+        # integrator but rather for the implementation of
+        # `ODE.solve`.  It should be moved out to another test
+        # function.
+
+        # If neither `tstop` nor `tout` was specified throw an error
+        @test_throws ErrorException ODE.solve(ivp; solver=integrator, delete!(delete!(Dict(opts),:tstop),:tout)...)
+        # If `tstop` was specified but is infinite
+        @test_throws ErrorException ODE.solve(ivp; solver=integrator, merge(Dict(opts), Dict(:tstop=>T(1//0)))...)
     end
 end
 

@@ -98,8 +98,7 @@ Now we have full flow control over the solver, we can analyze the
 intermediate results or interrupt the integration at any point.
 
 ```@example iterate
-iter = ODE.iterate(ode)
-for (t,y) in iter
+for (t,y) in ODE.iterate(ode)
     @show (t,y)
     if t > 1
         break
@@ -113,8 +112,7 @@ of the integrator `integ` we can pass optional arguments to
 `ODE.solver`.
 
 ```@example iterate
-iter = ODE.iterate(ode; tstop = 1)
-for (t,y) in iter
+for (t,y) in ODE.iterate(ode; tstop = 1)
     @show (t,y)
 end
 ```
@@ -130,8 +128,7 @@ tuple.  In the following example we use it compute the absolute
 residual error (zero in this case).
 
 ```@example iterate
-iter = ODE.iterate(ode; tstop = 1)
-for (t,y,dy) in iter
+for (t,y,dy) in ODE.iterate(ode; tstop = 1)
     err = norm(y-dy)
     @show err
 end
@@ -142,6 +139,7 @@ With `tstop` specified we can also get all results at once using
 (e.g. generators).  For example
 
 ```@example iterate
+iter = ODE.iterate(ode; tstop = 1)
 solution = collect(iter)
 ```
 

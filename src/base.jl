@@ -10,9 +10,9 @@
 """
     AbstractIVP{T,Y}
 
-A progenitor of types representing an IVP (initial value
-problem).  The type parameters `T` and `Y` correspond to the types of
-time and state variable respectively.
+The abstract supertype of all IVPs (initial value problems).  The type
+parameters `T` and `Y` correspond to the types of time and state
+variable respectively.
 
 """
 abstract AbstractIVP{T,Y}
@@ -207,20 +207,20 @@ Base.length(prob::Problem) = length(prob.solver)
 
 Base.eltype{O,S}(::Type{Problem{O,S}}) = eltype(O)
 
-if VERSION >= v"0.5.0-rc0"
-    """
-    Makes some generic operations on iterators work, like
-    generator comprehensions:
-        tgen=(t for (t,y) in sol)
-        tout=collect(tgen)
-    or
-        errgen=(y-[exp(t)] for (t,y) in sol)
-        errout=collect(errgen)
+"""
+Makes some generic operations on iterators work, like
+generator comprehensions:
 
-    TODO: doesn't work for 0.4 and might have show issues due to non-copying output
-    """
-    Base.iteratorsize{O,S}(::Type{Problem{O,S}}) = Base.SizeUnknown()
-end
+    tgen=(t for (t,y) in sol)
+    tout=collect(tgen)
+
+or
+    errgen=(y-[exp(t)] for (t,y) in sol)
+    errout=collect(errgen)
+
+TODO: doesn't work for 0.4 and might have issues with `show` due to non-copying output
+"""
+Base.iteratorsize{O,S}(::Type{Problem{O,S}}) = Base.SizeUnknown()
 
 """
     iterate(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
@@ -274,8 +274,29 @@ tuple of vectors `(Vector{T},Vector{Y})`, where `T,Y=eltype(ivp)`).
 """
 
 function solve(ivp::IVP; opts...)
+
+    # TODO: perhaps there is a more
+    # graceful way to treat these
+    # cases.  We only care about
+    # infinite `tstop` but if
+    # `tstop` is unspecified it
+    # defaults to `tout[end]`, with
+    # `tout` defaulting to
+    # `[Inf]`.  Maybe we should add
+    # `tout(::Problem)` to fix this?
+    # Or maybe we could store
+    # `tstop` in `Problem`.
+
+    dopts = Dict(opts)
+    if !in(:tstop,keys(dopts)) & !in(:tout,keys(dopts))
+        error("Neither `tstop` nor `tout` was specified.")
+    end
+    if in(:tstop,keys(dopts)) & !isfinite(dopts[:tstop])
+        error("Trying to integrate over an infinite time span, try specifying `|tstop|<Inf`.")
+    end
+
     prob = iterate(ivp; opts...)
-    T,Y=eltype(prob).parameters
+    T,Y = eltype(prob).parameters
     tout = Array(T,0)
     yout = Array(Y,0)
     dyout = Array(Y,0)
@@ -286,6 +307,7 @@ function solve(ivp::IVP; opts...)
     end
     return Solution{T,Y}(tout,yout,dyout)
 end
+
 
 """
 
@@ -435,20 +457,6 @@ function onestep!(ivp::IVP, integ::AbstractIntegrator, state::AbstractState)
     end
 end
 
-
-# TODO: the docs here are still confusing, I would rather have a
-# separate type to store the `accepted` step (perhaps `Step`?) and
-# call `trialstep!(solver,state,step)` to fill the `state` with the
-# newly made step, then `accept!(solver,state,step)` would use the
-# data in `state` to fill the `step` with new step.  This way we could
-# also implement a standard `output` function that would work on
-# `step` instead of `state`.  The step would contain the current state
-# of the solution: `(t,y)` at minimum, but it could also be
-# `(t,y,dy,dt)`.  Thoughts?
-#
-#m3: No, that doesn't work if we want to allow zero-allocation
-#    algorithms.  Unless you make `step` part of `state` but then it
-#    becomes pointless.
 
 """
 

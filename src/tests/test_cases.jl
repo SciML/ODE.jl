@@ -66,15 +66,15 @@ const test_cases =
               ),
 
          :harmonic_minimal_types=>
-         Dict(:ivp      => ExplicitODE(MyFloat(0.0),
-                                       Position(MyFloat(0.0),MyFloat(1.0)),
+         Dict(:ivp      => ExplicitODE(MyFloat(0),
+                                       Position(MyFloat(0),MyFloat(1)),
                                        (t,y,dy)->(dy.x=y.y;dy.y=-y.x),
                                        J! = (t,y,J)->(J[:]=0;J[2,1]=1;J[1,2]=-1)),
               :sol      => t->Position(sin(t),cos(t)),
               :name     => "harmonic (minimal types)",
-              :options  => Dict(:initstep => MyFloat(0.001),
-                                :tstop => MyFloat(1.0),
-                                :tout  => [MyFloat(0.0),MyFloat(0.1),MyFloat(1.0)])
+              :options  => Dict(:initstep => MyFloat(1//1000),
+                                :tstop => MyFloat(1),
+                                :tout  => [MyFloat(0),MyFloat(1//10),MyFloat(1)])
               ),
 
          # TODO: ForwardDiff Jacobian doesn't seem to work with custom AbstractVector type

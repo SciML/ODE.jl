@@ -3,7 +3,7 @@ import Base: +, -, *, /, ^
 # for the vector type
 import Base: getindex, setindex!, similar
 # for the scalar type
-import Base: eps, convert, promote_rule, sqrt
+import Base: eps, convert, promote_rule, sqrt, isfinite
 
 
 # position variable
@@ -29,41 +29,44 @@ setindex!{T}(p::Position{T},val::T,i::Int) = i==1 ? p.x=val : p.y=val
 # precision floats (like BigFloat) with lower precision constants,
 # which could result in decreasing the overall precision of the
 # algorithm.
-immutable MyFloat{T} <: Real
-    t::T
+immutable MyFloat <: Real
+    t::Float64
+    # the dummy is here to prevent the use of the default constructor
+    dummy::Int
 end
 
 # we need these to construct MyFloat from constants, constants are
 # predefined in terms of numbers of inifinite precision such as Int or
 # Rational
-convert{T}(::Type{MyFloat{T}},s::Rational) = MyFloat{T}(convert(T,s))
-convert{T}(::Type{MyFloat{T}},s::Integer) = MyFloat{T}(convert(T,s))
-promote_rule{T<:MyFloat,R<:Rational}(::Type{T},::Type{R}) = T
-promote_rule{T<:MyFloat,R<:Integer}(::Type{T},::Type{R}) = T
+convert(::Type{MyFloat},s::Rational) = MyFloat(convert(Float64,s),0)
+convert(::Type{MyFloat},s::Integer) = MyFloat(convert(Float64,s),0)
+promote_rule{R<:Rational}(::Type{MyFloat},::Type{R}) = MyFloat
+promote_rule{R<:Integer}(::Type{MyFloat},::Type{R}) = MyFloat
 
-eps{T}(::Type{MyFloat{T}}) = MyFloat{T}(eps(T))
+eps(::Type{MyFloat}) = MyFloat(eps(Float64),0)
+isfinite(x::MyFloat) = isfinite(x.t)
 # necessary for the modified Rosenbrock integrator
-sqrt{T}(t::MyFloat{T})=MyFloat{T}(sqrt(t.t))
+sqrt(t::MyFloat)=MyFloat(sqrt(t.t),0)
 
 # binary operators
 for op in (:+, :-, :*, :/, :^)
-    @eval ($op){T}(t1::MyFloat{T},t2::MyFloat{T}) = MyFloat{T}(($op)(t1.t,t2.t))
+    @eval ($op)(t1::MyFloat,t2::MyFloat) = MyFloat(($op)(t1.t,t2.t),0)
 end
 
 # See #18114
-^{T<:MyFloat}(x::T, y::Rational) = x^(convert(T,y.num)/convert(T,y.den))
+^(x::MyFloat, y::Rational) = x^(convert(MyFloat,y.num)/convert(MyFloat,y.den))
 
 # unary operators
 for op in (:-,)
-    @eval ($op)(t::MyFloat) = MyFloat(($op)(t.t))
+    @eval ($op)(t::MyFloat) = MyFloat(($op)(t.t),0)
 end
 
 # comparisons
 for op in (:<, :>, :>=, :<=)
-    @eval ($op){T}(t1::MyFloat{T},t2::MyFloat{T}) = ($op)(t1.t,t2.t)
+    @eval ($op)(t1::MyFloat,t2::MyFloat) = ($op)(t1.t,t2.t)
 end
 
 # these are only necessary because they are used in the definition of
 # the ODE test case (see test_cases.jl, :harmonic_minimal_types)
-Base.sin{T}(t::MyFloat{T})=MyFloat{T}(sin(t.t))
-Base.cos{T}(t::MyFloat{T})=MyFloat{T}(cos(t.t))
+Base.sin(t::MyFloat)=MyFloat(sin(t.t),0)
+Base.cos(t::MyFloat)=MyFloat(cos(t.t),0)
