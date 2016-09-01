@@ -1,7 +1,9 @@
 # Here are tests which test what interface the solvers require.
 
+nonconforming_solvers = [ODE.ode23s, ODE.ode4s_s, ODE.ode4s_kr]
+
 ################################################################################
-# This is to test a scalar-like state variable
+# This is to test a scalar-like state variable which is encoded in a custom type
 # (due to @acroy: https://gist.github.com/acroy/28be4f2384d01f38e577)
 
 import Base: +, -, *, /, .+, .-, .*, ./
@@ -33,6 +35,7 @@ Base.norm(y::CompSol) = norm(y::CompSol, 2.0)
 ### new for PR #68
 Base.abs(y::CompSol) = norm(y, 2.) # TODO not needed anymore once https://github.com/JuliaLang/julia/pull/11043 is in current stable julia
 Base.zero(::Type{CompSol}) = CompSol(complex(zeros(2,2)), 0., 0.)
+Base.zero(::CompSol) = zero(CompSol)
 ODE.isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
 
 # Because the new RK solvers wrap scalars in an array and because of
@@ -43,21 +46,18 @@ ODE.isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
 .*(s::Real, y1::CompSol) = y1*s
 ./(y1::CompSol, s::Real) = CompSol(y1.rho/s, y1.x/s, y1.p/s)
 
-
-################################################################################
- 
 # define RHSs of differential equations
 # delta, V and g are parameters
 function rhs(t, y, delta, V, g)
   H = [[-delta/2 V]; [V delta/2]]
- 
+
   rho_dot = -im*H*y.rho + im*y.rho*H
   x_dot = y.p
   p_dot = -y.x
- 
+
   return CompSol( rho_dot, x_dot, p_dot)
 end
- 
+
 # inital conditons
 rho0 = zeros(2,2);
 rho0[1,1]=1.;
@@ -70,13 +70,38 @@ t,y1 = ODE.ode45((t,y)->rhs(t, y, delta0, V0, g0), y0, [0., endt]) # used as ref
 print("Testing interface for scalar-like state... ")
 for solver in solvers
     # these only work with some Array-like interface defined:
-    if solver in [ODE.ode23s, ODE.ode4s_s, ODE.ode4s_kr]
+    if solver in nonconforming_solvers
         continue
     end
     t,y2 = solver((t,y)->rhs(t, y, delta0, V0, g0), y0, linspace(0., endt, 500))
     @test norm(y1[end]-y2[end])<0.1
 end
 println("ok.")
+
+################################################################################
+# Tests using a matrix as a scalar
+# test due to @gersonjferreira https://github.com/JuliaLang/ODE.jl/issues/86#issuecomment-224889775
+
+h = [5.0 1.0; -1.0 6.0]/10.0;
+tspan=linspace(0,1,30);
+dt=tspan[2]-tspan[1];
+
+y0 = [0.0 1.0; 1.0 1.0];
+
+function rhs(t, y)
+    return h*y
+end
+
+refsol = [ 0.173109  1.81331
+           1.81331   1.6402]
+solver = 1
+for solver in solvers
+    if solver in nonconforming_solvers
+        continue
+    end
+    t, y = solver(rhs, y0, tspan)
+    @test norm(y[end]-refsol) < 0.1
+end
 
 ################################################################################
 # TODO: test a vector-like state variable, i.e. one which can be indexed.

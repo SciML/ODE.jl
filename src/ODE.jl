@@ -91,7 +91,7 @@ end
 
 # isoutofdomain takes the state and returns true if state is outside
 # of the allowed domain.  Used in adaptive step-control.
-isoutofdomain(x) = isnan(x)
+isoutofdomain(x) = any(isnan(x))
 
 function make_consistent_types(fn, y0, tspan, btab::Tableau)
     # There are a few types involved in a call to a ODE solver which
