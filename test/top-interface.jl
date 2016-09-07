@@ -21,67 +21,69 @@ solvers = [
            # adaptive
            ODE.ode23s]
 
-for solver in solvers
-    tol = 1e-2
+@testset "Legacy interfaces" begin
+    for solver in solvers
+        @testset "$solver" begin
+            tol = 1e-2
 
-    println("using $solver")
+            # dy
+            # -- = 6 ==> y = 6t
+            # dt
+            # we need to fix initstep for the fixed-step methods
+            t,y=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1)
+            @test maximum(abs(y-6t)) < tol
+            tj,yj=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1, J! = (t,y,dy)->dy[1]=0.0)
+            @test maximum(abs(yj-6tj)) < tol
+            @test norm(yj-y,Inf)<eps(1.)
 
-    # dy
-    # -- = 6 ==> y = 6t
-    # dt
-    # we need to fix initstep for the fixed-step methods
-    t,y=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1)
-    @test maximum(abs(y-6t)) < tol
-    tj,yj=solver((t,y)->6.0, 0., [0:.1:1;], initstep=.1, J! = (t,y,dy)->dy[1]=0.0)
-    @test maximum(abs(yj-6tj)) < tol
-    @test norm(yj-y,Inf)<eps(1.)
+            # dy
+            # -- = 2t ==> y = t.^2
+            # dt
+            t,y  =solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001)
+            @test maximum(abs(y-t.^2)) < tol
+            tj,yj=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001, J! = (t,y,dy)->dy[1]=0.0)
+            @test maximum(abs(yj-tj.^2)) < tol
+            @test norm(yj-y,Inf)<eps(1.)
 
-    # dy
-    # -- = 2t ==> y = t.^2
-    # dt
-    t,y  =solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001)
-    @test maximum(abs(y-t.^2)) < tol
-    tj,yj=solver((t,y)->2t, 0., [0:.001:1;], initstep=0.001, J! = (t,y,dy)->dy[1]=0.0)
-    @test maximum(abs(yj-tj.^2)) < tol
-    @test norm(yj-y,Inf)<eps(1.)
+            # dy
+            # -- = y ==> y = y0*e.^t
+            # dt
+            t,y=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001)
+            @test maximum(abs(y-e.^t)) < tol
+            tj,yj=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
+            @test maximum(abs(yj-e.^tj)) < tol
+            @test norm(yj-y,Inf)<eps(1.)
 
-    # dy
-    # -- = y ==> y = y0*e.^t
-    # dt
-    t,y=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001)
-    @test maximum(abs(y-e.^t)) < tol
-    tj,yj=solver((t,y)->y, 1., [0:.001:1;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
-    @test maximum(abs(yj-e.^tj)) < tol
-    @test norm(yj-y,Inf)<eps(1.)
+            # reverse time integration
+            t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001)
+            @test maximum(abs(y-e.^(t-1))) < tol
+            tj,yj=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
+            @test maximum(abs(yj-e.^(tj-1))) < tol
+            @test norm(yj-y,Inf)<eps(1.)
 
-    # reverse time integration
-    t,y=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001)
-    @test maximum(abs(y-e.^(t-1))) < tol
-    tj,yj=solver((t,y)->y, 1., [1:-.001:0;], initstep=0.001, J! = (t,y,dy)->dy[1]=1.0)
-    @test maximum(abs(yj-e.^(tj-1))) < tol
-    @test norm(yj-y,Inf)<eps(1.)
+            # dv       dw
+            # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
+            # dt       dt
+            #
+            # y = [v, w]
+            t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001)
+            ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
+            @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
+            tj,yj=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001, J! = (t,y,dy)->copy!(dy,Float64[[0,1] [-1,0]]))
+            ysj = hcat(yj...).'   # convert Vector{Vector{Float}} to Matrix{Float}
+            @test maximum(abs(ysj-[cos(tj)-2*sin(tj) 2*cos(tj)+sin(tj)])) < tol
+            @test norm(map(norm,yj-y),Inf)<eps(1.)
 
-    # dv       dw
-    # -- = -w, -- = v ==> v = v0*cos(t) - w0*sin(t), w = w0*cos(t) + v0*sin(t)
-    # dt       dt
-    #
-    # y = [v, w]
-    t,y=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001)
-    ys = hcat(y...).'   # convert Vector{Vector{Float}} to Matrix{Float}
-    @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
-    tj,yj=solver((t,y)->[-y[2]; y[1]], [1., 2.], [0:.001:2*pi;], initstep=0.001, J! = (t,y,dy)->copy!(dy,Float64[[0,1] [-1,0]]))
-    ysj = hcat(yj...).'   # convert Vector{Vector{Float}} to Matrix{Float}
-    @test maximum(abs(ysj-[cos(tj)-2*sin(tj) 2*cos(tj)+sin(tj)])) < tol
-    @test norm(map(norm,yj-y),Inf)<eps(1.)
-
-    # test typeof(tspan)==Vector{Int} does not throw
-    @test_throws ErrorException t,y=solver((t,y)->2y, 0., [0,1])
-    # test typeof(y0)==Vector{Int} does not throw
-    @test_throws ErrorException t,y=solver((t,y)->[2y], [0], [0,1])
-    # test typeof(y0)==Int does not throw
-    @test_throws ErrorException t,y=solver((t,y)->2y, 0, [0,1])
-    # test if we can deal with a mixed case
-    @test_throws ErrorException t,y=solver((t,y)->2y, Number[1,1.1,BigInt(1)], Rational[0,1])
+            # test typeof(tspan)==Vector{Int} does not throw
+            @test_throws ErrorException t,y=solver((t,y)->2y, 0., [0,1])
+            # test typeof(y0)==Vector{Int} does not throw
+            @test_throws ErrorException t,y=solver((t,y)->[2y], [0], [0,1])
+            # test typeof(y0)==Int does not throw
+            @test_throws ErrorException t,y=solver((t,y)->2y, 0, [0,1])
+            # test if we can deal with a mixed case
+            @test_throws ErrorException t,y=solver((t,y)->2y, Number[1,1.1,BigInt(1)], Rational[0,1])
+        end
+    end
 end
 
 # Test negative starting times ODE.ode23s
