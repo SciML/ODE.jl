@@ -31,18 +31,18 @@ immutable AdaptiveOptions{T,N<:Function,O<:Function} <: Options{T}
 end
 
 @compat function (::Type{AdaptiveOptions{T}}){T,N,O}(;
-                                                     tout     = T[Inf],
+                                                     tout     = [T(1//0)],
                                                      tstop    = tout[end],
-                                                     reltol   = eps(T)^T(1//3)/10,
-                                                     abstol   = eps(T)^T(1//2)/10,
-                                                     minstep  = 10*eps(T),
+                                                     reltol   = eps(T)^T(1//3)/T(10),
+                                                     abstol   = eps(T)^T(1//2)/T(10),
+                                                     minstep  = T(10)*eps(T),
                                                      maxstep  = 1/minstep,
                                                      initstep = eps(T)^T(1//3),
-                                                     norm::N  = y->vecnorm(y,Inf),
-                                                     maxiters = T(Inf),
+                                                     norm::N  = y->maxabs(y),
+                                                     maxiters = T(1//0),
                                                      isoutofdomain::O = Base.isnan,
                                                      kargs...)
-    @assert minstep>=0 && maxstep>=0 && initstep>=0 # TODO: move to inner constructor
+    @assert minstep>=T(0) && maxstep>=T(0) && initstep>=T(0) # TODO: move to inner constructor
     AdaptiveOptions{T,N,O}(tstop,reltol,abstol,minstep,maxstep,initstep,norm,maxiters,isoutofdomain)
 end
 
@@ -63,9 +63,9 @@ immutable FixedOptions{T} <: Options{T}
 end
 
 @compat function (::Type{FixedOptions{T}}){T}(;
-                                              tout     = T[Inf],
+                                              tout     = [T(1//0)],
                                               tstop    = tout[end],
-                                              initstep = 10*eps(T),
+                                              initstep = T(1//100),
                                               kargs...)
     @assert initstep>=0
     FixedOptions{T}(tstop,initstep)

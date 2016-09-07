@@ -7,10 +7,24 @@
 # -
 
 
-abstract AbstractIVP{T,Y}
-Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = T,Y,Y
+"""
+    AbstractIVP{T,Y}
+
+The abstract supertype of all IVPs (initial value problems).  The type
+parameters `T` and `Y` correspond to the types of time and state
+variable respectively.
 
 """
+abstract AbstractIVP{T,Y}
+
+"""
+The "elements" of AbstractIVP are `t,y,dy` so the `eltype` returns `Tuple{T,Y,Y}`
+"""
+Base.eltype{T,Y}(::Type{AbstractIVP{T,Y}}) = Tuple{T,Y,Y}
+
+"""
+
+    IVP{T,Y,F,G,J} <: AbstractIVP{T,Y}
 
 Defines the mathematical part of an IVP (initial value problem)
 specified in the general form:
@@ -42,11 +56,13 @@ type IVP{T,Y,F,G,J} <: AbstractIVP{T,Y}
     G!  ::G
     J!  ::J
 end
-@compat Base.eltype(t::Type{IVP}) = eltype(supertype(t))
-Base.eltype(t::IVP) = eltype(typeof(t))
 
 
 """
+
+    typealias ExplicitODE{T,Y,F,J} IVP{T,Y,F,Void,J}
+
+Can be constructed by calling
 
     ODE.ExplicitODE(t0,y0,F!;J!=jacobian))
 
@@ -59,13 +75,16 @@ Explicit ODE representing the problem
 - J!: (optional) computes `J=dF/dy` in place, called with `J!(t,y,J)`
 
 """
-typealias ExplicitODE{T,Y} IVP{T,Y,Function,Void,Function}
+typealias ExplicitODE{T,Y,F,J} IVP{T,Y,F,Void,J}
 @compat function (::Type{ExplicitODE}){T,Y}(t0::T,
                                             y0::Y,
                                             F!::Function;
-                                            J!::Function = forward_jacobian!(F!,similar(y0)),
+                                            J!::Function = forward_jacobian!(F!,copy(y0)),
                                             kargs...)
-    ExplicitODE{T,Y}(t0,y0,similar(y0),F!,nothing,J!)
+    # precompute y'
+    dy0 = copy(y0)
+    F!(t0,y0,dy0)
+    IVP(t0,y0,dy0,F!,nothing,J!)
 end
 
 """
@@ -81,17 +100,19 @@ Implicit ODE representing the problem
       Returns Jacobian in-place in `out`.
 
 """
-typealias ImplicitODE{T,Y} IVP{T,Y,Void,Function,Function}
+typealias ImplicitODE{T,Y,G,J} IVP{T,Y,Void,G,J}
 @compat function (::Type{ImplicitODE}){T,Y}(t0::T,
                                             y0::Y,
                                             G!::Function;
                                             J!::Function = forward_jacobian_implicit!(G!,similar(y0)),
                                             dy0::Y = zero(y0),
                                             kargs...)
-    ImplicitODE{T,Y}(t0,y0,dy0,nothing,G!,J!)
+    IVP(t0,y0,dy0,nothing,G!,J!)
 end
 
 """
+
+    AbstractSolver
 
 The supertype of anything which can get you to a solution of a IVP.
 Subtypes include: `AbstractIntegrator`s but also `DenseOutput`
@@ -99,8 +120,14 @@ Subtypes include: `AbstractIntegrator`s but also `DenseOutput`
 """
 abstract AbstractSolver
 
-legnth(s::AbstractSolver) = error("`length` is not defined for $(typeof(s)).")
+Base.length(s::AbstractSolver) = error("`length` is not defined for $(typeof(s)).")
 
+"""
+
+The fallback generator of an abstract solver, throws an error if the
+solver cannot be generated for the given initial value problem type.
+
+"""
 @compat (::Type{S}){S<:AbstractSolver}(ivp;opts...) =
     error("The solver $S doesn't support IVP of form $(typeof(ivp))")
 
@@ -128,16 +155,6 @@ output(st::AbstractState) = t,y,dy
 """
 output(st::AbstractState) = st.step.t, st.step.y, st.step.dy
 
-
-
-# m3:
-# - docs
-# - maybe use the typevars as defined in make_consistent_types for t,
-#   y, dy?  T->Et, S->Ty
-#   (or something else consistent throughout, maybe nicer would be all
-#   uppercase: ET, EFY, TT, TY).
-# - if find `Step` a bit confusing name, in particular combined with
-#   AbstractIntegrator, but not sure what's better.
 
 """
 
@@ -176,31 +193,42 @@ end
 
 Base.length(prob::Problem) = length(prob.solver)
 
-Base.eltype{O}(::Type{Problem{O}}) = eltype(O)
-Base.eltype{O}(::Problem{O}) = eltype(O)
+Base.eltype{O,S}(::Type{Problem{O,S}}) = eltype(O)
 
 """
-    solve(ivp::IVP, solver::Type{AbstractSolver}, opts...)
-    solve(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
+Makes some generic operations on iterators work, like
+generator comprehensions:
 
-Solve creates an iterable `Problem` instance from an `IVP` instance
+    tgen=(t for (t,y) in sol)
+    tout=collect(tgen)
+
+or
+    errgen=(y-[exp(t)] for (t,y) in sol)
+    errout=collect(errgen)
+"""
+Base.iteratorsize{O,S}(::Type{Problem{O,S}}) = Base.SizeUnknown()
+
+"""
+    iterate(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
+
+Iterate creates an iterable `Problem` instance from an `IVP` instance
 (specifying the math) and from a `Type{AbstractSolver}` (the numerical
 integrator).  The simplest use case is
 
-    for (t,y,dy) in solver(...)
+    for (t,y,dy) in iterate(...)
         # do something with t, y an dy
     end
 
 If the integration interval, defined by the keyword argument `tstop`,
 is finite you can request all the results at once by calling
 
-    collect(solver(...)) # => Vector{Tuple{T,Y,Y}}
+    collect(iterate(...)) # => Vector{Tuple{T,Y,Y}}
 
 Notes:
 
-- usually a solvers requires the ivp to be in a certain form, say an
+- usually solvers require the ivp to be in a certain form, say an
  `ExplicitODE`.
-- the second argument it the *Type* of the solver and not an instance.
+- the second argument is the *Type* of the solver and not an instance.
   The instance of the solve can only be created together with the
   `ivp` as their type parameters need to match.
 
@@ -214,59 +242,93 @@ Output:
 - `::Problem`
 
 """
-function solve(ivp::IVP, solver; opts...)
-    Problem(ivp,solver(ivp;opts...))
+function iterate{S<:AbstractSolver}(ivp::IVP;
+                                    solver::Type{S} = RKIntegratorAdaptive{:rk45},
+                                    opts...)
+    Problem(ivp, solver(ivp; opts...))
 end
 
-function solve{S<:AbstractSolver}(ivp::IVP;
-                                  solver::Type{S} = RKIntegratorAdaptive{:rk45},
-                                  opts...)
-    solve(ivp, solver; opts...)
-end
+"""
+    solve(ivp::IVP; solver=RKIntegratorAdaptive{:rk45}, opts...)
 
-# In Julia 0.5 the collect needs length to be defined, we cannot do
-# that for a Problem but we can implement our own collect
-function collect(prob::Problem)
-    T,Y = eltype(prob)
-    pairs = Array(Tuple{T,Y,Y},0)
-    for (t,y,dy) in prob
-        push!(pairs,(t,copy(y),copy(dy)))
+Solve the initial value problem `ivp` using an algorithm `solver`
+(defaults to Runge-Kutta (4,5) integrator).  One can pass additional
+options to the `solver` via keyword arguments to `solve` (here denoted
+as `options`).  The output is a `Solution` type (currently simply a
+tuple of vectors `(Vector{T},Vector{Y})`, where `T,Y=eltype(ivp)`).
+
+"""
+
+function solve(ivp::IVP; opts...)
+
+    # TODO: perhaps there is a more
+    # graceful way to treat these
+    # cases.  We only care about
+    # infinite `tstop` but if
+    # `tstop` is unspecified it
+    # defaults to `tout[end]`, with
+    # `tout` defaulting to
+    # `[Inf]`.  Maybe we should add
+    # `tout(::Problem)` to fix this?
+    # Or maybe we could store
+    # `tstop` in `Problem`.
+
+    dopts = Dict(opts)
+    if !in(:tstop,keys(dopts)) & !in(:tout,keys(dopts))
+        error("Neither `tstop` nor `tout` was specified.")
     end
-    return pairs
-end
+    if in(:tstop,keys(dopts)) & !isfinite(dopts[:tstop])
+        error("Trying to integrate over an infinite time span, try specifying `|tstop|<Inf`.")
+    end
 
-
-"""
-
-    collect_vectors(prob::Problem)
-
-Input:
-
-- iterator constructed by `solve`
-
-Output:
-
-- `(tout,yout,dyout)` with `tout::Array{T}` containing subsequent
-  times, `yout::Vector{Y}` and `dyout::Vector{Y}` containig the vector
-  of solution and derivative respectively at corresponding `tout`
-  times.  In other words `yout[i]` approximates `y(tout[i])` where `y`
-  is the true solution to an ODE.  It could be interpreted as a
-  transpose of "`collect(prob)`".
-
-"""
-function collect_vectors(prob::Problem)
-    T,Y   = eltype(prob)
-    tout  = Array(T,0)
-    yout  = Array(Y,0)
+    prob = iterate(ivp; opts...)
+    T,Y = eltype(prob).parameters
+    tout = Array(T,0)
+    yout = Array(Y,0)
     dyout = Array(Y,0)
     for (t,y,dy) in prob
         push!(tout,t)
         push!(yout,copy(y))
         push!(dyout,copy(dy))
     end
-    return (tout,yout,dyout)
+    return Solution{T,Y}(tout,yout,dyout)
 end
 
+
+"""
+
+Stores a solution to the `ivp`.
+
+"""
+immutable Solution{T,Y}
+    t::Vector{T}
+    y::Vector{Y}
+    dy::Vector{Y}
+end
+
+"""
+Experimental support for the interpolation
+"""
+function interpolate(sol::Solution, t)
+    if (t>sol.t[end]) | (t<sol.t[1])
+        error("Out of range")
+    else
+        i = findfirst(ti -> t>ti, sol.t)
+        theta = (t-sol.t[i])/(sol.t[i+1]-sol.t[i])
+        return sol.y[i]+theta*(sol.y[i+1]-sol.y[i])
+    end
+end
+
+
+# In Julia 0.5 the collect needs length to be defined, we cannot do
+# that for a Problem but we can implement our own collect
+function collect(prob::Problem)
+    pairs = Array(eltype(prob),0)
+    for (t,y,dy) in prob
+        push!(pairs,(t,copy(y),copy(dy)))
+    end
+    return pairs
+end
 
 
 # Iteration: take one step on a IVP `Problem`
@@ -358,7 +420,7 @@ Input:
 
 Output:
 
-- Bool: `false`: continue iteration, `true`: terminate iteration.
+- Status
 
 substeps.
 
@@ -381,20 +443,6 @@ function onestep!(ivp::IVP, integ::AbstractIntegrator, state::AbstractState)
     end
 end
 
-
-# TODO: the docs here are still confusing, I would rather have a
-# separate type to store the `accepted` step (perhaps `Step`?) and
-# call `trialstep!(solver,state,step)` to fill the `state` with the
-# newly made step, then `accept!(solver,state,step)` would use the
-# data in `state` to fill the `step` with new step.  This way we could
-# also implement a standard `output` function that would work on
-# `step` instead of `state`.  The step would contain the current state
-# of the solution: `(t,y)` at minimum, but it could also be
-# `(t,y,dy,dt)`.  Thoughts?
-#
-#m3: No, that doesn't work if we want to allow zero-allocation
-#    algorithms.  Unless you make `step` part of `state` but then it
-#    becomes pointless.
 
 """
 

@@ -12,7 +12,7 @@ Coding conventions:
 
 Variables and Type variables:
 - T -> t::T
-- Y -> y::Y  TODO: or Vector{Y}?
+- Y -> y::Y
 
 
 """
@@ -48,5 +48,31 @@ include("integrators/rosenbrock.jl")
 
 # User interface to solvers
 include("top-interface.jl")
+
+
+"""
+
+This submodule contains simple test functions for solvers/integrators
+compatible with ODE.jl.  You can use it to test your custom solvers,
+for examples of how to use these functions see our tests in `test/`
+directory.
+
+"""
+module ODETests
+
+import Base.Test: @test, @test_approx_eq_eps
+
+using ODE
+
+import ODE: AbstractIntegrator, AbstractState, ExplicitODE
+
+include("tests/minimal_types.jl")
+include("tests/test_cases.jl")
+
+# Test function for the iterator interface
+include("tests/integrators.jl")
+
+end
+
 
 end # module ODE

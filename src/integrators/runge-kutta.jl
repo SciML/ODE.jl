@@ -20,7 +20,7 @@ immutable TableauRKExplicit{T} <: Tableau{T}
         @assert istril(a)
         @assert s==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<T(1e-10) # consistency.
+        @assert maxabs(sum(a,2)-c'')<T(1//10^10) # consistency.
         isFSAL = (a[end,:]==b[1,:] && c[end]==1)
         new(order,a,b,c,isFSAL,s,name)
     end
@@ -233,7 +233,6 @@ function trialstep!(ode::ExplicitODE, integ::RKIntegratorAdaptive, state::RKStat
     end
 
     if abs(dt) < opts.minstep
-        # TODO: use some sort of logging system
         warn("Minimum step size reached")
         return abort
     end
@@ -354,14 +353,13 @@ function stepsize_hw92!{T}(work,
     #
     # TODO:
     # - allow component-wise reltol and abstol?
-    # - allow other norms
 
-    ord = minimum(order(tableau))
+    ord = T(minimum(order(tableau)))
     timout_after_nan = 5
     # fac = T[0.8, 0.9, (0.25)^(1/(ord+1)), (0.38)^(1/(ord+1))][1]
     fac = T(8//10)
     facmax = T(5) # maximal step size increase. 1.5-5
-    facmin = 1./facmax  # maximal step size decrease. ?
+    facmin = 1/facmax  # maximal step size decrease. ?
     dof = length(last_step.y)
 
     # in-place calculate yerr./tol
@@ -375,13 +373,12 @@ function stepsize_hw92!{T}(work,
             return T(10), dt*facmin, timout_after_nan
         end
 
-        y0 = last_step.y[d] # TODO: is this supposed to be the last successful step?
+        y0 = last_step.y[d]
         y1 = work.ynew[d]    # the approximation to the next step
         sci = (opts.abstol + opts.reltol*max(norm(y0),norm(y1)))
         work.yerr[d] ./= sci # Eq 4.10
     end
 
-    # TOOD: should we use opts.norm here as well?
     err   = opts.norm(work.yerr) # Eq. 4.11
     newdt = sign(dt)*min(opts.maxstep, abs(dt)*clamp(fac*(1/err)^(1/(ord+1)),facmin,facmax)) # Eq 4.13 modified
 

@@ -9,7 +9,7 @@ immutable ModifiedRosenbrockIntegrator{T<:Number} <: AbstractIntegrator
     const_e::T
 end
 
-function ModifiedRosenbrockIntegrator{T}(ode::ExplicitODE{T};opts...)
+function ModifiedRosenbrockIntegrator{T,Y<:AbstractVector}(ode::ExplicitODE{T,Y};opts...)
     const_d = 1/(2+sqrt(T(2)))
     const_e = 6+sqrt(T(2))
 
@@ -73,7 +73,7 @@ function init{T}(ode::ExplicitODE{T},
                             zero(y), # k2
                             zero(y), # k3
                             zero(y), # ynew
-                            dt*0,    # dtnew
+                            zero(dt),    # dtnew
                             jac,       # jac
                             0)       # iters
 
@@ -152,7 +152,7 @@ function errorcontrol!(ode::ExplicitODE,
     err = (abs(dt)/6)*(opts.norm(k1 - 2*k2 + k3))/delta
 
     # new step-size
-    dtnew = td*min(opts.maxstep, abs(dt)*0.8*err^(-1/3) )
+    dtnew = td*min(opts.maxstep, abs(dt)*(8//10)*err^(-1//3) )
 
     # trim in case newdt > dt
     dtnew = td*min(abs(dtnew), abs(opts.tstop-(t+dt)))

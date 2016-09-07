@@ -6,24 +6,20 @@ Dense output options:
 
 - tout    ::Vector{T}  output times
 
-TODO options:
-
-- points   ::Symbol which points are returned: `:specified` only the
-  ones in tspan or `:all` which includes also the step-points of the solver.
-- stopevent   Stop integration at a zero of this function
-- roottol
-
 """
 
 immutable DenseOptions{T<:Number,TO<:AbstractVector} <: Options{T}
     tout::TO
-    # points   ::Symbol
-    # stopevent::S
-    # roottol  ::T
+
+    # Planned options:
+    # - points   ::Symbol which points are returned: `:specified` only the
+    #   ones in tspan or `:all` which includes also the step-points of the solver.
+    # - stopevent   Stop integration at a zero of this function
+    # - roottol
 end
 
 @compat function (::Type{DenseOptions{T}}){T}(;
-                                              tstop                   = T(Inf),
+                                              tstop                   = T(1//0),
                                               tout::AbstractVector{T} = T[tstop],
                                               # points::Symbol= :all,
                                               # stopevent::S  = (t,y)->false,
@@ -49,11 +45,25 @@ end
 Base.length(dense::DenseOutput) = length(dense.opts.tout)
 
 @compat function (::Type{DenseOutput{I}}){T,I}(ivp::IVP{T};
+                                               tstop = T(1//0),
+                                               tout::AbstractVector{T} = T[tstop],
                                                opts...)
+    if all(tout.>=ivp.t0)
+        tout = sort(tout)
+    elseif all(tout.<=ivp.t0)
+        tout = reverse(sort(tout))
+    else
+        error("Elements of tout should all be either to the right or to the left of `t0`.")
+    end
+
+    # normalize `tstop` to the last element of `tout`
+    tstop = tout[end]
+
     # create integrator
-    integ = I(ivp; opts...)
+    integ = I(ivp; tstop=tstop, opts...)
+
     # create dense solver
-    dense_opts = DenseOptions{T}(; opts...)
+    dense_opts = DenseOptions{T}(; tout=tout, opts...)
     dense_solver = DenseOutput(integ, dense_opts)
     return dense_solver
 end
@@ -77,10 +87,10 @@ output(ds::DenseState) = output(ds.step_out)
 function init(ivp::IVP,
               solver::DenseOutput)
     integrator_state = init(ivp, solver.integ)
-    dy0 = similar(ivp.y0)
+    dy0 = copy(ivp.y0)
     ivp.F!(ivp.t0,ivp.y0,dy0)
     step_prev = Step(ivp.t0,copy(ivp.y0),dy0)
-    step_out = Step(ivp.t0,similar(ivp.y0),similar(ivp.y0))
+    step_out = Step(ivp.t0,copy(ivp.y0),copy(ivp.y0))
     return DenseState(1,step_prev,step_out,integrator_state)
 end
 
@@ -133,13 +143,18 @@ step before `tout` and `t2` is `>=tout`.  In other words
 `tout∈[t1,t2]`.
 """
 function next_interval!(ivp, integ, istate, step_prev, tout)
-    td = tdir(ivp, integ)
     while true
         # get the current time
         t1   = step_prev.t
         t2,_ = output(istate)
 
-        if td*t1 <= td*tout <= td*t2
+        # in case we are integrating backwards in time reverse the
+        # time interval
+        if t2 < t1
+            t1, t2 = t2, t1
+        end
+
+        if t1 <= tout <= t2
             # we found the enclosing times
             return cont
         end
