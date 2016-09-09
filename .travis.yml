@@ -3,7 +3,7 @@ os:
     - osx
     - linux
 julia:
-    - release
+#    - release
     - nightly
 git:
     depth: 999999
