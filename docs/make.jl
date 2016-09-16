@@ -20,6 +20,6 @@ deploydocs(
            repo = "github.com/JuliaODE/ODE.jl.git",
            target = "build",
            julia = "0.5",
-           deps = nothing,
+           deps = Deps.pip("pygments", "python-markdown-math"),
            make = nothing
            )
