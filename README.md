@@ -3,9 +3,8 @@ Various basic Ordinary Differential Equation solvers implemented in Julia.
 [![Join the chat at https://gitter.im/pwl/ODE.jl](https://badges.gitter.im/pwl/ODE.jl.svg)](https://gitter.im/pwl/ODE.jl?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Build Status](https://travis-ci.org/JuliaODE/ODE.jl.svg?branch=master)](https://travis-ci.org/JuliaODE/ODE.jl)
 [![Coverage Status](https://img.shields.io/coveralls/JuliaODE/ODE.jl.svg)](https://coveralls.io/r/JuliaODE/ODE.jl)
-[![ODE](http://pkg.julialang.org/badges/ODE_0.4.svg)](http://pkg.julialang.org/?pkg=ODE&ver=0.4)
 [![ODE](http://pkg.julialang.org/badges/ODE_0.5.svg)](http://pkg.julialang.org/?pkg=ODE&ver=0.5)
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaODE.github.io/ODE.jl/stable)
+<!-- [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaODE.github.io/ODE.jl/stable) -->
 [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://JuliaODE.github.io/ODE.jl/latest)
 
 Pull requests are always highly welcome to fix bugs, add solvers, or anything else!
