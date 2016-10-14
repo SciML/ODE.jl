@@ -40,6 +40,14 @@ for solver in solvers
     t,y=solver((t,y)->2t, 0., [0:.001:1;])
     @test maximum(abs(y-t.^2)) < tol
 
+    # test typeof(tspan)==Vector{Int} does not throw
+    t,y=solver((t,y)->2t, 0., [0,1])
+    if !(solver in [ODE.ode4s_s, ODE.ode4s_kr, ODE.ode23s])
+        # test typeof(y0)==Vector{Int} does not throw
+        t,y=solver((t,y)->[2t], [0], [0,1])
+        # test typeof(y0)==Int does not throw
+        t,y=solver((t,y)->2t, 0, [0,1])
+    end
 
     # dy
     # -- = y ==> y = y0*e.^t
