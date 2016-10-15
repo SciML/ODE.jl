@@ -15,7 +15,7 @@ There are currently discussions about how the Julian API for ODE solvers should 
 
 The first release, v0.1, contains the basic functionality that was moved here when the package was originally moved from Base. Although quite poorly tested, at least some of the functionality is quite reliable. However, that version is almost entirely undocumented, and will probably stay that way.
 
-Since then, quite a lot has happened in the package, and the best way to use current ODE.jl is by checking out the latest master with `Pkg.checkout("ODE")`. By doing so, you get access to a new, better API -- but be careful; several breaking changes have been introduced since v0.1. Therefore, the best way to learn the current API is to read the source. (The documentation in [http://github.com/JuliaLang/ODE.jl/master/blobs/doc/api.md](doc/api.md) is to be regarded as a wishlist, where some but not all of the features have been implemented as of yet).
+Since then, quite a lot has happened in the package, and the best way to use current ODE.jl is by checking out the latest master with `Pkg.checkout("ODE")`. By doing so, you get access to a new, better API -- but be careful; several breaking changes have been introduced since v0.1. Therefore, the best way to learn the current API is to read the source. (The documentation in [http://github.com/JuliaDiffEq/ODE.jl/master/blobs/doc/api.md](doc/api.md) is to be regarded as a wishlist, where some but not all of the features have been implemented as of yet).
 
 Currently, `ODE` exports the following adaptive solvers:
 
