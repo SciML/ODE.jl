@@ -45,19 +45,42 @@ ODE.isoutofdomain(y::CompSol) = any(isnan, vcat(y.rho[:], y.x, y.p))
 
 
 ################################################################################
- 
+# TODO: test a vector-like state variable, i.e. one which can be indexed.
+function getZeroVector(y::Array{CompSol,1})
+    numElems = length(y)
+    tmp = Array{CompSol,1}(numElems)
+    for i = 1:numElems
+        tmp[i] = CompSol(complex(zeros(2,2)), 0., 0.)
+    end
+    return tmp
+end
+Base.zeros(y::Array{CompSol,1}) = getZeroVector(y)
+
+function getAbsVector(y::Array{CompSol,1})
+    numElems = length(y)
+    absVec = Array{Float64}(numElems)
+    for i = 1:numElems
+        absVec[i] = norm(y[i], 2.)
+    end
+    return absVec
+end
+Base.abs(y::Array{CompSol,1}) = getAbsVector(y)
+
+
+################################################################################
+
 # define RHSs of differential equations
 # delta, V and g are parameters
 function rhs(t, y, delta, V, g)
   H = [[-delta/2 V]; [V delta/2]]
- 
+
   rho_dot = -im*H*y.rho + im*y.rho*H
   x_dot = y.p
   p_dot = -y.x
- 
+
   return CompSol( rho_dot, x_dot, p_dot)
 end
- 
+
 # inital conditons
 rho0 = zeros(2,2);
 rho0[1,1]=1.;
@@ -77,6 +100,3 @@ for solver in solvers
     @test norm(y1[end]-y2[end])<0.1
 end
 println("ok.")
-
-################################################################################
-# TODO: test a vector-like state variable, i.e. one which can be indexed.

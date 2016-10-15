@@ -75,7 +75,7 @@ let
         ydot
     end
     t = [0., 1e11]
-    t,y = ode23s(f, [1.0, 0.0, 0.0], t; abstol=1e-8, reltol=1e-8,
+    t,y = ode23s(f, [1.0, 0.0, 0.0], t; abstol=1e-9*ones(3), reltol=1e-9*ones(3),
                                         maxstep=1e11/10, minstep=1e11/1e18)
 
     refsol = [0.2083340149701255e-07,
@@ -83,6 +83,7 @@ let
               0.9999999791665050] # reference solution at tspan[2]
     @test norm(refsol-y[end], Inf) < 2e-10
 end
+
 include("interface-tests.jl")
 
 println("All looks OK")

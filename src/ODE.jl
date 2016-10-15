@@ -62,14 +62,14 @@ Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert met
 
 # estimator for initial step based on book
 # "Solving Ordinary Differential Equations I" by Hairer et al., p.169
-function hinit(F, x0, t0, tend, p, reltol, abstol)
+function hinit(F, x0, t0, tend, p, reltol, abstol, norm)
     # Returns first step, direction of integration and F evaluated at t0
     tdir = sign(tend-t0)
     tdir==0 && error("Zero time span")
-    tau = max(reltol*norm(x0, Inf), abstol)
-    d0 = norm(x0, Inf)/tau
+    tau = max(reltol.*abs(x0), abstol)
+    d0 = norm(x0./tau)
     f0 = F(t0, x0)
-    d1 = norm(f0, Inf)/tau
+    d1 = norm(f0./tau)
     if d0 < 1e-5 || d1 < 1e-5
         h0 = 1e-6
     else
@@ -79,7 +79,7 @@ function hinit(F, x0, t0, tend, p, reltol, abstol)
     x1 = x0 + tdir*h0*f0
     f1 = F(t0 + tdir*h0, x1)
     # estimate second derivative
-    d2 = norm(f1 - f0, Inf)/(tau*h0)
+    d2 = norm((f1 - f0)./tau)/h0
     if max(d1, d2) <= 1e-15
         h1 = max(1e-6, 1e-3*h0)
     else
@@ -220,6 +220,40 @@ function fdjacobian(F, x, t)
     return dFdx
 end
 
+## Function to get the Scaled error given the error estimate
+# The following 3 functions are for the stiff solver
+# If both reltol and abstol are scalars then restore previous behaviour 
+function getScaledError(y,ynew,errEstimate,h,reltol::Number,abstol::Number,norm)
+	return (abs(h)/6)*norm(errEstimate)/max(reltol*max(norm(y),norm(ynew)), abstol) # scaled error estimate
+end
+# If atleast one of them is a vector then perform component-wise computations
+function getScaledError(y,ynew,errEstimate,h,reltol::Number,abstol::Vector,norm)
+	return (abs(h)/6)*norm((errEstimate)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate
+end
+function getScaledError(y,ynew,errEstimate,h,reltol::Vector,abstol,norm)
+	return (abs(h)/6)*norm((errEstimate)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate 
+end
+# The following 2 functions are for the non-stiff solvers since it requires dof check
+# As per the old code, the error estimate is rewritten with the scaled error
+# Estimates the error and a new step size following Hairer &
+# Wanner 1992, p167 (with some modifications)
+function getScaledError!(y,ynew,errEstimate,reltol::Number,abstol::Number,norm,dof)
+	for d=1:dof
+    	# if outside of domain (usually NaN) then make step size smaller by maximum
+    	isoutofdomain(ynew[d]) && return true
+    	errEstimate[d] = errEstimate[d]/(abstol + max(abs(y[d]), abs(ynew[d]))*reltol) # Eq 4.10
+    end
+	return false
+end
+function getScaledError!(y,ynew,errEstimate,reltol::Vector,abstol::Vector,norm,dof)
+	for d=1:dof
+    	# if outside of domain (usually NaN) then break and return
+    	isoutofdomain(ynew[d]) && return true
+    	errEstimate[d] = errEstimate[d]/(abstol[d] + max(abs(y[d]), abs(ynew[d]))*reltol[d]) # Eq 4.10
+	end
+	return false
+end
+
 # ODE23S  Solve stiff systems based on a modified Rosenbrock triple
 # (also used by MATLAB's ODE23s); see Sec. 4.1 in
 #
@@ -251,13 +285,17 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
 
     # initialization
     t = tspan[1]
+    
+    # Component-wise Tolerance check similar to the non-stiff solvers
+    @assert length(abstol) == 1 || length(abstol) == length(y0) "Dimension of Absolute tolerance does not match the dimension of the problem"
+    @assert length(reltol) == 1 || length(reltol) == length(y0) "Dimension of Absolute tolerance does not match the dimension of the problem"
 
     tfinal = tspan[end]
 
     h = initstep
     if h == 0.
         # initial guess at a step size
-        h, tdir, F0 = hinit(F, y0, t, tfinal, 3, reltol, abstol)
+        h, tdir, F0 = hinit(F, y0, t, tfinal, 3, reltol, abstol, norm)
     else
         tdir = sign(tfinal - t)
         F0 = F(t,y0)
@@ -300,11 +338,19 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         F2 = F(t + h, ynew)
         k3 = W\(F2 - e32*(k2 - F1) - 2*(k1 - F0) + T )
 
-        err = (abs(h)/6)*norm(k1 - 2*k2 + k3) # error estimate
-        delta = max(reltol*max(norm(y),norm(ynew)), abstol) # allowable error
+		# If reltol and abstol are vectors
+		# restore old behvaiour
+		# else perform component-wise computations for error
+		errEstimate = k1 - 2*k2 + k3;
+		err = getScaledError(y,ynew,errEstimate,h,reltol,abstol,norm)
+		#if length(abstol) == 1 && length(reltol) == 1
+		#	err = (abs(h)/6)*norm(k1 - 2*k2 + k3)/max(reltol*max(norm(y),norm(ynew)), abstol) # scaled error estimate
+		#else
+		#	err = (abs(h)/6)*norm((k1 - 2*k2 + k3)./max(reltol.*max(abs(y),abs(ynew)),abstol)) # scaled error estimate 
+	    #end
 
         # check if new solution is acceptable
-        if  err <= delta
+        if  err <= 1
 
             if points==:specified || points==:all
                 # only points in tspan are requested
@@ -334,7 +380,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         end
 
         # update of the step size
-        h = tdir*min( maxstep, abs(h)*0.8*(delta/err)^(1/3) )
+        h = tdir*min( maxstep, abs(h)*0.8*(1/err)^(1/3) )
     end
 
     return tout, yout
