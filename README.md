@@ -48,7 +48,3 @@ The examples directory contain a few notebooks that show how to get started. You
 * [Simple differential equation](http://nbviewer.jupyter.org/github/JuliaLang/ODE.jl/blob/master/examples/Simple_Differential_Equation.ipynb)
 * [Lorenz Attractor](http://nbviewer.jupyter.org/github/JuliaLang/ODE.jl/blob/master/examples/Lorenz_Attractor.ipynb)
 * [Terminal Velocity](http://nbviewer.jupyter.org/github/JuliaLang/ODE.jl/blob/master/examples/Terminal_Velocity.ipynb)
-
-# Need something long-term reliable right now?
-
-See [the Sundials.jl package](https://github.com/julialang/sundials.jl), which provides wrappers for the excellent Sundials ODE solver library.
