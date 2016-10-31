@@ -20,7 +20,12 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert istril(a)
         @assert S==length(c)==size(a,1)==size(a,2)==size(b,2)
         @assert size(b,1)==length(order)
-        @assert norm(sum(a,2)-c'',Inf)<1e-10 # consistency.
+        # consistency:
+        if T<:AbstractFloat
+            @assert norm(sum(a,2)-c'',Inf) < 100*eps(T)
+        else
+            @assert norm(sum(a,2)-c'',Inf) < 100*eps(Float64)
+        end
         new(order,a,b,c)
     end
 end
@@ -225,7 +230,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
                           norm=Base.norm,
                           minstep=abs(tspan[end] - tspan[1])/1e18,
                           maxstep=abs(tspan[end] - tspan[1])/2.5,
-                          initstep=0.,
+                          initstep=0,
                           points=:all
                           )
     # Needed interface:
@@ -296,7 +301,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
         err, newdt, timeout = stepsize_hw92!(dt, tdir, y, ytrial, yerr, order, timeout,
                                             dof, abstol, reltol, maxstep, norm)
 
-        if err<=1.0 # accept step
+        if err<=1 # accept step
             # diagnostics
             steps[1] +=1
             push!(dts, dt)
@@ -338,7 +343,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
             dt = newdt
 
             # Hit end point exactly if next step within 1% of end:
-            if tdir*(t+dt*1.01) >= tdir*tend
+            if tdir*(t+dt+dt/100) >= tdir*tend
                 dt = tend-t
                 islaststep = true # next step is the last, if it succeeds
             end
@@ -385,7 +390,7 @@ function rk_embedded_step!{N,S}(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab:
     end
 end
 
-function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
+function stepsize_hw92!{T}(dt::T, tdir, x0, xtrial, xerr, order,
                        timeout, dof, abstol, reltol, maxstep, norm)
     # Estimates the error and a new step size following Hairer &
     # Wanner 1992, p167 (with some modifications)
@@ -394,6 +399,8 @@ function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
     # decremented in here.
     #
     # Returns the error, newdt and the number of timeout-steps
+    #
+    # The work-array xerr is modified in-place
     #
     # TODO:
     # - allow component-wise reltol and abstol?
@@ -404,18 +411,21 @@ function stepsize_hw92!(dt, tdir, x0, xtrial, xerr, order,
     # On y0 container: norm, get/setindex
 
     timout_after_nan = 5
-    fac = [0.8, 0.9, 0.25^(1/(order+1)), 0.38^(1/(order+1))][1]
-    facmax = 5.0 # maximal step size increase. 1.5-5
-    facmin = 1./facmax  # maximal step size decrease. ?
+    fac = T[0.8, 0.9, 0.25^(1/(order+1)), 0.38^(1/(order+1))][1]
+    facmax = T(5) # maximal step size increase. 1.5-5
+    facmin = T(1)/T(facmax)  # maximal step size decrease. ?
+    maxstep = T(maxstep)
+    abstol = T(abstol)
+    reltol = T(reltol)
 
     # in-place calculate xerr./tol
     for d=1:dof
         # if outside of domain (usually NaN) then make step size smaller by maximum
-        isoutofdomain(xtrial[d]) && return 10., dt*facmin, timout_after_nan
+        isoutofdomain(xtrial[d]) && return T(10), dt*facmin, timout_after_nan
         xerr[d] = xerr[d]/(abstol + max(norm(x0[d]), norm(xtrial[d]))*reltol) # Eq 4.10
     end
     err = norm(xerr, 2) # Eq. 4.11
-    newdt = min(maxstep, tdir*dt*max(facmin, fac*(1/err)^(1/(order+1)))) # Eq 4.13 modified
+    newdt = min(maxstep, tdir*dt*max(facmin, fac*(1/err)^(T(1/(order+1)))) ) # Eq 4.13 modified
     if timeout>0
         newdt = min(newdt, dt)
         timeout -= 1

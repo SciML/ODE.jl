@@ -62,7 +62,7 @@ Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert met
 
 # estimator for initial step based on book
 # "Solving Ordinary Differential Equations I" by Hairer et al., p.169
-function hinit(F, x0, t0, tend, p, reltol, abstol)
+function hinit{T}(F, x0, t0::T, tend, p, reltol, abstol)
     # Returns first step, direction of integration and F evaluated at t0
     tdir = sign(tend-t0)
     tdir==0 && error("Zero time span")
@@ -75,17 +75,19 @@ function hinit(F, x0, t0, tend, p, reltol, abstol)
     else
         h0 = 0.01*(d0/d1)
     end
+    h0 = convert(T,h0)
     # perform Euler step
     x1 = x0 + tdir*h0*f0
     f1 = F(t0 + tdir*h0, x1)
     # estimate second derivative
     d2 = norm(f1 - f0, Inf)/(tau*h0)
     if max(d1, d2) <= 1e-15
-        h1 = max(1e-6, 1e-3*h0)
+        h1 = max(T(10)^(-6), T(10)^(-3)*h0)
     else
-        pow = -(2. + log10(max(d1, d2)))/(p + 1.)
-        h1 = 10.^pow
+        pow = -(2 + log10(max(d1, d2)))/(p + 1)
+        h1 = 10^pow
     end
+    h1 = convert(T,h1)
     return tdir*min(100*h0, h1, tdir*(tend-t0)), tdir, f0
 end
 
