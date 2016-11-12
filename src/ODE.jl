@@ -281,14 +281,14 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
         end
 
         if size(J,1) == 1
-            W = one(J) - h*d*J
+            W = I - h*d*J
         else
             # note: if there is a mass matrix M on the lhs of the ODE, i.e.,
             #   M * dy/dt = F(t,y)
             # we can simply replace eye(J) by M in the following expression
             # (see Sec. 5 in [SR97])
 
-            W = lufact( eye(J) - h*d*J )
+            W = lufact( I - h*d*J )
         end
 
         # approximate time-derivative of F
@@ -363,12 +363,8 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
         hs = h[solstep]
         xs = x[solstep]
         dFdx = G(ts, xs)
-        # FIXME
-        if size(dFdx,1) == 1
-            jac = 1/gamma/hs - dFdx[1]
-        else
-            jac = eye(dFdx)/gamma/hs - dFdx
-        end
+
+        jac = I/(gamma*hs) - dFdx
 
         g = Array(typeof(x0), size(a,1))
         g[1] = (jac \ F(ts + b[1]*hs, xs))
