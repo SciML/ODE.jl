@@ -5,6 +5,9 @@ module ODE
 
 using Polynomials
 using Compat
+using DiffEqBase
+
+import DiffEqBase: solve
 
 ## minimal function export list
 # adaptive non-stiff:
@@ -422,5 +425,8 @@ const ms_coefficients4 = [ 1      0      0     0
                           5/12  -4/3  23/12 0
                           -9/24   37/24 -59/24 55/24]
 
+####### Common Interface Bindings
+
+include("common.jl")
 
 end # module ODE
