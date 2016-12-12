@@ -2,28 +2,20 @@ using ODE, DiffEqBase, DiffEqProblemLibrary
 
 dt=1/2^(4)
 
+algs = [ode23(),ode45(),ode78(),ode4(),ode4ms(),ode4s()] # no ode23s
+
+# Check for errors
+
 prob = prob_ode_linear
 
-sol =solve(prob,ODE.ode23();dt=dt)
-# plot(sol,plot_analytic=true)
-
-sol =solve(prob,ode23s();dt=dt)
-sol =solve(prob,ode45();dt=dt)
-sol =solve(prob,ode78();dt=dt)
-
-sol =solve(prob,ode4();dt=dt)
-sol =solve(prob,ode4ms();dt=dt)
-sol =solve(prob,ode4s();dt=dt)
+for alg in algs
+  sol =solve(prob,alg;dt=dt,abstol=1e-6,reltol=1e-3)
+  @test typeof(sol[2]) <: Number
+end
 
 prob = prob_ode_2Dlinear
 
-sol =solve(prob,ode23();dt=dt,dtmin=eps())
-# plot(sol,plot_analytic=true)
-
-sol =solve(prob,ode23s();dt=dt)
-sol =solve(prob,ode45();dt=dt)
-sol =solve(prob,ode78();dt=dt)
-
-sol =solve(prob,ode4();dt=dt)
-sol =solve(prob,ode4ms();dt=dt)
-sol =solve(prob,ode4s();dt=dt)
+for alg in algs
+  sol =solve(prob,alg;dt=dt,dtmin=eps(),abstol=1e-6,reltol=1e-3)
+  @test size(sol[2]) == (4,2)
+end
