@@ -1,9 +1,3 @@
-abstract ODEJLAlgorithm <: AbstractODEAlgorithm
-immutable ode23Alg <: ODEJLAlgorithm end
-immutable ode45Alg <: ODEJLAlgorithm end
-immutable ode23sAlg <: ODEJLAlgorithm end
-immutable ode78Alg <: ODEJLAlgorithm end
-
 function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractODEProblem{uType,tType,isinplace,F},
     alg::algType,timeseries=[],ts=[],ks=[];dense=true,save_timeseries=true,
     saveat=tType[],timeseries_errors=true,reltol = 1e-5, abstol = 1e-8,
@@ -44,7 +38,7 @@ function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractOD
         u0 = prob.u0
     end
 
-    if typeof(alg) <: ode23Alg
+    if typeof(alg) <: ode23
         ts,timeseries_tmp = ODE.ode23(f,u0,Ts,
                           norm = norm,
                           abstol=abstol,
@@ -53,7 +47,7 @@ function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractOD
                           minstep=dtmin,
                           initstep=dt,
                           points=points)
-    elseif typeof(alg) <: ode45Alg
+    elseif typeof(alg) <: ode45
         ts,timeseries_tmp = ODE.ode45(f,u0,Ts,
                           norm = norm,
                           abstol=abstol,
@@ -62,7 +56,7 @@ function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractOD
                           minstep=dtmin,
                           initstep=dt,
                           points=points)
-    elseif typeof(alg) <: ode78Alg
+    elseif typeof(alg) <: ode78
         ts,timeseries_tmp = ODE.ode78(f,u0,Ts,
                           norm = norm,
                           abstol=abstol,
@@ -71,8 +65,35 @@ function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractOD
                           minstep=dtmin,
                           initstep=dt,
                           points=points)
-    elseif typeof(alg) <: ode23sAlg
+    elseif typeof(alg) <: ode23s
         ts,timeseries_tmp = ODE.ode23s(f,u0,Ts,
+                          norm = norm,
+                          abstol=abstol,
+                          reltol=reltol,
+                          maxstep=dtmax,
+                          minstep=dtmin,
+                          initstep=dt,
+                          points=points)
+    elseif typeof(alg) <: ode4
+        ts,timeseries_tmp = ODE.ode4(f,u0,Ts,
+                          norm = norm,
+                          abstol=abstol,
+                          reltol=reltol,
+                          maxstep=dtmax,
+                          minstep=dtmin,
+                          initstep=dt,
+                          points=points)
+    elseif typeof(alg) <: ode4ms
+        ts,timeseries_tmp = ODE.ode4ms(f,u0,Ts,
+                          norm = norm,
+                          abstol=abstol,
+                          reltol=reltol,
+                          maxstep=dtmax,
+                          minstep=dtmin,
+                          initstep=dt,
+                          points=points)
+    elseif typeof(alg) <: ode4s
+        ts,timeseries_tmp = ODE.ode4s(f,u0,Ts,
                           norm = norm,
                           abstol=abstol,
                           reltol=reltol,

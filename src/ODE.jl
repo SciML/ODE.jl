@@ -9,6 +9,8 @@ using DiffEqBase
 
 import DiffEqBase: solve
 
+include("algorithm_types.jl")
+
 ## minimal function export list
 # adaptive non-stiff:
 export ode23, ode45, ode78

@@ -216,7 +216,7 @@ ode23(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_rk23; kwargs...)
 ode45_fe(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_rk45; kwargs...)
 ode45_dp(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_dopri5; kwargs...)
 # Use Dormand-Prince version of ode45 by default
-const ode45 = ode45_dp
+ode45(fn, y0, tspan; kwargs...) = ode45_dp(fn, y0, tspan; kwargs...)
 ode78(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_feh78; kwargs...)
 
 function oderk_adapt(fn, y0, tspan, btab::TableauRKExplicit; kwords...)
