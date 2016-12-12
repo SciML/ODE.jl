@@ -420,7 +420,7 @@ const s4_coefficients = (0.5,
 ode4s_s(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, s4_coefficients...; jacobian=jacobian)
 
 # Use Shampine coefficients by default (matching Numerical Recipes)
-const ode4s = ode4s_s
+ode4s(F, x0, tspan; jacobian=nothing) = ode4s_s(F, x0, tspan; jacobian=nothing)
 
 const ms_coefficients4 = [ 1      0      0     0
                           -1/2    3/2    0     0

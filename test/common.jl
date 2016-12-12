@@ -11,6 +11,10 @@ sol =solve(prob,ode23s();dt=dt)
 sol =solve(prob,ode45();dt=dt)
 sol =solve(prob,ode78();dt=dt)
 
+sol =solve(prob,ode4();dt=dt)
+sol =solve(prob,ode4ms();dt=dt)
+sol =solve(prob,ode4s();dt=dt)
+
 prob = prob_ode_2Dlinear
 
 sol =solve(prob,ode23();dt=dt,dtmin=eps())
@@ -19,3 +23,7 @@ sol =solve(prob,ode23();dt=dt,dtmin=eps())
 sol =solve(prob,ode23s();dt=dt)
 sol =solve(prob,ode45();dt=dt)
 sol =solve(prob,ode78();dt=dt)
+
+sol =solve(prob,ode4();dt=dt)
+sol =solve(prob,ode4ms();dt=dt)
+sol =solve(prob,ode4s();dt=dt)
