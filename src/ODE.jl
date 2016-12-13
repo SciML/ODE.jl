@@ -157,7 +157,7 @@ include("runge_kutta.jl")
 
 # ODE_MS Fixed-step, fixed-order multi-step numerical method
 #   with Adams-Bashforth-Moulton coefficients
-function ode_ms(F, x0, tspan, order::Integer)
+function ode_ms(F, x0, tspan, order::Integer; kwargs...)
     h = diff(tspan)
     x = Array(typeof(x0), length(tspan))
     x[1] = x0
@@ -194,8 +194,8 @@ function ode_ms(F, x0, tspan, order::Integer)
 end
 
 # Use order 4 by default
-ode4ms(F, x0, tspan) = ode_ms(F, x0, tspan, 4)
-ode5ms(F, x0, tspan) = ODE.ode_ms(F, x0, tspan, 5)
+ode4ms(F, x0, tspan; kwargs...) = ode_ms(F, x0, tspan, 4; kwargs...)
+ode5ms(F, x0, tspan; kwargs...) = ODE.ode_ms(F, x0, tspan, 5; kwargs...)
 
 ###############################################################################
 ## STIFF SOLVERS
@@ -350,7 +350,7 @@ end
 
 #ODEROSENBROCK Solve stiff differential equations, Rosenbrock method
 #   with provided coefficients.
-function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing)
+function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing, kwargs...)
 
     if typeof(jacobian) == Function
         G = jacobian
@@ -403,7 +403,7 @@ const kr4_coefficients = (0.231,
                             6.02015272865   0.1597500684673  0        0
                            -1.856343618677 -8.50538085819   -2.08407513602 0],)
 
-ode4s_kr(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, kr4_coefficients...; jacobian=jacobian)
+ode4s_kr(F, x0, tspan; jacobian=nothing, kwargs...) = oderosenbrock(F, x0, tspan, kr4_coefficients...; jacobian=jacobian, kwargs...)
 
 # Shampine coefficients
 const s4_coefficients = (0.5,
@@ -417,10 +417,11 @@ const s4_coefficients = (0.5,
                            372/25   12/5    0   0
                           -112/125 -54/125 -2/5 0],)
 
-ode4s_s(F, x0, tspan; jacobian=nothing) = oderosenbrock(F, x0, tspan, s4_coefficients...; jacobian=jacobian)
+ode4s_s(F, x0, tspan; jacobian=nothing, kwargs...) =
+      oderosenbrock(F, x0, tspan, s4_coefficients...; jacobian=jacobian, kwargs...)
 
 # Use Shampine coefficients by default (matching Numerical Recipes)
-ode4s(F, x0, tspan; jacobian=nothing) = ode4s_s(F, x0, tspan; jacobian=nothing)
+ode4s(F, x0, tspan; jacobian=nothing, kwargs...) = ode4s_s(F, x0, tspan; jacobian=nothing, kwargs...)
 
 const ms_coefficients4 = [ 1      0      0     0
                           -1/2    3/2    0     0

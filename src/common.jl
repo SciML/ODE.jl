@@ -1,5 +1,5 @@
-function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractODEProblem{uType,tType,isinplace,F},
-    alg::algType,timeseries=[],ts=[],ks=[];dense=true,save_timeseries=true,
+function solve{uType,tType,isinplace,AlgType<:ODEJLAlgorithm,F}(prob::AbstractODEProblem{uType,tType,isinplace,F},
+    alg::AlgType,timeseries=[],ts=[],ks=[];dense=true,save_timeseries=true,
     saveat=tType[],timeseries_errors=true,reltol = 1e-5, abstol = 1e-8,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
@@ -38,42 +38,15 @@ function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractOD
         u0 = prob.u0
     end
 
-    if typeof(alg) <: ode23
-        ts,timeseries_tmp = ODE.ode23(f,u0,Ts,
-                          norm = norm,
-                          abstol=abstol,
-                          reltol=reltol,
-                          maxstep=dtmax,
-                          minstep=dtmin,
-                          initstep=dt,
-                          points=points)
-    elseif typeof(alg) <: ode45
-        ts,timeseries_tmp = ODE.ode45(f,u0,Ts,
-                          norm = norm,
-                          abstol=abstol,
-                          reltol=reltol,
-                          maxstep=dtmax,
-                          minstep=dtmin,
-                          initstep=dt,
-                          points=points)
-    elseif typeof(alg) <: ode78
-        ts,timeseries_tmp = ODE.ode78(f,u0,Ts,
-                          norm = norm,
-                          abstol=abstol,
-                          reltol=reltol,
-                          maxstep=dtmax,
-                          minstep=dtmin,
-                          initstep=dt,
-                          points=points)
-    elseif typeof(alg) <: ode23s
-        ts,timeseries_tmp = ODE.ode23s(f,u0,Ts,
-                          norm = norm,
-                          abstol=abstol,
-                          reltol=reltol,
-                          maxstep=dtmax,
-                          minstep=dtmin,
-                          initstep=dt,
-                          points=points)
+    ts,timeseries_tmp = AlgType(f,u0,Ts;
+                      norm = norm,
+                      abstol=abstol,
+                      reltol=reltol,
+                      maxstep=dtmax,
+                      minstep=dtmin,
+                      initstep=dt,
+                      points=points)
+                      #=
     elseif typeof(alg) <: ode4
         ts,timeseries_tmp = ODE.ode4(f,u0,Ts)
     elseif typeof(alg) <: ode4ms
@@ -81,6 +54,7 @@ function solve{uType,tType,isinplace,algType<:ODEJLAlgorithm,F}(prob::AbstractOD
     elseif typeof(alg) <: ode4s
         ts,timeseries_tmp = ODE.ode4s(f,u0,Ts)
     end
+    =#
 
     # Reshape the result if needed
     if uType <: AbstractArray
