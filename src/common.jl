@@ -46,15 +46,6 @@ function solve{uType,tType,isinplace,AlgType<:ODEJLAlgorithm,F}(prob::AbstractOD
                       minstep=dtmin,
                       initstep=dt,
                       points=points)
-                      #=
-    elseif typeof(alg) <: ode4
-        ts,timeseries_tmp = ODE.ode4(f,u0,Ts)
-    elseif typeof(alg) <: ode4ms
-        ts,timeseries_tmp = ODE.ode4ms(f,u0,Ts)
-    elseif typeof(alg) <: ode4s
-        ts,timeseries_tmp = ODE.ode4s(f,u0,Ts)
-    end
-    =#
 
     # Reshape the result if needed
     if uType <: AbstractArray
