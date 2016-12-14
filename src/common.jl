@@ -60,5 +60,3 @@ function solve{uType,tType,isinplace,AlgType<:ODEJLAlgorithm,F}(prob::AbstractOD
     build_solution(prob,alg,ts,timeseries,
                  timeseries_errors = timeseries_errors)
 end
-
-export ODEJLAlgorithm, ode23Alg, ode23sAlg, ode45Alg, ode78Alg

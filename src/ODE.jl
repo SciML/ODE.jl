@@ -21,6 +21,9 @@ export ode23s
 # non-adaptive stiff:
 export ode4s
 
+# Common Interface
+export ODEJLAlgorithm
+
 ## complete function export list: see runtests.jl
 
 ###############################################################################
