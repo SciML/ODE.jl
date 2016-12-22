@@ -165,9 +165,9 @@ const bt_feh78 = TableauRKExplicit(:feh78, (7,8), Rational{Int64},
 ode1(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_feuler)
 ode2_midpoint(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_midpoint)
 ode2_heun(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_heun)
-ode4(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_rk4)
+ode4(fn, y0, tspan;kwargs...) = oderk_fixed(fn, y0, tspan, bt_rk4;kwargs...)
 
-function oderk_fixed(fn, y0, tspan, btab::TableauRKExplicit)
+function oderk_fixed(fn, y0, tspan, btab::TableauRKExplicit;kwargs...)
     # Non-arrays y0 treat as scalar
     fn_(t, y) = [fn(t, y[1])]
     t,y = oderk_fixed(fn_, [y0], tspan, btab)
@@ -216,7 +216,7 @@ ode23(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_rk23; kwargs...)
 ode45_fe(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_rk45; kwargs...)
 ode45_dp(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_dopri5; kwargs...)
 # Use Dormand-Prince version of ode45 by default
-const ode45 = ode45_dp
+ode45(fn, y0, tspan; kwargs...) = ode45_dp(fn, y0, tspan; kwargs...)
 ode78(fn, y0, tspan; kwargs...) = oderk_adapt(fn, y0, tspan, bt_feh78; kwargs...)
 
 function oderk_adapt(fn, y0, tspan, btab::TableauRKExplicit; kwords...)
