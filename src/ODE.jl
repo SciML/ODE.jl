@@ -22,7 +22,7 @@ export ode23s
 export ode4s
 
 # Common Interface
-export ODEJLAlgorithm
+export ODEjlAlgorithm
 
 ## complete function export list: see runtests.jl
 

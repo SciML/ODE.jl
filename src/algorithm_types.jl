@@ -1,8 +1,10 @@
-abstract ODEJLAlgorithm <: AbstractODEAlgorithm
-immutable ode23 <: ODEJLAlgorithm end
-immutable ode45 <: ODEJLAlgorithm end
-immutable ode23s <: ODEJLAlgorithm end
-immutable ode78 <: ODEJLAlgorithm end
-immutable ode4 <: ODEJLAlgorithm end
-immutable ode4ms <: ODEJLAlgorithm end
-immutable ode4s <: ODEJLAlgorithm end
+abstract ODEjlAlgorithm <: AbstractODEAlgorithm
+# Making the ODE-solver functions into types lets us dispatch on them.
+#  Used in the DiffEqBase interface.
+immutable ode23 <: ODEjlAlgorithm end
+immutable ode45 <: ODEjlAlgorithm end
+immutable ode23s <: ODEjlAlgorithm end
+immutable ode78 <: ODEjlAlgorithm end
+immutable ode4 <: ODEjlAlgorithm end
+immutable ode4ms <: ODEjlAlgorithm end
+immutable ode4s <: ODEjlAlgorithm end

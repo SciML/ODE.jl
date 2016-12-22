@@ -1,4 +1,4 @@
-function solve{uType,tType,isinplace,AlgType<:ODEJLAlgorithm,F}(prob::AbstractODEProblem{uType,tType,isinplace,F},
+function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm,F}(prob::AbstractODEProblem{uType,tType,isinplace,F},
     alg::AlgType,timeseries=[],ts=[],ks=[];dense=true,save_timeseries=true,
     saveat=tType[],timeseries_errors=true,reltol = 1e-5, abstol = 1e-8,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
@@ -8,13 +8,9 @@ function solve{uType,tType,isinplace,AlgType<:ODEJLAlgorithm,F}(prob::AbstractOD
 
     tspan = prob.tspan
 
-    if tspan[end]-tspan[1]<tType(0)
-        error("final time must be greater than starting time. Aborting.")
-    end
-
     u0 = prob.u0
 
-    Ts = sort(unique([tspan[1];saveat;tspan[2]]))
+    Ts = unique([tspan[1];saveat;tspan[2]])
 
     if save_timeseries
         points = :all
@@ -32,12 +28,10 @@ function solve{uType,tType,isinplace,AlgType<:ODEJLAlgorithm,F}(prob::AbstractOD
         f = prob.f
     end
 
-    if uType <: AbstractArray
-        u0 = vec(prob.u0)
-    else
-        u0 = prob.u0
-    end
+    u0 = uType <: AbstractArray ? vec(prob.u0) : prob.u0
 
+    # Calling the solver, i.e. if the algorithm is ode45,
+    # then AlgType(...) is ode45(...)
     ts,timeseries_tmp = AlgType(f,u0,Ts;
                       norm = norm,
                       abstol=abstol,
