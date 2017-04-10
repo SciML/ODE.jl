@@ -3,6 +3,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
     save_timeseries=nothing,
     saveat=tType[],reltol = 1e-5, abstol = 1e-8,
     save_everystep=isempty(saveat),
+    save_start = true,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
     timeseries_errors=true,dense_errors=false,
@@ -64,10 +65,18 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
                       initstep=dt,
                       points=points)
 
-    # Reshape the result if needed
+
+    if save_start
+      start_idx = 1
+    else
+      start_idx = 2
+      ts = ts[2:end]
+    end
+
+    # Reshape the result if needed    
     if uType <: AbstractArray
         timeseries = Vector{uType}(0)
-        for i=1:length(timeseries_tmp)
+        for i=start_idx:length(timeseries_tmp)
             push!(timeseries,reshape(timeseries_tmp[i],sizeu))
         end
     else
