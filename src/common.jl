@@ -1,18 +1,40 @@
-function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm,F}(prob::AbstractODEProblem{uType,tType,isinplace,F},
-    alg::AlgType,timeseries=[],ts=[],ks=[];dense=true,save_timeseries=true,
+function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEProblem{uType,tType,isinplace},
+    alg::AlgType,timeseries=[],ts=[],ks=[];dense=true,
+    save_timeseries=nothing,
     saveat=tType[],timeseries_errors=true,reltol = 1e-5, abstol = 1e-8,
+    save_everystep=isempty(saveat),
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
     dt = 0.,norm = Base.vecnorm,
     kwargs...)
 
+    if save_timeseries != nothing
+        warn("save_timeseries is deprecated. Use save_everystep instead")
+        save_everystep = save_timeseries
+    end
+
     tspan = prob.tspan
 
     u0 = prob.u0
 
-    Ts = unique([tspan[1];saveat;tspan[2]])
+    if typeof(saveat) <: Number
+      saveat_vec = convert(Vector{tType},saveat:saveat:(tspan[end]-saveat))
+      # Exclude the endpoint because of floating point issues
+    else
+      saveat_vec =  convert(Vector{tType},collect(saveat))
+    end
 
-    if save_timeseries
+    if !isempty(saveat_vec) && saveat_vec[end] == tspan[2]
+      pop!(saveat_vec)
+    end
+
+    if !isempty(saveat_vec) && saveat_vec[1] == tspan[1]
+      Ts = unique([saveat_vec;tspan[2]])
+    else
+      Ts = unique([tspan[1];saveat_vec;tspan[2]])
+    end
+
+    if save_everystep
         points = :all
     else
         points = :specified
@@ -52,5 +74,6 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm,F}(prob::AbstractOD
     end
 
     build_solution(prob,alg,ts,timeseries,
-                 timeseries_errors = timeseries_errors)
+                 timeseries_errors = timeseries_errors,
+                 retcode = :Success)
 end
