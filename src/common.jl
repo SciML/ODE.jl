@@ -1,10 +1,11 @@
 function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEProblem{uType,tType,isinplace},
     alg::AlgType,timeseries=[],ts=[],ks=[];dense=true,
     save_timeseries=nothing,
-    saveat=tType[],timeseries_errors=true,reltol = 1e-5, abstol = 1e-8,
+    saveat=tType[],reltol = 1e-5, abstol = 1e-8,
     save_everystep=isempty(saveat),
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
+    timeseries_errors=true,dense_errors=false,
     dt = 0.,norm = Base.vecnorm,
     kwargs...)
 
@@ -75,5 +76,6 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
 
     build_solution(prob,alg,ts,timeseries,
                  timeseries_errors = timeseries_errors,
-                 retcode = :Success)
+                 dense_errors = dense_errors,
+                 retcode = :Succss)
 end
