@@ -67,7 +67,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
 
 
     if save_start
-      start_idx = 1
+      start_idx = 1 # The index to start making the timeseries from
     else
       start_idx = 2
       ts = ts[2:end]
