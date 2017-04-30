@@ -3,7 +3,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
     save_timeseries=nothing,
     saveat=tType[],reltol = 1e-5, abstol = 1e-8,
     save_everystep=isempty(saveat),
-    save_start = true,
+    save_start = true,callback=nothing,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
     timeseries_errors=true,dense_errors=false,
@@ -19,7 +19,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
         error("This solver is not able to use mass matrices.")
     end
     
-    if callback != nothing
+    if callback != nothing || prob.callback != nothing
         error("ODE is not compatible with callbacks.")
     end
     
