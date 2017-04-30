@@ -15,6 +15,14 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
         save_everystep = save_timeseries
     end
 
+    if prob.mass_matrix != I
+        error("This solver is not able to use mass matrices.")
+    end
+    
+    if callback != nothing
+        error("ODE is not compatible with callbacks.")
+    end
+    
     tspan = prob.tspan
 
     u0 = prob.u0
