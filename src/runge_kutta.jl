@@ -13,7 +13,7 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
     # second for error calc.
     b::Matrix{T}
     c::Vector{T}
-    function TableauRKExplicit(order,a,b,c)
+    function (::Type{TableauRKExplicit{Name, S, T}}){Name, S, T}(order,a,b,c)
         @assert isa(S,Integer)
         @assert isa(Name,Symbol)
         @assert c[1]==0
@@ -26,7 +26,7 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         else
             @assert norm(sum(a,2)-c'',Inf) < 100*eps(Float64)
         end
-        new(order,a,b,c)
+        new{Name, S, T}(order,a,b,c)
     end
 end
 function TableauRKExplicit{T}(name::Symbol, order::(@compat(Tuple{Vararg{Int}})),

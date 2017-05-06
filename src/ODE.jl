@@ -33,7 +33,7 @@ export ODEjlAlgorithm
 # Butcher Tableaus, or more generally coefficient tables
 # see Hairer & Wanner 1992, p. 134, 166
 
-abstract Tableau{Name, S, T<:Real}
+@compat abstract type Tableau{Name, S, T<:Real} end
 # Name is the name of the tableau/method (a symbol)
 # S is the number of stages (an int)
 # T is the type of the coefficients
