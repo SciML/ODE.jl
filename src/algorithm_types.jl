@@ -1,4 +1,4 @@
-abstract ODEjlAlgorithm <: AbstractODEAlgorithm
+@compat abstract type ODEjlAlgorithm <: AbstractODEAlgorithm end
 # Making the ODE-solver functions into types lets us dispatch on them.
 #  Used in the DiffEqBase interface.
 immutable ode23 <: ODEjlAlgorithm end
