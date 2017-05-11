@@ -18,17 +18,17 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
     if prob.mass_matrix != I
         error("This solver is not able to use mass matrices.")
     end
-    
+
     if callback != nothing || prob.callback != nothing
         error("ODE is not compatible with callbacks.")
     end
-    
+
     tspan = prob.tspan
 
     u0 = prob.u0
 
     if typeof(saveat) <: Number
-      saveat_vec = convert(Vector{tType},saveat:saveat:(tspan[end]-saveat))
+      saveat_vec = convert(Vector{tType},saveat+tspan[1]:saveat:(tspan[end]-saveat))
       # Exclude the endpoint because of floating point issues
     else
       saveat_vec =  convert(Vector{tType},collect(saveat))
@@ -81,7 +81,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
       ts = ts[2:end]
     end
 
-    # Reshape the result if needed    
+    # Reshape the result if needed
     if uType <: AbstractArray
         timeseries = Vector{uType}(0)
         for i=start_idx:length(timeseries_tmp)
