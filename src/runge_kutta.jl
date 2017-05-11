@@ -65,19 +65,19 @@ isFSAL(btab::TableauRKExplicit) = btab.a[end,:]==btab.b[1,:] && btab.c[end]==1 #
 # Fixed step:
 const bt_feuler = TableauRKExplicit(:feuler,(1,), Rational{Int64},
                                     zeros(Int,1,1),
-                                    [1]',
+                                    [1][:,:],
                                     [0]
                                     )
 const bt_midpoint = TableauRKExplicit(:midpoint,(2,), Rational{Int64},
                                       [0  0
                                        1//2  0],
-                                      [0, 1]',
+                                      [0  1],
                                       [0, 1//2]
                                       )
 const bt_heun = TableauRKExplicit(:heun,(2,), Rational{Int64},
                                   [0  0
                                    1  0],
-                                  [1//2, 1//2]',
+                                  [1//2  1//2],
                                   [0, 1])
 
 const bt_rk4 = TableauRKExplicit(:rk4,(4,),Rational{Int64},
@@ -85,7 +85,7 @@ const bt_rk4 = TableauRKExplicit(:rk4,(4,),Rational{Int64},
                                   1//2 0    0 0
                                   0    1//2 0 0
                                   0    0    1 0],
-                                 [1//6, 1//3, 1//3, 1//6]',
+                                 [1//6  1//3  1//3  1//6],
                                  [0, 1//2, 1//2, 1])
 
 # Adaptive step:
