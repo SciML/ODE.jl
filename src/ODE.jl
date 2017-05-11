@@ -18,6 +18,15 @@ function __init__()
     const global warnlist = Set(warnkeywords)
 end
 
+const warnkeywords =
+    (:save_idxs, :d_discontinuities, :isoutofdomain, :unstable_check,
+     :calck, :progress, :timeseries_steps,
+     :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
+
+function __init__()
+    const global warnlist = Set(warnkeywords)
+end
+
 include("algorithm_types.jl")
 
 ## minimal function export list

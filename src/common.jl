@@ -3,6 +3,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
     alg::AlgType,
     timeseries=[], ts=[], ks=[];
 
+    dense=false,
     verbose=true,
     save_timeseries=nothing,
     saveat=tType[], reltol = 1e-5, abstol = 1e-8,
