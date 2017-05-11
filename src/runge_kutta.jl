@@ -185,13 +185,13 @@ function oderk_fixed{N,S}(fn, y0::AbstractVector, tspan,
     Et, Eyf, Ty, btab = make_consistent_types(fn, y0, tspan, btab_)
     dof = length(y0)
 
-    ys = Array(Ty, length(tspan))
+    ys = Vector{Ty}(length(tspan))
     allocate!(ys, y0, dof)
     ys[1] = deepcopy(y0)
 
     tspan = convert(Vector{Et}, tspan)
     # work arrays:
-    ks = Array(Ty, S)
+    ks = Vector{Ty}(S)
     # allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
     ytmp = similar(y0, Eyf, dof)
     for i=1:length(tspan)-1
@@ -261,23 +261,23 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     y[:]   = y0
     ytrial = similar(y0, Eyf, dof) # trial solution at time t+dt
     yerr   = similar(y0, Eyf, dof) # error of trial solution
-    ks = Array(Ty, S)
+    ks = Vector{Ty}(S)
     # allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
     ytmp   = similar(y0, Eyf, dof)
 
     # output ys
     nsteps_fixed = length(tspan) # these are always output
-    ys = Array(Ty, nsteps_fixed)
+    ys = Vector{Ty}(nsteps_fixed)
     allocate!(ys, y0, dof)
     ys[1] = y0
 
     # Option points determines where solution is returned:
-    if points==:all
+    if points == :all
         tspan_fixed = tspan
         tspan = Et[tstart]
         iter_fixed = 2 # index into tspan_fixed
         sizehint!(tspan, nsteps_fixed)
-    elseif points!=:specified
+    elseif points != :specified
         error("Unrecognized option points==$points")
     end
     # Time
