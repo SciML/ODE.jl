@@ -1,17 +1,23 @@
-function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEProblem{uType,tType,isinplace},
-    alg::AlgType,timeseries=[],ts=[],ks=[];dense=true,
+function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
+    prob::AbstractODEProblem{uType,tType,isinplace},
+    alg::AlgType,
+    timeseries=[], ts=[], ks=[];
+
+    verbose=true,
     save_timeseries=nothing,
-    saveat=tType[],reltol = 1e-5, abstol = 1e-8,
+    saveat=tType[], reltol = 1e-5, abstol = 1e-8,
     save_everystep=isempty(saveat),
-    save_start = true,callback=nothing,
+    save_start=true, callback=nothing,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
-    timeseries_errors=true,dense_errors=false,
-    dt = 0.,norm = Base.vecnorm,
+    timeseries_errors=true, dense_errors=false,
+    dt = 0.0, norm = Base.vecnorm,
     kwargs...)
 
+    verbose && !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
+
     if save_timeseries != nothing
-        warn("save_timeseries is deprecated. Use save_everystep instead")
+        verbose && warn("save_timeseries is deprecated. Use save_everystep instead")
         save_everystep = save_timeseries
     end
 
@@ -28,20 +34,20 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
     u0 = prob.u0
 
     if typeof(saveat) <: Number
-      saveat_vec = convert(Vector{tType},saveat+tspan[1]:saveat:(tspan[end]-saveat))
-      # Exclude the endpoint because of floating point issues
+        saveat_vec = convert(Vector{tType}, saveat+tspan[1]:saveat:(tspan[end]-saveat))
+        # Exclude the endpoint because of floating point issues
     else
-      saveat_vec =  convert(Vector{tType},collect(saveat))
+        saveat_vec = convert(Vector{tType}, collect(saveat))
     end
 
     if !isempty(saveat_vec) && saveat_vec[end] == tspan[2]
-      pop!(saveat_vec)
+        pop!(saveat_vec)
     end
 
     if !isempty(saveat_vec) && saveat_vec[1] == tspan[1]
-      Ts = unique([saveat_vec;tspan[2]])
+        Ts = unique([saveat_vec;tspan[2]])
     else
-      Ts = unique([tspan[1];saveat_vec;tspan[2]])
+        Ts = unique([tspan[1];saveat_vec;tspan[2]])
     end
 
     if save_everystep
@@ -64,21 +70,20 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
 
     # Calling the solver, i.e. if the algorithm is ode45,
     # then AlgType(...) is ode45(...)
-    ts,timeseries_tmp = AlgType(f,u0,Ts;
-                      norm = norm,
-                      abstol=abstol,
-                      reltol=reltol,
-                      maxstep=dtmax,
-                      minstep=dtmin,
-                      initstep=dt,
-                      points=points)
-
+    ts, timeseries_tmp = AlgType(f,u0,Ts;
+                                 norm = norm,
+                                 abstol=abstol,
+                                 reltol=reltol,
+                                 maxstep=dtmax,
+                                 minstep=dtmin,
+                                 initstep=dt,
+                                 points=points)
 
     if save_start
-      start_idx = 1 # The index to start making the timeseries from
+        start_idx = 1 # The index to start making the timeseries from
     else
-      start_idx = 2
-      ts = ts[2:end]
+        start_idx = 2
+        ts = ts[2:end]
     end
 
     # Reshape the result if needed
@@ -92,7 +97,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(prob::AbstractODEP
     end
 
     build_solution(prob,alg,ts,timeseries,
-                 timeseries_errors = timeseries_errors,
-                 dense_errors = dense_errors,
-                 retcode = :Succss)
-end
+                   timeseries_errors = timeseries_errors,
+                   dense_errors = dense_errors,
+                   retcode = :Succss)
+end # function solve

@@ -7,7 +7,16 @@ using Polynomials
 using Compat
 using DiffEqBase
 
-import DiffEqBase: solve
+import DiffEqBase: solve, check_keywords
+
+const warnkeywords =
+    (:save_idxs, :d_discontinuities, :unstable_check,
+     :calck, :progress, :timeseries_steps, :dense,
+     :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
+
+function __init__()
+    const global warnlist = Set(warnkeywords)
+end
 
 include("algorithm_types.jl")
 

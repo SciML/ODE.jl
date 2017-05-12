@@ -19,3 +19,9 @@ for alg in algs
     sol =solve(prob,alg;dt=dt,dtmin=eps(),abstol=1e-6,reltol=1e-3)
     @test size(sol[2]) == (4,2)
 end
+
+# Check that warnings are displayed
+for alg in algs
+    sol = solve(prob,alg;dt=dt,abstol=1e-6,reltol=1e-3, dense=true, verbose=true,
+                save_idxs = true, progress = true, beta1 = 1.23, gamma = 0.5)
+end
