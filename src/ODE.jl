@@ -10,7 +10,7 @@ using DiffEqBase
 import DiffEqBase: solve, check_keywords
 
 const warnkeywords =
-    (:save_idxs, :d_discontinuities, :isoutofdomain, :unstable_check,
+    (:save_idxs, :d_discontinuities, :unstable_check,
      :calck, :progress, :timeseries_steps, :dense,
      :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
 
