@@ -7,7 +7,7 @@ using Polynomials
 using Compat
 using DiffEqBase
 
-import DiffEqBase: solve, check_keywords
+import DiffEqBase: solve
 
 const warnkeywords =
     (:save_idxs, :d_discontinuities, :unstable_check,
