@@ -18,6 +18,15 @@ function __init__()
     const global warnlist = Set(warnkeywords)
 end
 
+const warnkeywords =
+    (:save_idxs, :d_discontinuities, :isoutofdomain, :unstable_check,
+     :calck, :progress, :timeseries_steps,
+     :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
+
+function __init__()
+    const global warnlist = Set(warnkeywords)
+end
+
 include("algorithm_types.jl")
 
 ## minimal function export list
@@ -171,7 +180,7 @@ include("runge_kutta.jl")
 #   with Adams-Bashforth-Moulton coefficients
 function ode_ms(F, x0, tspan, order::Integer; kwargs...)
     h = diff(tspan)
-    x = Array(typeof(x0), length(tspan))
+    x = Vector{typeof(x0)}(length(tspan))
     x[1] = x0
 
     if 1 <= order <= 4
@@ -284,9 +293,9 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
     h = tdir * min(abs(h), maxstep)
 
     y = y0
-    tout = Array(typeof(t), 1)
+    tout = Vector{typeof(t)}(1)
     tout[1] = t         # first output time
-    yout = Array(typeof(y0), 1)
+    yout = Vector{typeof(y0)}(1)
     yout[1] = deepcopy(y)         # first output solution
 
 
@@ -328,7 +337,7 @@ function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
             if points==:specified || points==:all
                 # only points in tspan are requested
                 # -> find relevant points in (t,t+h]
-                for toi in tspan[(tspan.>t) & (tspan.<=t+h)]
+                for toi in tspan[(tspan.>t) .& (tspan.<=t+h)]
                     # rescale to (0,1]
                     s = (toi-t)/h
 
@@ -371,7 +380,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing, kwargs...
     end
 
     h = diff(tspan)
-    x = Array(typeof(x0), length(tspan))
+    x = Vector{typeof(x0)}(length(tspan))
     x[1] = x0
 
     solstep = 1
@@ -383,7 +392,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing, kwargs...
 
         jac = I/(gamma*hs) - dFdx
 
-        g = Array(typeof(x0), size(a,1))
+        g = Vector{typeof(x0)}(size(a,1))
         g[1] = (jac \ F(ts + b[1]*hs, xs))
         x[solstep+1] = x[solstep] + b[1]*g[1]
 

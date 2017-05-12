@@ -46,25 +46,25 @@ for solver in solvers
         # -- = 6 ==> y = 6t
         # dt
         t,y=solver((t,y)->T(6), T(0), T[0:.1:1;])
-        @test maximum(abs(y-6t)) < tol
+        @test maximum(abs.(y-6t)) < tol
         @test eltype(t)==T
 
         # dy
         # -- = 2t ==> y = t.^2
         # dt
         t,y=solver((t,y)->T(2)*t, T(0), T[0:.001:1;])
-        @test maximum(abs(y-t.^2)) < tol
+        @test maximum(abs.(y-t.^2)) < tol
         @test eltype(t)==T
 
         # dy
         # -- = y ==> y = y0*e.^t
         # dt
         t,y=solver((t,y)->y, T(1), T[0:.001:1;])
-        @test maximum(abs(y-e.^t)) < tol
+        @test maximum(abs.(y-e.^t)) < tol
         @test eltype(t)==T
 
         t,y=solver((t,y)->y, T(1), T[1:-.001:0;])
-        @test maximum(abs(y-e.^(t-1))) < tol
+        @test maximum(abs.(y-e.^(t-1))) < tol
         @test eltype(t)==T
 
         # dv       dw
@@ -74,7 +74,7 @@ for solver in solvers
         # y = [v, w]
         t,y=solver((t,y)->[-y[2]; y[1]], T[1, 2], T[0:.001:2*pi;])
         ys = hcat(y...).'   # convert Vector{Vector{T}} to Matrix{T}
-        @test maximum(abs(ys-[cos(t)-2*sin(t) 2*cos(t)+sin(t)])) < tol
+        @test maximum(abs.(ys-[cos.(t)-2*sin.(t) 2*cos.(t)+sin.(t)])) < tol
         @test eltype(t)==T
     end
 end
