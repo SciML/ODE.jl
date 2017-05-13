@@ -10,15 +10,6 @@ using DiffEqBase
 import DiffEqBase: solve
 
 const warnkeywords =
-    (:save_idxs, :d_discontinuities, :unstable_check,
-     :calck, :progress, :timeseries_steps, :dense,
-     :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
-
-function __init__()
-    const global warnlist = Set(warnkeywords)
-end
-
-const warnkeywords =
     (:save_idxs, :d_discontinuities, :isoutofdomain, :unstable_check,
      :calck, :progress, :timeseries_steps,
      :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
@@ -80,7 +71,8 @@ Base.eltype{N,S,T}(b::Tableau{N,S,T}) = T
 order(b::Tableau) = b.order
 # Subtypes need to define a convert method to convert to a different
 # eltype with signature:
-Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) = error("Define convert method for concrete Tableau types")
+Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) =
+    error("Define convert method for concrete Tableau types")
 
 ###############################################################################
 ## HELPER FUNCTIONS
@@ -255,14 +247,14 @@ end
 #
 # supports keywords: points = :all | :specified (using dense output)
 #                    jacobian = G(t,y)::Function | nothing (FD)
-function ode23s(F, y0, tspan; reltol = 1.0e-5, abstol = 1.0e-8,
-                                                jacobian=nothing,
-                                                points=:all,
-                                                norm=Base.norm,
-                                                minstep=abs(tspan[end] - tspan[1])/1e18,
-                                                maxstep=abs(tspan[end] - tspan[1])/2.5,
-                                                initstep=0.)
-
+function ode23s(F, y0, tspan;
+                reltol = 1.0e-5, abstol = 1.0e-8,
+                jacobian=nothing,
+                points=:all,
+                norm=Base.norm,
+                minstep=abs(tspan[end] - tspan[1])/1e18,
+                maxstep=abs(tspan[end] - tspan[1])/2.5,
+                initstep=0.)
 
     # select method for computing the Jacobian
     if typeof(jacobian) == Function
@@ -439,10 +431,11 @@ const s4_coefficients = (0.5,
                           -112/125 -54/125 -2/5 0],)
 
 ode4s_s(F, x0, tspan; jacobian=nothing, kwargs...) =
-      oderosenbrock(F, x0, tspan, s4_coefficients...; jacobian=jacobian, kwargs...)
+    oderosenbrock(F, x0, tspan, s4_coefficients...; jacobian=jacobian, kwargs...)
 
 # Use Shampine coefficients by default (matching Numerical Recipes)
-ode4s(F, x0, tspan; jacobian=nothing, kwargs...) = ode4s_s(F, x0, tspan; jacobian=nothing, kwargs...)
+ode4s(F, x0, tspan; jacobian=nothing, kwargs...) =
+    ode4s_s(F, x0, tspan; jacobian=nothing, kwargs...)
 
 const ms_coefficients4 = [ 1      0      0     0
                           -1/2    3/2    0     0
