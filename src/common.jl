@@ -3,11 +3,10 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
     alg::AlgType,
     timeseries=[], ts=[], ks=[];
 
-    dense=false,
     verbose=true,
     save_timeseries=nothing,
     saveat=tType[], reltol = 1e-5, abstol = 1e-8,
-    save_everystep=isempty(saveat),
+    save_everystep=isempty(saveat), dense=save_everystep,
     save_start=true, callback=nothing,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
@@ -15,7 +14,20 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
     dt = 0.0, norm = Base.vecnorm,
     kwargs...)
 
-    verbose && !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
+    if verbose
+        warned = !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
+        if !(typeof(prob.f) <: AbstractParameterizedFunction) && typeof(alg) <: ode23s
+            if has_tgrad(prob.f)
+                warn("Explicit t-gradient given to this stiff solver is ignored.")
+                warned = true
+            end
+            if has_jac(prob.f)
+                warn("Explicit Jacobian given to this stiff solver is ignored.")
+                warned = true
+            end
+        end
+        warned && warn_compat()
+    end
 
     if save_timeseries != nothing
         verbose && warn("save_timeseries is deprecated. Use save_everystep instead")
