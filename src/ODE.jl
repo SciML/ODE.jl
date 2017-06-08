@@ -5,7 +5,8 @@ module ODE
 
 using Polynomials
 using Compat
-using DiffEqBase
+using Reexport
+@reexport using DiffEqBase
 
 import DiffEqBase: solve
 
