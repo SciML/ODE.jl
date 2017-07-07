@@ -19,12 +19,12 @@ This project is deprecated in favor of [DifferentialEquations.jl](https://github
 The ODE.jl methods can be used on the common interface. Simply use the solver's name as the algorithm. For example, [the ODE tutorial](http://docs.juliadiffeq.org/latest/tutorials/ode_example.html) can be solved using ODE.jl's `ode45` by using the following commands:
 
 ```julia
-using DifferentialEquations
+using ODE
 f(t,u) = 1.01*u
 u0=1/2
 tspan = (0.0,1.0)
 prob = ODEProblem(f,u0,tspan)
-sol = solve(prob,Tsit5(),reltol=1e-8,abstol=1e-8)
+sol = solve(prob,ode45(),reltol=1e-8,abstol=1e-8)
 using Plots
 plot(sol,linewidth=5,title="Solution to the linear ODE with a thick line",
      xaxis="Time (t)",yaxis="u(t) (in μm)",label="My Thick Line!") # legend=false
