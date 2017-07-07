@@ -10,24 +10,32 @@ Various basic Ordinary Differential Equation solvers implemented in Julia.
 
 Pull requests are always highly welcome to fix bugs, add solvers, or anything else!
 
-# API discussions
-There are currently discussions about how the Julian API for ODE solvers should look like, and the current documentation is more like a wishlist than a documentation. The API has changed considerably since the initial v0.1 release, so be carefull when you upgrade to v0.2 or later versions.
-
 # Current status of the project
 
-The first release, v0.1, contains the basic functionality that was moved here when the package was originally moved from Base. Although quite poorly tested, at least some of the functionality is quite reliable. However, that version is almost entirely undocumented, and will probably stay that way.
+This project is deprecated in favor of [DifferentialEquations.jl](https://github.com/JuliaDiffEq/DifferentialEquations.jl) and its ODE solvers [OrdinaryDiffEq.jl](https://github.com/JuliaDiffEq/OrdinaryDiffEq.jl). This library is in "maitanance mode", meaning that it is being upgraded with each Julia version, but not seeing active feature development. ODE.jl contains the basic functionality that was moved here when the package was originally moved from Base. Although quite poorly tested, at least some of the functionality is quite reliable. Use at your own risk. However, that version is almost entirely undocumented, and will probably stay that way.
 
-Since then, quite a lot has happened in the package, and the best way to use current ODE.jl is by checking out the latest master with `Pkg.checkout("ODE")`. By doing so, you get access to a new, better API -- but be careful; several breaking changes have been introduced since v0.1. Therefore, the best way to learn the current API is to read the source. (The documentation in [http://github.com/JuliaDiffEq/ODE.jl/master/blobs/doc/api.md](doc/api.md) is to be regarded as a wishlist, where some but not all of the features have been implemented as of yet).
+## Usage On the Common Interface
 
-Currently, `ODE` exports the following adaptive solvers:
+The ODE.jl methods can be used on the common interface. Simply use the solver's name as the algorithm. For example, [the ODE tutorial](http://docs.juliadiffeq.org/latest/tutorials/ode_example.html) can be solved using ODE.jl's `ode45` by using the following commands:
 
-* `ode23`: 2nd order adaptive solver with 3rd order error control, using the Bogacki–Shampine coefficients
-* `ode45`: 4th order adaptive solver with 5th order error control, using the Dormand Prince coefficients. Fehlberg and Cash-Karp coefficients are also available.
-* `ode78`: 7th order adaptive solver with 8th order error control, using the Fehlberg coefficients.
+```julia
+using DifferentialEquations
+f(t,u) = 1.01*u
+u0=1/2
+tspan = (0.0,1.0)
+prob = ODEProblem(f,u0,tspan)
+sol = solve(prob,Tsit5(),reltol=1e-8,abstol=1e-8)
+using Plots
+plot(sol,linewidth=5,title="Solution to the linear ODE with a thick line",
+     xaxis="Time (t)",yaxis="u(t) (in μm)",label="My Thick Line!") # legend=false
+plot!(sol.t, t->0.5*exp(1.01t),lw=3,ls=:dash,label="True Solution!")
+```
 
-* `ode23s`: 2nd/3rd order adaptive solver for stiff problems, using a modified Rosenbrock triple.
+Note that ODE.jl does not natively support inplace updates. Inplace functions `f(t,u,du)` are converted to out-of-place functions `du=f(t,u)` and thus it will not be any more efficient.
 
-all of which have the following basic API:
+## Basic API
+
+All of the ODE.jl solvers the following basic API:
 
     tout, yout = odeXX(F, y0, tspan; keywords...)
 
@@ -44,6 +52,17 @@ Additionally, `ode23s` solver supports
 - `jacobian = G(t,y)`: user-supplied Jacobian G(t,y) = dF(t,y)/dy (default estimate by finite-difference method).
 
 There are also fixed step Runge-Kutta and Rosenbrock solvers available.
+
+## Available Solvers
+
+Currently, `ODE` exports the following adaptive solvers:
+
+* `ode23`: 2nd order adaptive solver with 3rd order error control, using the Bogacki–Shampine coefficients
+* `ode45`: 4th order adaptive solver with 5th order error control, using the Dormand Prince coefficients. Fehlberg and Cash-Karp coefficients are also available.
+* `ode78`: 7th order adaptive solver with 8th order error control, using the Fehlberg coefficients.
+* `ode23s`: 2nd/3rd order adaptive solver for stiff problems, using a modified Rosenbrock triple.
+
+For a full list, see the [DiffEqDocs ODE Solvers page](http://docs.juliadiffeq.org/latest/solvers/ode_solve.html#ODE.jl-1).
 
 # Examples
 The examples directory contain a few notebooks that show how to get started. You can also see them here:
