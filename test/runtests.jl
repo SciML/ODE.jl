@@ -26,14 +26,7 @@ solvers = [
            # adaptive
            ODE.ode23s]
 
-# Because of https://github.com/JuliaLang/julia/issues/16667
-# which was fixed for BigFloat in https://github.com/JuliaLang/julia/pull/16999
-# but not back-ported to Julia 0.4
-if VERSION<=v"0.5-"
-    dtypes = [Float32, Float64]
-else
-    dtypes = [Float32, Float64, BigFloat]
-end
+dtypes = [Float32, Float64, BigFloat]
 for solver in solvers
     println("using $solver")
     for (tol,T) in zip(tols, dtypes)
