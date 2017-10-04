@@ -50,7 +50,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
       if (tspan[1]:saveat:tspan[end])[end] == tspan[end]
         saveat_vec = convert(Vector{tType},collect(tType,tspan[1]+saveat:saveat:tspan[end]))
       else
-        saveat_vec = convert(Vector{tType},(collect(tType,tspan[1]+saveat:saveat:(tspan[end]-saveat)))
+        saveat_vec = convert(Vector{tType},collect(tType,tspan[1]+saveat:saveat:(tspan[end]-saveat)))
       end
     else
         saveat_vec = convert(Vector{tType}, collect(saveat))
