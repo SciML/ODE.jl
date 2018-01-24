@@ -1,14 +1,12 @@
 language: julia
 os:
-    - osx
+#    - osx
     - linux
 julia:
-    - 0.5
     - 0.6
     - nightly
 matrix:
   allow_failures:
-    - julia: 0.6
     - julia: nightly
 git:
     depth: 999999
