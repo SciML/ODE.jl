@@ -1,6 +1,6 @@
 Various basic Ordinary Differential Equation solvers implemented in Julia.
 
-[![Join the chat at https://gitter.im/JuliaDiffEq/Lobby](https://badges.gitter.im/JuliaDiffEq/Lobby.svg)](https://gitter.im/JuliaDiffEq/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) 
+[![Join the chat at https://gitter.im/JuliaDiffEq/Lobby](https://badges.gitter.im/JuliaDiffEq/Lobby.svg)](https://gitter.im/JuliaDiffEq/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Travis](https://travis-ci.org/JuliaDiffEq/ODE.jl.svg?branch=master)](https://travis-ci.org/JuliaDiffEq/ODE.jl)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/mue0n1yhlxq4ok8d/branch/master?svg=true)](https://ci.appveyor.com/project/ChrisRackauckas/ode-jl/branch/master)
 [![Coverage Status](https://img.shields.io/coveralls/JuliaDiffEq/ODE.jl.svg)](https://coveralls.io/r/JuliaDiffEq/ODE.jl)
@@ -20,7 +20,7 @@ The ODE.jl methods can be used on the common interface. Simply use the solver's 
 
 ```julia
 using ODE
-f(t,u) = 1.01*u
+f(u,p,t) = 1.01*u
 u0=1/2
 tspan = (0.0,1.0)
 prob = ODEProblem(f,u0,tspan)

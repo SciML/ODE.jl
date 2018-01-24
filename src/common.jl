@@ -73,13 +73,14 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
     end
 
     sizeu = size(prob.u0)
+    p = prob.p
 
     if isinplace
-        f = (t,u) -> (du = zeros(u); prob.f(t,u,du); vec(du))
+        f = (t,u) -> (du = zeros(u); prob.f(du,u,p,t); vec(du))
     elseif uType <: AbstractArray
-        f = (t,u) -> vec(prob.f(t,reshape(u,sizeu)))
+        f = (t,u) -> vec(prob.f(reshape(u,sizeu),p,t))
     else
-        f = prob.f
+        f = (t,u) -> prob.f(u,p,t)
     end
 
     u0 = uType <: AbstractArray ? vec(prob.u0) : prob.u0
