@@ -1,4 +1,6 @@
-isdefined(Base, :__precompile__) && __precompile__()
+__precompile__()
+# Ordinary Differential Equation Solvers
+
 # Ordinary Differential Equation Solvers
 
 module ODE
@@ -43,7 +45,7 @@ export ODEjlAlgorithm
 # Butcher Tableaus, or more generally coefficient tables
 # see Hairer & Wanner 1992, p. 134, 166
 
-@compat abstract type Tableau{Name, S, T<:Real} end
+abstract type Tableau{Name, S, T<:Real} end
 # Name is the name of the tableau/method (a symbol)
 # S is the number of stages (an int)
 # T is the type of the coefficients
@@ -68,11 +70,11 @@ export ODEjlAlgorithm
 #      | b_1     ...   b_s   this is the one used for stepping
 #      | b'_1    ...   b'_s  this is the one used for error-checking
 
-Base.eltype{N,S,T}(b::Tableau{N,S,T}) = T
+Base.eltype(b::Tableau{N,S,T}) where {N,S,T} = T
 order(b::Tableau) = b.order
 # Subtypes need to define a convert method to convert to a different
 # eltype with signature:
-Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) =
+Base.convert(::Type{Tnew}, tab::Tableau) where {Tnew<:Real} =
     error("Define convert method for concrete Tableau types")
 
 ###############################################################################
@@ -81,7 +83,7 @@ Base.convert{Tnew<:Real}(::Type{Tnew}, tab::Tableau) =
 
 # estimator for initial step based on book
 # "Solving Ordinary Differential Equations I" by Hairer et al., p.169
-function hinit{T}(F, x0, t0::T, tend, p, reltol, abstol)
+function hinit(F, x0, t0::T, tend, p, reltol, abstol) where T
     # Returns first step, direction of integration and F evaluated at t0
     tdir = sign(tend-t0)
     tdir==0 && error("Zero time span")

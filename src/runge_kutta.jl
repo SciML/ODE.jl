@@ -6,14 +6,14 @@
 # Tableaus for explicit Runge-Kutta methods
 ###########################################
 
-immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
+struct TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
     order::(Tuple{Vararg{Int}}) # the order of the methods
     a::Matrix{T}
     # one or several row vectors.  First row is used for the step,
     # second for error calc.
     b::Matrix{T}
     c::Vector{T}
-    function (::Type{TableauRKExplicit{Name, S, T}}){Name, S, T}(order,a,b,c)
+    function TableauRKExplicit{Name, S, T}(order,a,b,c) where {Name, S, T}
         @assert isa(S,Integer)
         @assert isa(Name,Symbol)
         @assert c[1]==0
@@ -29,8 +29,8 @@ immutable TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         new{Name, S, T}(order,a,b,c)
     end
 end
-function TableauRKExplicit{T}(name::Symbol, order::(Tuple{Vararg{Int}}),
-                   a::Matrix{T}, b::Matrix{T}, c::Vector{T})
+function TableauRKExplicit(name::Symbol, order::(Tuple{Vararg{Int}}),
+                   a::Matrix{T}, b::Matrix{T}, c::Vector{T}) where T
     TableauRKExplicit{name,length(c),T}(order, a, b, c)
 end
 function TableauRKExplicit(name::Symbol, order::(Tuple{Vararg{Int}}), T::Type,
@@ -38,11 +38,11 @@ function TableauRKExplicit(name::Symbol, order::(Tuple{Vararg{Int}}), T::Type,
     TableauRKExplicit{name,length(c),T}(order, convert(Matrix{T},a),
                                         convert(Matrix{T},b), convert(Vector{T},c) )
 end
-conv_field{T,N}(D,a::Array{T,N}) = convert(Array{D,N}, a)
-function Base.convert{Tnew<:Real,Name,S,T}(::Type{Tnew}, tab::TableauRKExplicit{Name,S,T})
+conv_field(D,a::Array{T,N}) where {T,N} = convert(Array{D,N}, a)
+function Base.convert(::Type{Tnew}, tab::TableauRKExplicit{Name,S,T}) where {Tnew<:Real,Name,S,T}
     # Converts the tableau coefficients to the new type Tnew
     newflds = ()
-    @compat for n in fieldnames(tab)
+    for n in fieldnames(tab)
         fld = getfield(tab,n)
         if eltype(fld)==T
             newflds = tuple(newflds..., conv_field(Tnew, fld))
@@ -173,8 +173,8 @@ function oderk_fixed(fn, y0, tspan, btab::TableauRKExplicit;kwargs...)
     t,y = oderk_fixed(fn_, [y0], tspan, btab)
     return t, vcat_nosplat(y)
 end
-function oderk_fixed{N,S}(fn, y0::AbstractVector, tspan,
-                          btab_::TableauRKExplicit{N,S})
+function oderk_fixed(fn, y0::AbstractVector, tspan,
+                     btab_::TableauRKExplicit{N,S}) where {N,S}
     # TODO: instead of AbstractVector use a Holy-trait
 
     # Needed interface:
@@ -225,14 +225,14 @@ function oderk_adapt(fn, y0, tspan, btab::TableauRKExplicit; kwords...)
     t,y = oderk_adapt(fn_, [y0], tspan, btab; kwords...)
     return t, vcat_nosplat(y)
 end
-function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S};
-                          reltol = 1.0e-5, abstol = 1.0e-8,
-                          norm=Base.norm,
-                          minstep=abs(tspan[end] - tspan[1])/1e18,
-                          maxstep=abs(tspan[end] - tspan[1])/2.5,
-                          initstep=0,
-                          points=:all
-                          )
+function oderk_adapt(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S};
+                     reltol = 1.0e-5, abstol = 1.0e-8,
+                     norm=Base.norm,
+                     minstep=abs(tspan[end] - tspan[1])/1e18,
+                     maxstep=abs(tspan[end] - tspan[1])/2.5,
+                     initstep=0,
+                     points=:all
+                     ) where {N,S}
     # Needed interface:
     # On components:
     #  - note that the type of the components might change!
@@ -360,7 +360,7 @@ function oderk_adapt{N,S}(fn, y0::AbstractVector, tspan, btab_::TableauRKExplici
     return tspan, ys
 end
 
-function rk_embedded_step!{N,S}(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab::TableauRKExplicit{N,S})
+function rk_embedded_step!(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab::TableauRKExplicit{N,S}) where {N,S}
     # Does one embedded R-K step updating ytrial, yerr and ks.
     #
     # Assumes that ks[:,1] is already calculated!
@@ -390,8 +390,8 @@ function rk_embedded_step!{N,S}(ytrial, yerr, ks, ytmp, y, fn, t, dt, dof, btab:
     end
 end
 
-function stepsize_hw92!{T}(dt::T, tdir, x0, xtrial, xerr, order,
-                       timeout, dof, abstol, reltol, maxstep, norm)
+function stepsize_hw92!(dt::T, tdir, x0, xtrial, xerr, order,
+                    timeout, dof, abstol, reltol, maxstep, norm) where T
     # Estimates the error and a new step size following Hairer &
     # Wanner 1992, p167 (with some modifications)
     #
@@ -433,7 +433,7 @@ function stepsize_hw92!{T}(dt::T, tdir, x0, xtrial, xerr, order,
     return err, tdir*newdt, timeout
 end
 
-function calc_next_k!{Ty}(ks::Vector, ytmp::Ty, y, s, fn, t, dt, dof, btab)
+function calc_next_k!(ks::Vector, ytmp::Ty, y, s, fn, t, dt, dof, btab) where Ty
     # Calculates the next ks and puts it into ks[s]
     # - ks and ytmp are modified inside this function.
 
@@ -450,7 +450,7 @@ function calc_next_k!{Ty}(ks::Vector, ytmp::Ty, y, s, fn, t, dt, dof, btab)
 end
 
 # Helper functions:
-function allocate!{T}(vec::Vector{T}, y0, dof)
+function allocate!(vec::Vector{T}, y0, dof) where T
     # Allocates all vectors inside a Vector{Vector} using the same
     # kind of container as y0 has and element type eltype(eltype(vec)).
     for s=1:length(vec)
