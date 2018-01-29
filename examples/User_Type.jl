@@ -15,20 +15,20 @@ using ODE
 using PyPlot
 using Compat
 
-typealias DataFloat Float64
-type Vec2
+const DataFloat = Float64
+mutable struct Vec2
   a::DataFloat
   b::DataFloat
 end
 
 # This is the minimal set of function required on the type inorder to work with
 # the ODE module
-@compat Base.:/(x::Vec2, y::Real) = Vec2(x.a/y, x.b/y)
-@compat Base.:*(y::Real, x::Vec2) = Vec2(y * x.a, y * x.b)
-@compat Base.:*(x::Vec2, y::Real) = y*x
-@compat Base.:.*(y::Real, x::Vec2) = y*x
-@compat Base.:+(x::Vec2, y::Vec2) = Vec2(x.a + y.a, x.b + y.b)
-@compat Base.:-(x::Vec2, y::Vec2) = Vec2(x.a - y.a, x.b - y.b)
+Base.:/(x::Vec2, y::Real) = Vec2(x.a/y, x.b/y)
+Base.:*(y::Real, x::Vec2) = Vec2(y * x.a, y * x.b)
+Base.:*(x::Vec2, y::Real) = y*x
+Base.:.*(y::Real, x::Vec2) = y*x
+Base.:+(x::Vec2, y::Vec2) = Vec2(x.a + y.a, x.b + y.b)
+Base.:-(x::Vec2, y::Vec2) = Vec2(x.a - y.a, x.b - y.b)
 Base.norm(x::Vec2) = sqrt(x.a^2 + x.b^2)
 Base.zero(x::Type{Vec2}) = Vec2(zero(DataFloat), zero(DataFloat))
 ODE.isoutofdomain(x::Vec2) = isnan(x.a) || isnan(x.b)

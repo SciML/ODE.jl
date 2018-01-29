@@ -11,7 +11,7 @@ const V0 = 1.
 const g0 = 0.
 
 # define custom type ...
-immutable CompSol
+struct CompSol
   rho::Matrix{Complex128}
   x::Float64
   p::Float64

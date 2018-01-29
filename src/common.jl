@@ -1,4 +1,4 @@
-function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
+function solve(
     prob::AbstractODEProblem{uType,tType,isinplace},
     alg::AlgType,
     timeseries=[], ts=[], ks=[];
@@ -12,7 +12,7 @@ function solve{uType,tType,isinplace,AlgType<:ODEjlAlgorithm}(
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
     timeseries_errors=true, dense_errors=false,
     dt = 0.0, norm = Base.vecnorm,
-    kwargs...)
+    kwargs...) where {uType,tType,isinplace,AlgType<:ODEjlAlgorithm}
 
     if verbose
         warned = !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
