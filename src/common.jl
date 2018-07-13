@@ -7,7 +7,7 @@ function solve(
     save_timeseries=nothing,
     saveat=tType[], reltol = 1e-5, abstol = 1e-8,
     save_everystep=isempty(saveat), 
-    dense = save_everystep && !(typeof(alg) <: FunctionMap) && isempty(saveat),
+    dense = save_everystep && isempty(saveat),
     save_start = save_everystep || isempty(saveat) || typeof(saveat) <: Number ? true : prob.tspan[1] in saveat,
     callback=nothing,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
