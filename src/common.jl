@@ -1,10 +1,10 @@
 function solve(
-    prob::DiffEqBase.AbstractODEProblem{uType,tType,isinplace},
+    prob::DiffEqBase.AbstractODEProblem{uType,tupType,isinplace},
     alg::AlgType,
     timeseries=[], ts=[], ks=[];
     verbose=true,
     save_timeseries=nothing,
-    saveat=tType[], reltol = 1e-5, abstol = 1e-8,
+    saveat=eltype(tupType)[], reltol = 1e-5, abstol = 1e-8,
     save_everystep=isempty(saveat),
     dense = save_everystep && isempty(saveat),
     save_start = save_everystep || isempty(saveat) || typeof(saveat) <: Number ?
@@ -14,7 +14,9 @@ function solve(
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
     timeseries_errors=true, dense_errors=false,
     dt = 0.0, norm = Base.vecnorm,
-    kwargs...) where {uType,tType,isinplace,AlgType<:DiffEqBase.ODEjlAlgorithm}
+    kwargs...) where {uType,tupType,isinplace,AlgType<:ODEjlAlgorithm}
+
+    tType = eltype(tupType)
 
     if verbose
         warned = !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
@@ -116,7 +118,7 @@ function solve(
         timeseries = timeseries_tmp
     end
 
-    build_solution(prob,alg,ts,timeseries,
+    DiffEqBase.build_solution(prob,alg,ts,timeseries,
                    timeseries_errors = timeseries_errors,
                    dense_errors = dense_errors,
                    retcode = :Succss)

@@ -242,7 +242,7 @@ function oderk_adapt(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S
     # For y0 which support indexing.  Currently y0<:AbstractVector but
     # that could be relaxed with a Holy-trait.
     !isadaptive(btab_) && error("Can only use this solver with an adaptive RK Butcher table")
-
+    @show tspan
     Et, Eyf, Ty, btab = make_consistent_types(fn, y0, tspan, btab_)
     # parameters
     order = minimum(btab.order)
