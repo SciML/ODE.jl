@@ -1,5 +1,5 @@
-julia 0.6
+julia 0.7-
 Polynomials
 Compat 0.17.0
-DiffEqBase 3.0.0
+DiffEqBase 4.0.0
 Reexport

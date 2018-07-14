@@ -1,29 +1,32 @@
 function solve(
-    prob::AbstractODEProblem{uType,tType,isinplace},
+    prob::DiffEqBase.AbstractODEProblem{uType,tupType,isinplace},
     alg::AlgType,
     timeseries=[], ts=[], ks=[];
-
     verbose=true,
     save_timeseries=nothing,
-    saveat=tType[], reltol = 1e-5, abstol = 1e-8,
-    save_everystep=isempty(saveat), 
+    saveat=eltype(tupType)[], reltol = 1e-5, abstol = 1e-8,
+    save_everystep=isempty(saveat),
     dense = save_everystep && isempty(saveat),
-    save_start = save_everystep || isempty(saveat) || typeof(saveat) <: Number ? true : prob.tspan[1] in saveat,
+    save_start = save_everystep || isempty(saveat) || typeof(saveat) <: Number ?
+                 true : prob.tspan[1] in saveat,
     callback=nothing,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
     timeseries_errors=true, dense_errors=false,
     dt = 0.0, norm = Base.vecnorm,
-    kwargs...) where {uType,tType,isinplace,AlgType<:ODEjlAlgorithm}
+    kwargs...) where {uType,tupType,isinplace,AlgType<:ODEjlAlgorithm}
+
+    tType = eltype(tupType)
 
     if verbose
         warned = !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
-        if !(typeof(prob.f) <: AbstractParameterizedFunction) && typeof(alg) <: ode23s
-            if has_tgrad(prob.f)
+        if !(typeof(prob.f) <: DiffEqBase.AbstractParameterizedFunction) &&
+            typeof(alg) <: ode23s
+            if DiffEqBase.has_tgrad(prob.f)
                 warn("Explicit t-gradient given to this stiff solver is ignored.")
                 warned = true
             end
-            if has_jac(prob.f)
+            if DiffEqBase.has_jac(prob.f)
                 warn("Explicit Jacobian given to this stiff solver is ignored.")
                 warned = true
             end
@@ -115,7 +118,7 @@ function solve(
         timeseries = timeseries_tmp
     end
 
-    build_solution(prob,alg,ts,timeseries,
+    DiffEqBase.build_solution(prob,alg,ts,timeseries,
                    timeseries_errors = timeseries_errors,
                    dense_errors = dense_errors,
                    retcode = :Succss)

@@ -5,7 +5,7 @@ __precompile__()
 
 module ODE
 
-using Polynomials
+using Polynomials, LinearAlgebra
 using Compat
 using Reexport
 @reexport using DiffEqBase
@@ -18,7 +18,7 @@ const warnkeywords =
      :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
 
 function __init__()
-    const global warnlist = Set(warnkeywords)
+    global warnlist = Set(warnkeywords)
 end
 
 include("algorithm_types.jl")
@@ -147,6 +147,7 @@ function make_consistent_types(fn, y0, tspan, btab::Tableau)
     Eyf = typeof(y0[1]/(tspan[end]-tspan[1]))
 
     Et = eltype(tspan)
+    @show Et
     @assert Et<:Real
     if !(Et<:AbstractFloat)
         Et = promote_type(Et, Float64)

@@ -1,5 +1,4 @@
-using ODE
-using Base.Test
+using ODE, Test
 
 tols = [5e-2, 1e-2, 1e-2]
 
