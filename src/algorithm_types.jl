@@ -1,4 +1,4 @@
-abstract type ODEjlAlgorithm <: AbstractODEAlgorithm end
+abstract type ODEjlAlgorithm <: DiffEqBase.AbstractODEAlgorithm end
 # Making the ODE-solver functions into types lets us dispatch on them.
 #  Used in the DiffEqBase interface.
 struct ode23 <: ODEjlAlgorithm end
