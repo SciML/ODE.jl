@@ -23,11 +23,11 @@ function solve(
         if !(typeof(prob.f) <: DiffEqBase.AbstractParameterizedFunction) &&
             typeof(alg) <: ode23s
             if DiffEqBase.has_tgrad(prob.f)
-                warn("Explicit t-gradient given to this stiff solver is ignored.")
+                @warn("Explicit t-gradient given to this stiff solver is ignored.")
                 warned = true
             end
             if DiffEqBase.has_jac(prob.f)
-                warn("Explicit Jacobian given to this stiff solver is ignored.")
+                @warn("Explicit Jacobian given to this stiff solver is ignored.")
                 warned = true
             end
         end
@@ -35,7 +35,7 @@ function solve(
     end
 
     if save_timeseries != nothing
-        verbose && warn("save_timeseries is deprecated. Use save_everystep instead")
+        verbose && @warn("save_timeseries is deprecated. Use save_everystep instead")
         save_everystep = save_timeseries
     end
 
@@ -110,7 +110,7 @@ function solve(
 
     # Reshape the result if needed
     if uType <: AbstractArray
-        timeseries = Vector{uType}(0)
+        timeseries = Vector{uType}()
         for i=start_idx:length(timeseries_tmp)
             push!(timeseries,reshape(timeseries_tmp[i],sizeu))
         end

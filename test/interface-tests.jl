@@ -13,7 +13,7 @@ const g0 = 0.
 
 # define custom type ...
 struct CompSol
-  rho::Matrix{Complex128}
+  rho::Matrix{ComplexF64}
   x::Float64
   p::Float64
 
@@ -74,7 +74,7 @@ for solver in solvers
     if solver in [ODE.ode23s, ODE.ode4s_s, ODE.ode4s_kr]
         continue
     end
-    t,y2 = solver((t,y)->rhs(t, y, delta0, V0, g0), y0, linspace(0., endt, 500))
+    t,y2 = solver((t,y)->rhs(t, y, delta0, V0, g0), y0, range(0., stop=endt, length=500))
     @test norm(y1[end]-y2[end])<0.15
 end
 println("ok.")
