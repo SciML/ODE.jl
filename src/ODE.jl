@@ -159,8 +159,8 @@ function make_consistent_types(fn, y0, tspan, btab::Tableau)
         Eyf = Et
     end
 
-    !isleaftype(Et) && warn("The eltype(tspan) is not a concrete type!  Change type of tspan for better performance.")
-    !isleaftype(Eyf) && warn("The eltype(y0/tspan[1]) is not a concrete type!  Change type of y0 and/or tspan for better performance.")
+    !isconcretetype(Et) && @warn("The eltype(tspan) is not a concrete type!  Change type of tspan for better performance.")
+    !isconcretetype(Eyf) && @warn("The eltype(y0/tspan[1]) is not a concrete type!  Change type of y0 and/or tspan for better performance.")
 
     btab_ = convert(Et, btab)
     return Et, Eyf, Ty, btab_
@@ -269,8 +269,8 @@ function ode23s(F, y0, tspan;
     end
 
     # constants
-    const d = 1/(2 + sqrt(2))
-    const e32 = 6 + sqrt(2)
+    d = 1/(2 + sqrt(2))
+    e32 = 6 + sqrt(2)
 
 
     # initialization
@@ -289,9 +289,9 @@ function ode23s(F, y0, tspan;
     h = tdir * min(abs(h), maxstep)
 
     y = y0
-    tout = Vector{typeof(t)}(1)
+    tout = Vector{typeof(t)}(undef, 1)
     tout[1] = t         # first output time
-    yout = Vector{typeof(y0)}(1)
+    yout = Vector{typeof(y0)}(undef, 1)
     yout[1] = deepcopy(y)         # first output solution
 
 
