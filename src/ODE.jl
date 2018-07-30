@@ -147,7 +147,6 @@ function make_consistent_types(fn, y0, tspan, btab::Tableau)
     Eyf = typeof(y0[1]/(tspan[end]-tspan[1]))
 
     Et = eltype(tspan)
-    @show Et
     @assert Et<:Real
     if !(Et<:AbstractFloat)
         Et = promote_type(Et, Float64)
@@ -176,7 +175,7 @@ include("runge_kutta.jl")
 #   with Adams-Bashforth-Moulton coefficients
 function ode_ms(F, x0, tspan, order::Integer; kwargs...)
     h = diff(tspan)
-    x = Vector{typeof(x0)}(length(tspan))
+    x = Vector{typeof(x0)}(undef,length(tspan))
     x[1] = x0
 
     if 1 <= order <= 4
@@ -289,10 +288,8 @@ function ode23s(F, y0, tspan;
     h = tdir * min(abs(h), maxstep)
 
     y = y0
-    tout = Vector{typeof(t)}(undef, 1)
-    tout[1] = t         # first output time
-    yout = Vector{typeof(y0)}(undef, 1)
-    yout[1] = deepcopy(y)         # first output solution
+    tout = [t]         # first output time
+    yout = [deepcopy(y)]        # first output solution
 
 
     J = jac(t,y)    # get Jacobian of F wrt y
@@ -376,7 +373,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing, kwargs...
     end
 
     h = diff(tspan)
-    x = Vector{typeof(x0)}(length(tspan))
+    x = Vector{typeof(x0)}(undef,length(tspan))
     x[1] = x0
 
     solstep = 1
@@ -388,7 +385,7 @@ function oderosenbrock(F, x0, tspan, gamma, a, b, c; jacobian=nothing, kwargs...
 
         jac = I/(gamma*hs) - dFdx
 
-        g = Vector{typeof(x0)}(size(a,1))
+        g = Vector{typeof(x0)}(undef,size(a,1))
         g[1] = (jac \ F(ts + b[1]*hs, xs))
         x[solstep+1] = x[solstep] + b[1]*g[1]
 

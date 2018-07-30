@@ -13,7 +13,7 @@ function solve(
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
     dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
     timeseries_errors=true, dense_errors=false,
-    dt = 0.0, norm = Base.vecnorm,
+    dt = 0.0, norm = LinearAlgebra.norm,
     kwargs...) where {uType,tupType,isinplace,AlgType<:ODEjlAlgorithm}
 
     tType = eltype(tupType)

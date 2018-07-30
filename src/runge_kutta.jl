@@ -22,9 +22,9 @@ struct TableauRKExplicit{Name, S, T} <: Tableau{Name, S, T}
         @assert size(b,1)==length(order)
         # consistency:
         if T<:AbstractFloat
-            @assert norm(sum(a,2)-c'',Inf) < 100*eps(T)
+            @assert norm(sum(a,dims=2)-c'',Inf) < 100*eps(T)
         else
-            @assert norm(sum(a,2)-c'',Inf) < 100*eps(Float64)
+            @assert norm(sum(a,dims=2)-c'',Inf) < 100*eps(Float64)
         end
         new{Name, S, T}(order,a,b,c)
     end
@@ -185,13 +185,13 @@ function oderk_fixed(fn, y0::AbstractVector, tspan,
     Et, Eyf, Ty, btab = make_consistent_types(fn, y0, tspan, btab_)
     dof = length(y0)
 
-    ys = Vector{Ty}(length(tspan))
+    ys = Vector{Ty}(undef,length(tspan))
     allocate!(ys, y0, dof)
     ys[1] = deepcopy(y0)
 
     tspan = convert(Vector{Et}, tspan)
     # work arrays:
-    ks = Vector{Ty}(S)
+    ks = Vector{Ty}(undef,S)
     # allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
     ytmp = similar(y0, Eyf, dof)
     for i=1:length(tspan)-1
@@ -242,7 +242,6 @@ function oderk_adapt(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S
     # For y0 which support indexing.  Currently y0<:AbstractVector but
     # that could be relaxed with a Holy-trait.
     !isadaptive(btab_) && error("Can only use this solver with an adaptive RK Butcher table")
-    @show tspan
     Et, Eyf, Ty, btab = make_consistent_types(fn, y0, tspan, btab_)
     # parameters
     order = minimum(btab.order)
@@ -261,13 +260,13 @@ function oderk_adapt(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S
     y[:]   = y0
     ytrial = similar(y0, Eyf, dof) # trial solution at time t+dt
     yerr   = similar(y0, Eyf, dof) # error of trial solution
-    ks = Vector{Ty}(S)
+    ks = Vector{Ty}(undef,S)
     # allocate!(ks, y0, dof) # no need to allocate as fn is not in-place
     ytmp   = similar(y0, Eyf, dof)
 
     # output ys
     nsteps_fixed = length(tspan) # these are always output
-    ys = Vector{Ty}(nsteps_fixed)
+    ys = Vector{Ty}(undef,nsteps_fixed)
     allocate!(ys, y0, dof)
     ys[1] = y0
 
