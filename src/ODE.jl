@@ -187,7 +187,7 @@ function ode_ms(F, x0, tspan, order::Integer; kwargs...)
             for j = 0:(s - 1)
                 # Assign in correct order for multiplication below
                 #  (a factor depending on j and s) .* (an integral of a polynomial with -(0:s), except -j, as roots)
-                p_int = polyint(poly(diagm(-[0:j - 1; j + 1:s - 1])))
+                p_int = polyint(poly(diagm(0 => -[0:j - 1; j + 1:s - 1])))
                 b[s, s - j] = ((-1)^j / factorial(j)
                                / factorial(s - 1 - j) * polyval(p_int, 1))
             end
@@ -254,7 +254,7 @@ function ode23s(F, y0, tspan;
                 reltol = 1.0e-5, abstol = 1.0e-8,
                 jacobian=nothing,
                 points=:all,
-                norm=Base.norm,
+                norm=LinearAlgebra.norm,
                 minstep=abs(tspan[end] - tspan[1])/1e18,
                 maxstep=abs(tspan[end] - tspan[1])/2.5,
                 initstep=0.)
@@ -307,7 +307,7 @@ function ode23s(F, y0, tspan;
             # we can simply replace eye(J) by M in the following expression
             # (see Sec. 5 in [SR97])
 
-            W = lufact( I - h*d*J )
+            W = lu( I - h*d*J )
         end
 
         # approximate time-derivative of F

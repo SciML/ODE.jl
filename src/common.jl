@@ -81,7 +81,7 @@ function solve(
     p = prob.p
 
     if isinplace
-        f = (t,u) -> (du = zeros(u); prob.f(du,u,p,t); vec(du))
+        f = (t,u) -> (du = zero(u); prob.f(du,u,p,t); vec(du))
     elseif uType <: AbstractArray
         f = (t,u) -> vec(prob.f(reshape(u,sizeu),p,t))
     else

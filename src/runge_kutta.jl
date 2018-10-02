@@ -42,7 +42,7 @@ conv_field(D,a::Array{T,N}) where {T,N} = convert(Array{D,N}, a)
 function Base.convert(::Type{Tnew}, tab::TableauRKExplicit{Name,S,T}) where {Tnew<:Real,Name,S,T}
     # Converts the tableau coefficients to the new type Tnew
     newflds = ()
-    for n in fieldnames(tab)
+    for n in fieldnames(typeof(tab))
         fld = getfield(tab,n)
         if eltype(fld)==T
             newflds = tuple(newflds..., conv_field(Tnew, fld))
@@ -227,7 +227,7 @@ function oderk_adapt(fn, y0, tspan, btab::TableauRKExplicit; kwords...)
 end
 function oderk_adapt(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S};
                      reltol = 1.0e-5, abstol = 1.0e-8,
-                     norm=Base.norm,
+                     norm=LinearAlgebra.norm,
                      minstep=abs(tspan[end] - tspan[1])/1e18,
                      maxstep=abs(tspan[end] - tspan[1])/2.5,
                      initstep=0,

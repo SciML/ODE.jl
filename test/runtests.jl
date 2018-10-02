@@ -1,4 +1,4 @@
-using ODE, Test
+using ODE, Test, LinearAlgebra
 
 tols = [5e-2, 1e-2, 1e-2]
 
@@ -52,11 +52,11 @@ for solver in solvers
         # -- = y ==> y = y0*e.^t
         # dt
         t,y=solver((t,y)->y, T(1), T[0:.001:1;])
-        @test maximum(abs.(y-e.^t)) < tol
+        @test maximum(abs.(y-ℯ.^t)) < tol
         @test eltype(t)==T
 
         t,y=solver((t,y)->y, T(1), T[1:-.001:0;])
-        @test maximum(abs.(y-e.^(t-1))) < tol
+        @test maximum(abs.(y .- ℯ .^ (t.-1))) < tol
         @test eltype(t)==T
 
         # dv       dw
@@ -65,7 +65,7 @@ for solver in solvers
         #
         # y = [v, w]
         t,y=solver((t,y)->[-y[2]; y[1]], T[1, 2], T[0:.001:2*pi;])
-        ys = hcat(y...).'   # convert Vector{Vector{T}} to Matrix{T}
+        ys = hcat(y...)'   # convert Vector{Vector{T}} to Matrix{T}
         @test maximum(abs.(ys-[cos.(t)-2*sin.(t) 2*cos.(t)+sin.(t)])) < tol
         @test eltype(t)==T
     end
@@ -92,7 +92,7 @@ let
     refsol = [0.2083340149701255e-07,
               0.8333360770334713e-13,
               0.9999999791665050] # reference solution at tspan[2]
-    @test norm(refsol-y[end], Inf) < 2e-10
+    @test LinearAlgebra.norm(refsol-y[end], Inf) < 2e-10
 end
 include("interface-tests.jl")
 include("common.jl")

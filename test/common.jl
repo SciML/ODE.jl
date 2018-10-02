@@ -1,4 +1,4 @@
-using ODE, DiffEqBase, DiffEqProblemLibrary
+using ODE, DiffEqBase, DiffEqProblemLibrary, Test
 using DiffEqProblemLibrary.ODEProblemLibrary: importodeproblems; importodeproblems()
 import DiffEqProblemLibrary.ODEProblemLibrary: prob_ode_linear, prob_ode_2Dlinear
 using LinearAlgebra
