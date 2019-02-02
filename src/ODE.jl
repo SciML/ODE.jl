@@ -1,8 +1,6 @@
 __precompile__()
 # Ordinary Differential Equation Solvers
 
-# Ordinary Differential Equation Solvers
-
 module ODE
 
 using Polynomials, LinearAlgebra
@@ -14,7 +12,7 @@ import DiffEqBase: solve
 
 const warnkeywords =
     (:save_idxs, :d_discontinuities, :isoutofdomain, :unstable_check,
-     :calck, :progress, :timeseries_steps,
+     :calck, :progress,
      :internalnorm, :gamma, :beta1, :beta2, :qmax, :qmin, :qoldinit)
 
 function __init__()
