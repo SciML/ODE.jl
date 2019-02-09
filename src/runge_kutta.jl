@@ -162,19 +162,19 @@ const bt_feh78 = TableauRKExplicit(:feh78, (7,8), Rational{Int64},
 ################################
 
 # TODO: iterator method
-ode1(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_feuler)
-ode2_midpoint(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_midpoint)
-ode2_heun(fn, y0, tspan) = oderk_fixed(fn, y0, tspan, bt_heun)
-ode4(fn, y0, tspan;kwargs...) = oderk_fixed(fn, y0, tspan, bt_rk4;kwargs...)
+ode1(fn, y0, tspan; kwargs...) = oderk_fixed(fn, y0, tspan, bt_feuler; kwargs...)
+ode2_midpoint(fn, y0, tspan; kwargs...) = oderk_fixed(fn, y0, tspan, bt_midpoint; kwargs...)
+ode2_heun(fn, y0, tspan; kwargs...) = oderk_fixed(fn, y0, tspan, bt_heun; kwargs...)
+ode4(fn, y0, tspan; kwargs...) = oderk_fixed(fn, y0, tspan, bt_rk4; kwargs...)
 
-function oderk_fixed(fn, y0, tspan, btab::TableauRKExplicit;kwargs...)
+function oderk_fixed(fn, y0, tspan, btab::TableauRKExplicit; kwargs...)
     # Non-arrays y0 treat as scalar
     fn_(t, y) = [fn(t, y[1])]
     t,y = oderk_fixed(fn_, [y0], tspan, btab)
     return t, vcat_nosplat(y)
 end
 function oderk_fixed(fn, y0::AbstractVector, tspan,
-                     btab_::TableauRKExplicit{N,S}) where {N,S}
+                     btab_::TableauRKExplicit{N,S}, alias_u0=false) where {N,S}
     # TODO: instead of AbstractVector use a Holy-trait
 
     # Needed interface:
@@ -187,7 +187,11 @@ function oderk_fixed(fn, y0::AbstractVector, tspan,
 
     ys = Vector{Ty}(undef,length(tspan))
     allocate!(ys, y0, dof)
-    ys[1] = deepcopy(y0)
+    if alias_u0
+        ys[1] = y0
+    else
+        ys[1] = deepcopy(y0)
+    end
 
     tspan = convert(Vector{Et}, tspan)
     # work arrays:
@@ -231,7 +235,8 @@ function oderk_adapt(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S
                      minstep=abs(tspan[end] - tspan[1])/1e18,
                      maxstep=abs(tspan[end] - tspan[1])/2.5,
                      initstep=0,
-                     points=:all
+                     points=:all,
+                     alias_u0=false
                      ) where {N,S}
     # Needed interface:
     # On components:
@@ -256,7 +261,11 @@ function oderk_adapt(fn, y0::AbstractVector, tspan, btab_::TableauRKExplicit{N,S
     tend = tspan[end]
 
     # work arrays:
-    y      = similar(y0, Eyf, dof)      # y at time t
+    if alias_u0
+        y = y0                     # y at time t
+    else
+        y  = similar(y0, Eyf, dof) # y at time t
+    end
     y[:]   = y0
     ytrial = similar(y0, Eyf, dof) # trial solution at time t+dt
     yerr   = similar(y0, Eyf, dof) # error of trial solution

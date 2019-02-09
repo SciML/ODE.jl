@@ -49,8 +49,6 @@ function solve(
 
     tspan = prob.tspan
 
-    u0 = prob.u0
-
     if typeof(saveat) <: Number
       if (tspan[1]:saveat:tspan[end])[end] == tspan[end]
         saveat_vec = convert(Vector{tType},collect(tType,tspan[1]+saveat:saveat:tspan[end]))
