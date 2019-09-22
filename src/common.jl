@@ -34,7 +34,7 @@ function solve(
         warned && warn_compat()
     end
 
-    if save_timeseries != nothing
+    if save_timeseries !== nothing
         verbose && @warn("save_timeseries is deprecated. Use save_everystep instead")
         save_everystep = save_timeseries
     end
@@ -43,7 +43,7 @@ function solve(
         error("This solver is not able to use mass matrices.")
     end
 
-    if callback != nothing || prob.callback != nothing
+    if callback !== nothing || :callback ∈ keys(prob.kwargs)
         error("ODE is not compatible with callbacks.")
     end
 
