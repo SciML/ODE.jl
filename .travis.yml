@@ -1,19 +1,27 @@
 language: julia
+
 os:
-#    - osx
-    - linux
+  - osx
+  - linux
+
 julia:
-    - 1.2
-    - nightly
+  - 1.0
+  - 1.2
+  - nightly
+
+# # Uncomment the following lines to allow failures on nightly julia
+# # (tests will run but not make your overall status red)
 matrix:
   allow_failures:
     - julia: nightly
-git:
-    depth: 999999
+
 notifications:
-    email: false
-#script:
-#    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-#    - julia -e 'Pkg.clone(pwd()); Pkg.build("ODE"); Pkg.test("ODE"; coverage=true)';
-#after_success:
-    - julia -e 'import Pkg; cd(Pkg.dir("ODE")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder()); Codecov.submit(process_folder())';
+  email: false
+
+#script: # the default script is equivalent to the following
+#  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+#  - julia --project -e 'using Pkg; Pkg.build(); Pkg.test(; coverage=true)';
+
+after_success:
+  - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())';
+  - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())';
