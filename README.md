@@ -13,7 +13,7 @@ This project is deprecated in favor of [DifferentialEquations.jl](https://github
 
 ## Usage On the Common Interface
 
-The ODE.jl methods can be used on the common interface. Simply use the solver's name as the algorithm. For example, [the ODE tutorial](http://docs.juliadiffeq.org/latest/tutorials/ode_example.html) can be solved using ODE.jl's `ode45` by using the following commands:
+The ODE.jl methods can be used on the common interface. Simply use the solver's name as the algorithm. For example, [the ODE tutorial](http://docs.juliadiffeq.org/dev/tutorials/ode_example.html) can be solved using ODE.jl's `ode45` by using the following commands:
 
 ```julia
 using ODE
@@ -59,7 +59,7 @@ Currently, `ODE` exports the following adaptive solvers:
 * `ode78`: 7th order adaptive solver with 8th order error control, using the Fehlberg coefficients.
 * `ode23s`: 2nd/3rd order adaptive solver for stiff problems, using a modified Rosenbrock triple.
 
-For a full list, see the [DiffEqDocs ODE Solvers page](http://docs.juliadiffeq.org/latest/solvers/ode_solve.html#ODE.jl-1).
+For a full list, see the [DiffEqDocs ODE Solvers page](http://docs.juliadiffeq.org/dev/solvers/ode_solve.html#ODE.jl-1).
 
 # Examples
 The examples directory contain a few notebooks that show how to get started. You can also see them here:
