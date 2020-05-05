@@ -1,7 +1,7 @@
 Various basic Ordinary Differential Equation solvers implemented in Julia.
 
 [![Join the chat at https://gitter.im/JuliaDiffEq/Lobby](https://badges.gitter.im/JuliaDiffEq/Lobby.svg)](https://gitter.im/JuliaDiffEq/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Travis](https://travis-ci.org/JuliaDiffEq/ODE.jl.svg?branch=master)](https://travis-ci.org/JuliaDiffEq/ODE.jl)
+[![Travis](https://travis-ci.org/SciML/ODE.jl.svg?branch=master)](https://travis-ci.org/SciML/ODE.jl)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/mue0n1yhlxq4ok8d/branch/master?svg=true)](https://ci.appveyor.com/project/ChrisRackauckas/ode-jl/branch/master)
 [![Coverage Status](https://img.shields.io/coveralls/JuliaDiffEq/ODE.jl.svg)](https://coveralls.io/r/JuliaDiffEq/ODE.jl)
 
