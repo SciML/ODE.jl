@@ -1,7 +1,7 @@
 name = "ODE"
 uuid = "c030b06c-0b6d-57c2-b091-7029874bd033"
 authors = ["Chris Rackauckas"]
-version = "2.9.0"
+version = "2.10.0"
 
 [deps]
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
