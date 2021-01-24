@@ -4,6 +4,7 @@ __precompile__()
 module ODE
 
 using Polynomials, LinearAlgebra
+using Polynomials.PolyCompat
 using Compat
 using Reexport
 @reexport using DiffEqBase
