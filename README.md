@@ -8,7 +8,7 @@ Pull requests are always highly welcome to fix bugs, add solvers, or anything el
 
 # Current status of the project
 
-This project is deprecated in favor of [DifferentialEquations.jl](https://github.com/JuliaDiffEq/DifferentialEquations.jl) and its ODE solvers [OrdinaryDiffEq.jl](https://github.com/JuliaDiffEq/OrdinaryDiffEq.jl). This library is in "maitanance mode", meaning that it is being upgraded with each Julia version, but not seeing active feature development. ODE.jl contains the basic functionality that was moved here when the package was originally moved from Base. Although quite poorly tested, at least some of the functionality is quite reliable. Use at your own risk.
+This project is deprecated in favor of [DifferentialEquations.jl](https://github.com/JuliaDiffEq/DifferentialEquations.jl) and its ODE solvers [OrdinaryDiffEq.jl](https://github.com/JuliaDiffEq/OrdinaryDiffEq.jl). This library is in "maintanance mode", meaning that it is being upgraded with each Julia version, but not seeing active feature development. ODE.jl contains the basic functionality that was moved here when the package was originally moved from Base. Although quite poorly tested, at least some of the functionality is quite reliable. Use at your own risk.
 
 ## Usage On the Common Interface
 
