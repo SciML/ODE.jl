@@ -1,27 +1,25 @@
-function solve(
-    prob::DiffEqBase.AbstractODEProblem{uType,tupType,isinplace},
-    alg::AlgType,
-    timeseries=[], ts=[], ks=[];
-    verbose=true,
-    save_timeseries=nothing,
-    saveat=eltype(tupType)[], reltol = 1e-5, abstol = 1e-8,
-    save_everystep=isempty(saveat),
-    dense = save_everystep && isempty(saveat),
-    save_start = save_everystep || isempty(saveat) || typeof(saveat) <: Number ?
-                 true : prob.tspan[1] in saveat,
-    callback=nothing,
-    dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
-    dtmax = abs(prob.tspan[2]-prob.tspan[1])/2.5,
-    timeseries_errors=true, dense_errors=false,
-    dt = 0.0, norm = LinearAlgebra.norm,
-    kwargs...) where {uType,tupType,isinplace,AlgType<:ODEjlAlgorithm}
-
+function solve(prob::DiffEqBase.AbstractODEProblem{uType, tupType, isinplace},
+               alg::AlgType,
+               timeseries = [], ts = [], ks = [];
+               verbose = true,
+               save_timeseries = nothing,
+               saveat = eltype(tupType)[], reltol = 1e-5, abstol = 1e-8,
+               save_everystep = isempty(saveat),
+               dense = save_everystep && isempty(saveat),
+               save_start = save_everystep || isempty(saveat) || typeof(saveat) <: Number ?
+                            true : prob.tspan[1] in saveat,
+               callback = nothing,
+               dtmin = abs(prob.tspan[2] - prob.tspan[1]) / 1e-9,
+               dtmax = abs(prob.tspan[2] - prob.tspan[1]) / 2.5,
+               timeseries_errors = true, dense_errors = false,
+               dt = 0.0, norm = LinearAlgebra.norm,
+               kwargs...) where {uType, tupType, isinplace, AlgType <: ODEjlAlgorithm}
     tType = eltype(tupType)
 
     if verbose
         warned = !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
         if !(typeof(prob.f) <: DiffEqBase.AbstractParameterizedFunction) &&
-            typeof(alg) <: ode23s
+           typeof(alg) <: ode23s
             if DiffEqBase.has_tgrad(prob.f)
                 @warn("Explicit t-gradient given to this stiff solver is ignored.")
                 warned = true
@@ -50,11 +48,14 @@ function solve(
     tspan = prob.tspan
 
     if typeof(saveat) <: Number
-      if (tspan[1]:saveat:tspan[end])[end] == tspan[end]
-        saveat_vec = convert(Vector{tType},collect(tType,tspan[1]+saveat:saveat:tspan[end]))
-      else
-        saveat_vec = convert(Vector{tType},collect(tType,tspan[1]+saveat:saveat:(tspan[end]-saveat)))
-      end
+        if (tspan[1]:saveat:tspan[end])[end] == tspan[end]
+            saveat_vec = convert(Vector{tType},
+                                 collect(tType, (tspan[1] + saveat):saveat:tspan[end]))
+        else
+            saveat_vec = convert(Vector{tType},
+                                 collect(tType,
+                                         (tspan[1] + saveat):saveat:(tspan[end] - saveat)))
+        end
     else
         saveat_vec = convert(Vector{tType}, collect(saveat))
     end
@@ -64,9 +65,9 @@ function solve(
     end
 
     if !isempty(saveat_vec) && saveat_vec[1] == tspan[1]
-        Ts = unique([saveat_vec;tspan[2]])
+        Ts = unique([saveat_vec; tspan[2]])
     else
-        Ts = unique([tspan[1];saveat_vec;tspan[2]])
+        Ts = unique([tspan[1]; saveat_vec; tspan[2]])
     end
 
     if save_everystep
@@ -79,25 +80,25 @@ function solve(
     p = prob.p
 
     if isinplace
-        f = (t,u) -> (du = zero(u); prob.f(du,u,p,t); vec(du))
+        f = (t, u) -> (du = zero(u); prob.f(du, u, p, t); vec(du))
     elseif uType <: AbstractArray
-        f = (t,u) -> vec(prob.f(reshape(u,sizeu),p,t))
+        f = (t, u) -> vec(prob.f(reshape(u, sizeu), p, t))
     else
-        f = (t,u) -> prob.f(u,p,t)
+        f = (t, u) -> prob.f(u, p, t)
     end
 
     u0 = uType <: AbstractArray ? vec(prob.u0) : prob.u0
 
     # Calling the solver, i.e. if the algorithm is ode45,
     # then AlgType(...) is ode45(...)
-    ts, timeseries_tmp = AlgType(f,u0,Ts;
+    ts, timeseries_tmp = AlgType(f, u0, Ts;
                                  norm = norm,
-                                 abstol=abstol,
-                                 reltol=reltol,
-                                 maxstep=dtmax,
-                                 minstep=dtmin,
-                                 initstep=dt,
-                                 points=points)
+                                 abstol = abstol,
+                                 reltol = reltol,
+                                 maxstep = dtmax,
+                                 minstep = dtmin,
+                                 initstep = dt,
+                                 points = points)
 
     if save_start
         start_idx = 1 # The index to start making the timeseries from
@@ -109,15 +110,15 @@ function solve(
     # Reshape the result if needed
     if uType <: AbstractArray
         timeseries = Vector{uType}()
-        for i=start_idx:length(timeseries_tmp)
-            push!(timeseries,reshape(timeseries_tmp[i],sizeu))
+        for i in start_idx:length(timeseries_tmp)
+            push!(timeseries, reshape(timeseries_tmp[i], sizeu))
         end
     else
         timeseries = timeseries_tmp
     end
 
-    DiffEqBase.build_solution(prob,alg,ts,timeseries,
-                   timeseries_errors = timeseries_errors,
-                   dense_errors = dense_errors,
-                   retcode = :Succss)
+    DiffEqBase.build_solution(prob, alg, ts, timeseries,
+                              timeseries_errors = timeseries_errors,
+                              dense_errors = dense_errors,
+                              retcode = :Succss)
 end # function solve
