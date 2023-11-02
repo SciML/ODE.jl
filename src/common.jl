@@ -7,7 +7,7 @@ function solve(
     saveat=eltype(tupType)[], reltol = 1e-5, abstol = 1e-8,
     save_everystep=isempty(saveat),
     dense = save_everystep && isempty(saveat),
-    save_start = save_everystep || isempty(saveat) || typeof(saveat) <: Number ?
+    save_start = save_everystep || isempty(saveat) || saveat isa Number ?
                  true : prob.tspan[1] in saveat,
     callback=nothing,
     dtmin = abs(prob.tspan[2]-prob.tspan[1])/1e-9,
@@ -20,8 +20,8 @@ function solve(
 
     if verbose
         warned = !isempty(kwargs) && check_keywords(alg, kwargs, warnlist)
-        if !(typeof(prob.f) <: DiffEqBase.AbstractParameterizedFunction) &&
-            typeof(alg) <: ode23s
+        if !(prob.f isa DiffEqBase.AbstractParameterizedFunction) &&
+            alg isa ode23s
             if DiffEqBase.has_tgrad(prob.f)
                 @warn("Explicit t-gradient given to this stiff solver is ignored.")
                 warned = true
@@ -49,7 +49,7 @@ function solve(
 
     tspan = prob.tspan
 
-    if typeof(saveat) <: Number
+    if saveat isa Number
       if (tspan[1]:saveat:tspan[end])[end] == tspan[end]
         saveat_vec = convert(Vector{tType},collect(tType,tspan[1]+saveat:saveat:tspan[end]))
       else
