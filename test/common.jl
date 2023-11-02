@@ -12,7 +12,7 @@ prob = prob_ode_linear
 
 for alg in algs
     sol =solve(prob,alg;dt=dt,abstol=1e-6,reltol=1e-3)
-    @test typeof(sol[2]) <: Number
+    @test sol[2] isa Number
 end
 
 prob = prob_ode_2Dlinear
